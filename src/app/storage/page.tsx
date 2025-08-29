@@ -18,7 +18,7 @@ export default function Storage() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-            🌰 청양 칠갑산<br/>알밤 농장
+🌰 청양 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>

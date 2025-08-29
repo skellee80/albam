@@ -18,7 +18,7 @@ export default function FarmIntro() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-            🌰 청양 칠갑산<br/>알밤 농장
+🌰 청양 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
@@ -79,7 +79,7 @@ export default function FarmIntro() {
                 지금은 청양 지역에서 손꼽히는 알밤 농장으로 성장했습니다.
               </p>
               <p>
-                "정직하고 건강한 농산물로 고객의 건강과 행복에 기여한다"는 
+                &ldquo;정직하고 건강한 농산물로 고객의 건강과 행복에 기여한다&rdquo;는 
                 마음가짐으로 매일 농장을 돌보고 있습니다.
               </p>
             </div>
@@ -266,7 +266,7 @@ export default function FarmIntro() {
           <h2>🎯 농장 비전</h2>
           <div style={{fontSize: '1.2rem', lineHeight: '1.8'}}>
             <p style={{marginBottom: '1rem'}}>
-              <strong>"건강한 땅에서 건강한 먹거리를"</strong>
+              <strong>&ldquo;건강한 땅에서 건강한 먹거리를&rdquo;</strong>
             </p>
             <p>
               청양 칠갑산 알밤 농장은 지속가능한 농업을 통해 다음 세대에게 

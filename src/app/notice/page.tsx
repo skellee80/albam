@@ -9,7 +9,8 @@ interface Notice {
   content: string;
   date: string;
   author: string;
-  image?: string; // 사진 URL (옵션)
+  images?: string[]; // 사진 URL 배열 (옵션)
+  isPinned?: boolean; // 상단 고정 여부
 }
 
 export default function Notice() {
@@ -18,10 +19,15 @@ export default function Notice() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [newNotice, setNewNotice] = useState({ title: '', content: '', image: '' });
+  const [newNotice, setNewNotice] = useState({ title: '', content: '' });
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [editFiles, setEditFiles] = useState<File[]>([]);
+  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // 관리자 세션 확인
   useEffect(() => {
@@ -93,7 +99,7 @@ export default function Notice() {
       setShowAdminLogin(false);
       setAdminPassword('');
       localStorage.setItem('adminSession', 'true');
-      alert('관리자로 로그인되었습니다.');
+
     } else {
       alert('비밀번호가 올바르지 않습니다.');
       setAdminPassword('');
@@ -110,9 +116,12 @@ export default function Notice() {
 
   // 파일 업로드 핸들러
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB 제한
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // 파일 크기 및 타입 검사
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
         alert('파일 크기는 5MB 이하여야 합니다.');
         return;
       }
@@ -121,16 +130,60 @@ export default function Notice() {
         alert('이미지 파일만 업로드할 수 있습니다.');
         return;
       }
+      }
       
-      setSelectedFile(file);
+    setSelectedFiles(prev => [...prev, ...files]);
       
       // 미리보기 생성
+    files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+        setImagePreviews(prev => [...prev, e.target?.result as string]);
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  // 이미지 제거 (새 공지)
+  const removeImage = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 편집용 파일 처리
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // 파일 크기 및 타입 검사
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('파일 크기는 5MB 이하여야 합니다.');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드할 수 있습니다.');
+        return;
+      }
     }
+
+    setEditFiles(prev => [...prev, ...files]);
+    
+    // 미리보기 생성
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setEditImagePreviews(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // 이미지 제거 (편집)
+  const removeEditImage = (index: number) => {
+    setEditFiles(prev => prev.filter((_, i) => i !== index));
+    setEditImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   // 새 공지사항 추가
@@ -146,18 +199,17 @@ export default function Notice() {
       content: newNotice.content,
       date: new Date().toLocaleDateString('ko-KR'),
       author: '이기영',
-      image: imagePreview || undefined
+      images: imagePreviews.length > 0 ? imagePreviews : undefined
     };
 
     const updatedNotices = [notice, ...notices];
     setNotices(updatedNotices);
     localStorage.setItem('notices', JSON.stringify(updatedNotices));
     
-    setNewNotice({ title: '', content: '', image: '' });
-    setSelectedFile(null);
-    setImagePreview('');
+    setNewNotice({ title: '', content: '' });
+    setSelectedFiles([]);
+    setImagePreviews([]);
     setShowAddForm(false);
-    alert('공지사항이 등록되었습니다.');
   };
 
   // 공지사항 삭제
@@ -167,8 +219,67 @@ export default function Notice() {
       setNotices(updatedNotices);
       localStorage.setItem('notices', JSON.stringify(updatedNotices));
       setSelectedNotice(null);
-      alert('공지사항이 삭제되었습니다.');
     }
+  };
+
+  // 상단 고정 토글
+  const togglePinNotice = (id: string) => {
+    const updatedNotices = notices.map(notice => 
+      notice.id === id ? { ...notice, isPinned: !notice.isPinned } : notice
+    );
+    setNotices(updatedNotices);
+    localStorage.setItem('notices', JSON.stringify(updatedNotices));
+  };
+
+  // 공지사항 편집
+  const handleEditNotice = (notice: Notice) => {
+    setEditingNotice({...notice});
+    setEditImagePreviews(notice.images || []);
+  };
+
+  // 공지사항 업데이트
+  const handleUpdateNotice = () => {
+    if (!editingNotice?.title.trim() || !editingNotice?.content.trim()) {
+      alert('제목과 내용을 모두 입력해주세요.');
+      return;
+    }
+
+    const updatedNotice = { 
+      ...editingNotice, 
+      images: editImagePreviews.length > 0 ? editImagePreviews : undefined 
+    };
+
+    const updatedNotices = notices.map(notice => 
+      notice.id === editingNotice.id ? updatedNotice : notice
+    );
+    setNotices(updatedNotices);
+    localStorage.setItem('notices', JSON.stringify(updatedNotices));
+    
+    // 현재 선택된 공지사항이 편집된 공지사항이면 상세보기도 업데이트
+    if (selectedNotice && selectedNotice.id === editingNotice.id) {
+      setSelectedNotice(updatedNotice);
+    }
+    
+    setEditingNotice(null);
+    setEditFiles([]);
+    setEditImagePreviews([]);
+  };
+
+  // 공지사항 정렬 (고정된 것이 먼저)
+  const sortedNotices = [...notices].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(sortedNotices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentNotices = sortedNotices.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -176,7 +287,7 @@ export default function Notice() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-            🌰 청양 칠갑산<br/>알밤 농장
+🌰 청양 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
@@ -298,6 +409,7 @@ export default function Notice() {
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleFileChange}
                 className="form-input"
                 style={{padding: '0.5rem'}}
@@ -306,44 +418,54 @@ export default function Notice() {
                 * 이미지 파일만 업로드 가능 (최대 5MB)
               </p>
               
-              {imagePreview && (
+              {imagePreviews.length > 0 && (
                 <div style={{marginTop: '1rem'}}>
                   <p style={{fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem'}}>미리보기:</p>
                   <div style={{
-                    maxWidth: '300px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: '1rem'
+                  }}>
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} style={{position: 'relative'}}>
+                        <div style={{
                     border: '2px solid var(--chestnut-light)',
                     borderRadius: '10px',
                     overflow: 'hidden'
                   }}>
                     <img 
-                      src={imagePreview} 
-                      alt="미리보기" 
+                            src={preview} 
+                            alt={`미리보기 ${index + 1}`} 
                       style={{
                         width: '100%',
-                        height: 'auto',
+                              height: '150px',
+                              objectFit: 'cover',
                         display: 'block'
                       }}
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      setImagePreview('');
-                    }}
+                          onClick={() => removeImage(index)}
                     style={{
-                      marginTop: '0.5rem',
-                      padding: '0.3rem 0.8rem',
-                      background: 'var(--chestnut-dark)',
+                            position: 'absolute',
+                            top: '5px',
+                            right: '5px',
+                            background: '#f44336',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '5px',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    사진 제거
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          ×
                   </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -351,9 +473,9 @@ export default function Notice() {
             <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
               <button onClick={() => {
                 setShowAddForm(false);
-                setSelectedFile(null);
-                setImagePreview('');
-                setNewNotice({ title: '', content: '', image: '' });
+                setSelectedFiles([]);
+                setImagePreviews([]);
+                setNewNotice({ title: '', content: '' });
               }} className="btn btn-secondary">
                 취소
               </button>
@@ -364,18 +486,166 @@ export default function Notice() {
           </div>
         )}
 
+        {/* 공지사항 편집 모달 */}
+        {editingNotice && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div className="card" style={{width: '600px', margin: 0, maxHeight: '80vh', overflow: 'auto'}}>
+              <h2>✏️ 공지사항 편집</h2>
+              
+              <div className="form-group">
+                <label className="form-label">제목</label>
+                <input
+                  type="text"
+                  value={editingNotice.title}
+                  onChange={(e) => setEditingNotice({...editingNotice, title: e.target.value})}
+                  className="form-input"
+                  placeholder="공지사항 제목을 입력하세요"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">내용</label>
+                <textarea
+                  value={editingNotice.content}
+                  onChange={(e) => setEditingNotice({...editingNotice, content: e.target.value})}
+                  className="form-input form-textarea"
+                  placeholder="공지사항 내용을 입력하세요"
+                  rows={10}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">사진 첨부 (선택)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleEditFileChange}
+                  className="form-input"
+                  style={{padding: '0.5rem'}}
+                />
+                <p style={{fontSize: '0.8rem', color: 'var(--text-light)', marginTop: '0.5rem'}}>
+                  * 이미지 파일만 업로드 가능 (최대 5MB)
+                </p>
+                
+                {editImagePreviews.length > 0 && (
+                  <div style={{marginTop: '1rem'}}>
+                    <p style={{fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem'}}>미리보기:</p>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                      gap: '1rem'
+                    }}>
+                      {editImagePreviews.map((preview, index) => (
+                        <div key={index} style={{position: 'relative'}}>
+                          <div style={{
+                            border: '2px solid var(--chestnut-light)',
+                            borderRadius: '10px',
+                            overflow: 'hidden'
+                          }}>
+                            <img 
+                              src={preview} 
+                              alt={`미리보기 ${index + 1}`} 
+                              style={{
+                                width: '100%',
+                                height: '150px',
+                                objectFit: 'cover',
+                                display: 'block'
+                              }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeEditImage(index)}
+                            style={{
+                              position: 'absolute',
+                              top: '5px',
+                              right: '5px',
+                              background: '#f44336',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '24px',
+                              height: '24px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+                <button 
+                  onClick={() => {
+                    setEditingNotice(null);
+                    setSelectedFiles([]);
+                    setImagePreviews([]);
+                  }} 
+                  className="btn btn-secondary"
+                >
+                  취소
+                </button>
+                <button onClick={handleUpdateNotice} className="btn">
+                  수정 완료
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '3rem'}}>
           {/* 공지사항 목록 */}
           <div className="card">
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
             <h2>📋 공지사항 목록</h2>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <label style={{fontSize: '0.9rem', color: 'var(--text-light)'}}>페이지당:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    padding: '0.3rem',
+                    border: '1px solid var(--chestnut-light)',
+                    borderRadius: '5px',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  <option value={5}>5개</option>
+                  <option value={10}>10개</option>
+                  <option value={20}>20개</option>
+                  <option value={50}>50개</option>
+                </select>
+              </div>
+            </div>
             
             {notices.length === 0 ? (
               <p style={{textAlign: 'center', color: 'var(--text-light)', margin: '2rem 0'}}>
                 등록된 공지사항이 없습니다.
               </p>
             ) : (
+              <>
               <div style={{marginTop: '1rem'}}>
-                {notices.map((notice, index) => (
+                  {currentNotices.map((notice, index) => (
                   <div 
                     key={notice.id}
                     onClick={() => setSelectedNotice(notice)}
@@ -385,19 +655,36 @@ export default function Notice() {
                       borderRadius: '10px',
                       marginBottom: '1rem',
                       cursor: 'pointer',
-                      background: selectedNotice?.id === notice.id ? 'var(--soft-beige)' : 'white',
-                      transition: 'all 0.3s ease'
+                      background: selectedNotice?.id === notice.id ? 'var(--soft-beige)' : notice.isPinned ? 'linear-gradient(135deg, #fff9e6 0%, #fff3d3 100%)' : 'white',
+                      transition: 'all 0.3s ease',
+                      position: 'relative'
                     }}
                   >
+                    {notice.isPinned && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        left: '0.5rem',
+                        background: '#ff9800',
+                        color: 'white',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold'
+                      }}>
+                        📌 고정
+                      </div>
+                    )}
+                    
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                      <div style={{flex: 1}}>
+                      <div style={{flex: 1, marginTop: notice.isPinned ? '1.5rem' : '0'}}>
                         <h4 style={{
                           color: 'var(--primary-brown)',
                           marginBottom: '0.5rem',
                           fontSize: '1rem'
                         }}>
                           {notice.title}
-                          {notice.image && <span style={{marginLeft: '0.5rem', fontSize: '1rem'}}>📷</span>}
+                          {notice.images && notice.images.length > 0 && <span style={{marginLeft: '0.5rem', fontSize: '1rem'}}>📷</span>}
                         </h4>
                         <p style={{
                           fontSize: '0.8rem',
@@ -409,28 +696,129 @@ export default function Notice() {
                       </div>
                       
                       {isAdmin && (
+                        <div style={{display: 'flex', gap: '0.5rem', flexDirection: 'column'}}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePinNotice(notice.id);
+                            }}
+                            style={{
+                              background: notice.isPinned ? '#ff9800' : '#9e9e9e',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '5px',
+                              padding: '0.3rem 0.6rem',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {notice.isPinned ? '📌 고정해제' : '📌 고정'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditNotice(notice);
+                            }}
+                            style={{
+                              background: '#2196f3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '5px',
+                              padding: '0.3rem 0.6rem',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✏️ 편집
+                          </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteNotice(notice.id);
                           }}
                           style={{
-                            background: 'var(--deep-orange)',
+                              background: '#f44336',
                             color: 'white',
                             border: 'none',
                             borderRadius: '5px',
                             padding: '0.3rem 0.6rem',
-                            fontSize: '0.8rem',
+                              fontSize: '0.7rem',
                             cursor: 'pointer'
                           }}
                         >
-                          삭제
+                            🗑️ 삭제
                         </button>
+                        </div>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
+
+                {/* 페이지네이션 */}
+                {totalPages > 1 && (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginTop: '2rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid var(--chestnut-light)'
+                  }}>
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      style={{
+                        padding: '0.5rem 0.8rem',
+                        border: '1px solid var(--chestnut-light)',
+                        borderRadius: '5px',
+                        background: currentPage === 1 ? '#f5f5f5' : 'white',
+                        color: currentPage === 1 ? '#999' : 'var(--chestnut-brown)',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      이전
+                    </button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        style={{
+                          padding: '0.5rem 0.8rem',
+                          border: '1px solid var(--chestnut-light)',
+                          borderRadius: '5px',
+                          background: currentPage === page ? 'var(--chestnut-brown)' : 'white',
+                          color: currentPage === page ? 'white' : 'var(--chestnut-brown)',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: currentPage === page ? 'bold' : 'normal'
+                        }}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      style={{
+                        padding: '0.5rem 0.8rem',
+                        border: '1px solid var(--chestnut-light)',
+                        borderRadius: '5px',
+                        background: currentPage === totalPages ? '#f5f5f5' : 'white',
+                        color: currentPage === totalPages ? '#999' : 'var(--chestnut-brown)',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      다음
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -466,7 +854,7 @@ export default function Notice() {
                   {selectedNotice.content}
                 </div>
                 
-                {selectedNotice.image && (
+                {selectedNotice.images && selectedNotice.images.length > 0 && (
                   <div style={{
                     marginTop: '2rem',
                     padding: '1rem',
@@ -475,25 +863,35 @@ export default function Notice() {
                   }}>
                     <h4 style={{marginBottom: '1rem', color: 'var(--chestnut-brown)'}}>📷 첨부 사진</h4>
                     <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}>
+                      {selectedNotice.images.map((image, index) => (
+                        <div key={index} style={{
                       maxWidth: '100%',
                       border: '2px solid var(--chestnut-light)',
                       borderRadius: '10px',
                       overflow: 'hidden'
                     }}>
                       <img 
-                        src={selectedNotice.image} 
-                        alt="공지사항 첨부 이미지" 
+                            src={image} 
+                            alt={`공지사항 첨부 이미지 ${index + 1}`} 
                         style={{
                           width: '100%',
                           height: 'auto',
                           display: 'block',
-                          objectFit: 'contain'
+                              objectFit: 'contain',
+                              cursor: 'pointer'
                         }}
+                            onClick={() => window.open(image, '_blank')}
                         onError={(e) => {
-                          console.error('이미지 로드 실패:', selectedNotice.image);
+                              console.error('이미지 로드 실패:', image);
                           e.currentTarget.style.display = 'none';
                         }}
                       />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

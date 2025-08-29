@@ -5,6 +5,60 @@ import Link from "next/link";
 
 export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [products, setProducts] = useState([
+    {
+      id: 1,
+      name: "알밤 1kg",
+      description: "신선하고 달콤한 청양 알밤 1kg입니다. 당일 수확한 싱싱한 알밤을 드시는 즉시 맛보실 수 있습니다.",
+      price: "15,000원",
+      emoji: "🌰",
+      image: ""
+    },
+    {
+      id: 2,
+      name: "알밤 3kg",
+      description: "가족이 함께 드시기 좋은 3kg 대용량 포장입니다. 신선도와 품질을 보장합니다.",
+      price: "40,000원",
+      emoji: "🌰",
+      image: ""
+    },
+    {
+      id: 3,
+      name: "알밤 5kg",
+      description: "대가족이나 업체용으로 적합한 5kg 포장입니다. 대량 주문 시 할인 혜택이 있습니다.",
+      price: "65,000원",
+      emoji: "🌰",
+      image: ""
+    },
+    {
+      id: 4,
+      name: "껍질 깐 알밤 500g",
+      description: "바로 드실 수 있도록 껍질을 깐 알밤입니다. 요리나 간식용으로 편리하게 이용하세요.",
+      price: "12,000원",
+      emoji: "🥜",
+      image: ""
+    },
+    {
+      id: 5,
+      name: "구운 알밤 1kg",
+      description: "전통 방식으로 구운 고소하고 달콤한 알밤입니다. 따뜻할 때 드시면 더욱 맛있습니다.",
+      price: "18,000원",
+      emoji: "🔥",
+      image: ""
+    },
+    {
+      id: 6,
+      name: "알밤 선물세트",
+      description: "고급 포장지에 담은 프리미엄 선물세트입니다. 명절이나 특별한 날 선물하기 좋습니다.",
+      price: "35,000원",
+      emoji: "🎁",
+      image: ""
+    }
+  ]);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedProductFile, setSelectedProductFile] = useState<File | null>(null);
+  const [productImagePreview, setProductImagePreview] = useState<string>('');
 
   // 관리자 세션 확인
   useEffect(() => {
@@ -12,51 +66,94 @@ export default function Home() {
     if (adminSession === 'true') {
       setIsAdmin(true);
     }
-  }, []);
-  const chestnutProducts = [
-    {
-      id: 1,
-      name: "알밤 1kg",
-      description: "신선하고 달콤한 청양 알밤 1kg입니다. 당일 수확한 싱싱한 알밤을 드시는 즉시 맛보실 수 있습니다.",
-      price: "15,000원",
-      emoji: "🌰"
-    },
-    {
-      id: 2,
-      name: "알밤 3kg",
-      description: "가족이 함께 드시기 좋은 3kg 대용량 포장입니다. 신선도와 품질을 보장합니다.",
-      price: "40,000원",
-      emoji: "🌰"
-    },
-    {
-      id: 3,
-      name: "알밤 5kg",
-      description: "대가족이나 업체용으로 적합한 5kg 포장입니다. 대량 주문 시 할인 혜택이 있습니다.",
-      price: "65,000원",
-      emoji: "🌰"
-    },
-    {
-      id: 4,
-      name: "껍질 깐 알밤 500g",
-      description: "바로 드실 수 있도록 껍질을 깐 알밤입니다. 요리나 간식용으로 편리하게 이용하세요.",
-      price: "12,000원",
-      emoji: "🥜"
-    },
-    {
-      id: 5,
-      name: "구운 알밤 1kg",
-      description: "전통 방식으로 구운 고소하고 달콤한 알밤입니다. 따뜻할 때 드시면 더욱 맛있습니다.",
-      price: "18,000원",
-      emoji: "🔥"
-    },
-    {
-      id: 6,
-      name: "알밤 선물세트",
-      description: "고급 포장지에 담은 프리미엄 선물세트입니다. 명절이나 특별한 날 선물하기 좋습니다.",
-      price: "35,000원",
-      emoji: "🎁"
+    
+    // 저장된 상품 데이터 로드
+    const savedProducts = localStorage.getItem('chestnutProducts');
+    if (savedProducts) {
+      setProducts(JSON.parse(savedProducts));
     }
-  ];
+  }, []);
+
+  // 상품 저장
+  const saveProducts = (updatedProducts: any[]) => {
+    setProducts(updatedProducts);
+    localStorage.setItem('chestnutProducts', JSON.stringify(updatedProducts));
+  };
+
+  // 상품 수정
+  const handleEditProduct = (product: any) => {
+    setEditingProduct({...product});
+    setProductImagePreview(product.image || '');
+  };
+
+  // 상품 이미지 파일 처리
+  const handleProductFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB 제한
+        alert('파일 크기는 5MB 이하여야 합니다.');
+        return;
+      }
+      
+      setSelectedProductFile(file);
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProductImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+    // 상품 업데이트
+  const handleUpdateProduct = () => {
+    if (!editingProduct.name?.trim() || !editingProduct.description?.trim() || !editingProduct.price?.trim()) {
+      alert('이름, 설명, 가격을 모두 입력해주세요.');
+      return;
+    }
+
+    const updatedProduct = {
+      ...editingProduct,
+      image: productImagePreview || editingProduct.emoji || '🌰'
+    };
+
+    const updatedProducts = products.map(p => 
+      p.id === editingProduct.id ? updatedProduct : p
+    );
+    saveProducts(updatedProducts);
+    setEditingProduct(null);
+    setSelectedProductFile(null);
+    setProductImagePreview('');
+  };
+
+  // 상품 삭제
+  const handleDeleteProduct = (id: number) => {
+    if (confirm('정말로 이 상품을 삭제하시겠습니까?')) {
+      const updatedProducts = products.filter(p => p.id !== id);
+      saveProducts(updatedProducts);
+    }
+  };
+
+  // 새 상품 추가
+  const handleAddProduct = () => {
+    if (!editingProduct?.name?.trim() || !editingProduct?.description?.trim() || !editingProduct?.price?.trim()) {
+      alert('이름, 설명, 가격을 모두 입력해주세요.');
+      return;
+    }
+    
+    const newProduct = {
+      ...editingProduct,
+      id: Math.max(...products.map(p => p.id)) + 1,
+      image: productImagePreview || editingProduct.emoji || '🌰'
+    };
+    
+    const updatedProducts = [...products, newProduct];
+    saveProducts(updatedProducts);
+    setEditingProduct(null);
+    setShowAddForm(false);
+    setSelectedProductFile(null);
+    setProductImagePreview('');
+  };
 
   return (
     <>
@@ -64,9 +161,10 @@ export default function Home() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-            🌰 청양 칠갑산<br/>알밤 농장
+            🌰 청양 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
+            <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 소개</Link>
             <Link href="/production" className="nav-link">생산 과정</Link>
@@ -103,34 +201,350 @@ export default function Home() {
 
         {/* 알밤 상품 썸네일 */}
         <section>
-          <h2 style={{ 
-            textAlign: 'center', 
-            fontSize: '2.5rem', 
-            color: 'var(--primary-brown)', 
-            marginBottom: '3rem',
-            fontWeight: '700'
-          }}>
-            🌰 알밤 상품 둘러보기
-          </h2>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem'}}>
+            <h2 style={{ 
+              fontSize: '2.5rem', 
+              color: 'var(--primary-brown)', 
+              fontWeight: '700',
+              margin: 0
+            }}>
+              🌰 알밤 상품 둘러보기
+            </h2>
+            {isAdmin && (
+              <button 
+                onClick={() => {
+                                          setEditingProduct({name: '', description: '', price: '', emoji: ''});
+                        setShowAddForm(true);
+                }}
+                className="btn"
+              >
+                ➕ 상품 추가
+              </button>
+            )}
+          </div>
           
           <div className="thumbnails-grid">
-            {chestnutProducts.map((product) => (
+            {products.map((product) => (
               <div key={product.id} className="thumbnail-card">
                 <div className="thumbnail-image">
-                  {product.emoji}
+                  {product.image && product.image.startsWith('data:') ? (
+                    <img 
+                      src={product.image} 
+                      alt={product.name} 
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        borderRadius: '10px'
+                      }}
+                    />
+                  ) : (
+                    product.emoji || product.image || '🌰'
+                  )}
                 </div>
                 <div className="thumbnail-content">
                   <h3 className="thumbnail-title">{product.name}</h3>
                   <p className="thumbnail-description">{product.description}</p>
                   <p className="thumbnail-price">{product.price}</p>
-                  <Link href={`/purchase?product=${product.id}`} className="btn" style={{marginTop: '1rem'}}>
-                    주문하기
-                  </Link>
+                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '1rem'}}>
+                    <Link href={`/purchase?product=${product.id}`} className="btn" style={{flex: 1}}>
+                      주문하기
+                    </Link>
+                    {isAdmin && (
+                      <>
+                        <button 
+                          onClick={() => handleEditProduct(product)}
+                          className="btn btn-secondary"
+                          style={{padding: '0.5rem'}}
+                        >
+                          ✏️
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="btn"
+                          style={{background: '#dc3545', padding: '0.5rem'}}
+                        >
+                          🗑️
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </section>
+
+        {/* 상품 편집 모달 */}
+        {(editingProduct && !showAddForm) && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div className="card" style={{width: '500px', margin: 0, maxHeight: '80vh', overflow: 'auto'}}>
+              <h2>✏️ 상품 수정</h2>
+              
+              <div className="form-group">
+                <label className="form-label">상품 이미지</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProductFileChange}
+                  className="form-input"
+                  style={{padding: '0.5rem'}}
+                />
+                <p style={{fontSize: '0.8rem', color: 'var(--text-light)', marginTop: '0.5rem'}}>
+                  * 이미지 파일만 업로드 가능 (최대 5MB)
+                </p>
+                
+
+                
+                {productImagePreview && (
+                  <div style={{marginTop: '1rem'}}>
+                    <p style={{fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem'}}>미리보기:</p>
+                    <div style={{
+                      width: '100px',
+                      height: '100px',
+                      border: '2px solid var(--chestnut-light)',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#f9f9f9'
+                    }}>
+                      {productImagePreview.startsWith('data:') ? (
+                        <img 
+                          src={productImagePreview} 
+                          alt="미리보기" 
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      ) : (
+                        <span style={{fontSize: '3rem'}}>{productImagePreview}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductFile(null);
+                        setProductImagePreview('');
+                      }}
+                      style={{
+                        marginTop: '0.5rem',
+                        padding: '0.3rem 0.8rem',
+                        background: 'var(--chestnut-dark)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      이미지 제거
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">상품명</label>
+                <input
+                  type="text"
+                  value={editingProduct.name}
+                  onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                  className="form-input"
+                  placeholder="상품명을 입력하세요"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">상품 설명</label>
+                <textarea
+                  value={editingProduct.description}
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                  className="form-input form-textarea"
+                  placeholder="상품에 대한 자세한 설명을 입력하세요"
+                  rows={4}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">가격</label>
+                <input
+                  type="text"
+                  value={editingProduct.price}
+                  onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                  className="form-input"
+                  placeholder="15,000원"
+                />
+              </div>
+
+              <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+                <button 
+                  onClick={() => setEditingProduct(null)} 
+                  className="btn btn-secondary"
+                >
+                  취소
+                </button>
+                <button 
+                  onClick={handleUpdateProduct} 
+                  className="btn"
+                >
+                  수정 완료
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 상품 추가 모달 */}
+        {(editingProduct && showAddForm) && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div className="card" style={{width: '500px', margin: 0, maxHeight: '80vh', overflow: 'auto'}}>
+              <h2>➕ 새 상품 추가</h2>
+              
+              <div className="form-group">
+                <label className="form-label">상품 이미지</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProductFileChange}
+                  className="form-input"
+                  style={{padding: '0.5rem'}}
+                />
+                <p style={{fontSize: '0.8rem', color: 'var(--text-light)', marginTop: '0.5rem'}}>
+                  * 이미지 파일만 업로드 가능 (최대 5MB)
+                </p>
+                
+
+                
+                {productImagePreview && (
+                  <div style={{marginTop: '1rem'}}>
+                    <p style={{fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem'}}>미리보기:</p>
+                    <div style={{
+                      width: '100px',
+                      height: '100px',
+                      border: '2px solid var(--chestnut-light)',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#f9f9f9'
+                    }}>
+                      {productImagePreview.startsWith('data:') ? (
+                        <img 
+                          src={productImagePreview} 
+                          alt="미리보기" 
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      ) : (
+                        <span style={{fontSize: '3rem'}}>{productImagePreview}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductFile(null);
+                        setProductImagePreview('');
+                      }}
+                      style={{
+                        marginTop: '0.5rem',
+                        padding: '0.3rem 0.8rem',
+                        background: 'var(--chestnut-dark)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      이미지 제거
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">상품명</label>
+                <input
+                  type="text"
+                  value={editingProduct.name}
+                  onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                  className="form-input"
+                  placeholder="상품명을 입력하세요"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">상품 설명</label>
+                <textarea
+                  value={editingProduct.description}
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                  className="form-input form-textarea"
+                  placeholder="상품에 대한 자세한 설명을 입력하세요"
+                  rows={4}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">가격</label>
+                <input
+                  type="text"
+                  value={editingProduct.price}
+                  onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                  className="form-input"
+                  placeholder="15,000원"
+                />
+              </div>
+
+              <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+                <button 
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setShowAddForm(false);
+                  }} 
+                  className="btn btn-secondary"
+                >
+                  취소
+                </button>
+                <button 
+                  onClick={handleAddProduct} 
+                  className="btn"
+                >
+                  추가하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 농장 소개 미리보기 */}
         <section className="card">

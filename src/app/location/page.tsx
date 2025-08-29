@@ -18,7 +18,7 @@ export default function Location() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-            🌰 청양 칠갑산<br/>알밤 농장
+🌰 청양 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
@@ -174,7 +174,7 @@ export default function Location() {
           <div className="alert alert-info">
             <h4>📱 네비게이션 이용 시</h4>
             <p><strong>주소 입력:</strong> 충남 청양군 남양면 충절로 265-27</p>
-            <p><strong>또는 검색:</strong> "청양 칠갑산 알밤 농장" 또는 "청양 알밤 농장"</p>
+            <p><strong>또는 검색:</strong> &ldquo;청양 칠갑산 알밤 농장&rdquo; 또는 &ldquo;청양 알밤 농장&rdquo;</p>
           </div>
         </section>
 

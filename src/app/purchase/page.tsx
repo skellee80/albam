@@ -42,18 +42,28 @@ export default function Purchase() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [editableOrderData, setEditableOrderData] = useState<any>(null);
+  const [sameAsOrderer, setSameAsOrderer] = useState(false);
+  const [products, setProducts] = useState([
+    { id: 1, name: '알밤 1kg', price: '15,000원', emoji: '🌰' },
+    { id: 2, name: '알밤 3kg', price: '40,000원', emoji: '🌰' },
+    { id: 3, name: '알밤 5kg', price: '65,000원', emoji: '🌰' },
+    { id: 4, name: '껍질 깐 알밤 500g', price: '12,000원', emoji: '🌰' },
+    { id: 5, name: '구운 알밤 1kg', price: '18,000원', emoji: '🌰' },
+    { id: 6, name: '알밤 선물세트', price: '35,000원', emoji: '🎁' }
+  ]);
 
-  const products = [
-    { id: '1', name: '알밤 1kg', price: 15000 },
-    { id: '2', name: '알밤 3kg', price: 40000 },
-    { id: '3', name: '알밤 5kg', price: 65000 },
-    { id: '4', name: '껍질 깐 알밤 500g', price: 12000 },
-    { id: '5', name: '구운 알밤 1kg', price: 18000 },
-    { id: '6', name: '알밤 선물세트', price: 35000 }
-  ];
+  // 상품 목록 로드
+  useEffect(() => {
+    const savedProducts = localStorage.getItem('chestnutProducts');
+    if (savedProducts) {
+      setProducts(JSON.parse(savedProducts));
+    }
+  }, []);
 
-  const selectedProduct = products.find(p => p.id === formData.productId);
-  const totalPrice = selectedProduct ? selectedProduct.price * formData.quantity : 0;
+  const selectedProduct = products.find(p => p.id.toString() === formData.productId);
+  const totalPrice = selectedProduct ? parseInt(selectedProduct.price.replace(/[^0-9]/g, '')) * formData.quantity : 0;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -63,13 +73,41 @@ export default function Purchase() {
     }));
   };
 
+  // 연락처 형식 검증
+  const validatePhoneNumber = (phone: string) => {
+    // 한국 휴대폰 번호 형식: 010-1234-5678, 01012345678, 010 1234 5678
+    const phoneRegex = /^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$|^01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}$/;
+    return phoneRegex.test(phone.replace(/\s/g, ''));
+  };
+
+  // 수취인 정보 동일 체크 처리
+  const handleSameAsOrderer = (checked: boolean) => {
+    setSameAsOrderer(checked);
+    if (checked) {
+      setFormData({
+        ...formData,
+        recipientName: formData.name,
+        recipientPhone: formData.phone
+      });
+    } else {
+      setFormData({
+        ...formData,
+        recipientName: '',
+        recipientPhone: ''
+      });
+    }
+  };
+
   const generateOrderNumber = () => {
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `ALB${year}${month}${day}${random}`;
+    // 한국 시간(KST) 기준으로 주문번호 생성 - 구매하기용 (A 접두사)
+    const kstTime = new Date(new Date().getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
+    const month = String(kstTime.getMonth() + 1).padStart(2, '0'); // MM
+    const year = kstTime.getFullYear().toString().slice(-2); // YY
+    const day = String(kstTime.getDate()).padStart(2, '0'); // DD
+    const hour = String(kstTime.getHours()).padStart(2, '0'); // HH
+    const minute = String(kstTime.getMinutes()).padStart(2, '0'); // MM
+    const second = String(kstTime.getSeconds()).padStart(2, '0'); // SS
+    return `A${month}${year}${day}${hour}${minute}${second}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,6 +115,17 @@ export default function Purchase() {
     
     if (!formData.name || !formData.recipientName || !formData.phone || !formData.recipientPhone || !formData.address) {
       alert('모든 필수 항목을 입력해주세요.');
+      return;
+    }
+
+    // 연락처 형식 검증
+    if (!validatePhoneNumber(formData.phone)) {
+      alert('주문자 연락처 형식이 올바르지 않습니다.\n올바른 형식: 010-1234-5678 또는 01012345678');
+      return;
+    }
+
+    if (!validatePhoneNumber(formData.recipientPhone)) {
+      alert('수취인 연락처 형식이 올바르지 않습니다.\n올바른 형식: 010-1234-5678 또는 01012345678');
       return;
     }
 
@@ -121,7 +170,7 @@ export default function Purchase() {
         <header className="header">
           <div className="header-content">
             <Link href="/" className="logo">
-              🌰 청양 칠갑산<br/>알밤 농장
+  🌰 청양 칠갑산 알밤 농장
             </Link>
             <nav className="nav">
               <Link href="/" className="nav-link">홈</Link>
@@ -131,19 +180,19 @@ export default function Purchase() {
               <Link href="/storage" className="nav-link">저장 방법</Link>
               <Link href="/location" className="nav-link">오시는 길</Link>
               <Link href="/notice" className="nav-link">농장 공지사항</Link>
-                          {isAdmin && (
-              <>
-                <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
-                  📊 주문 현황
-                </Link>
-                <button onClick={() => {
-                  setIsAdmin(false);
-                  localStorage.removeItem('adminSession');
-                }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
-                  관리자 로그아웃
-                </button>
-              </>
-            )}
+              {isAdmin && (
+                <>
+                  <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                    📊 주문 현황
+                  </Link>
+                  <button onClick={() => {
+                    setIsAdmin(false);
+                    localStorage.removeItem('adminSession');
+                  }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
+                    관리자 로그아웃
+                  </button>
+                </>
+              )}
             </nav>
           </div>
         </header>
@@ -155,6 +204,49 @@ export default function Purchase() {
             <div className="alert alert-success">
               <h3>주문번호: {orderNumber}</h3>
               <p>소중한 주문 감사합니다. 신선한 알밤을 정성껏 준비해서 배송해드리겠습니다.</p>
+            </div>
+
+            {/* 주문 요약 정보 */}
+            <div style={{
+              margin: '2rem 0',
+              padding: '1.5rem',
+              background: 'var(--creamy-white)',
+              borderRadius: '10px',
+              textAlign: 'left',
+              border: '2px solid var(--chestnut-light)'
+            }}>
+              <h4 style={{textAlign: 'center', marginBottom: '1.5rem', color: 'var(--chestnut-brown)'}}>📋 주문 내용</h4>
+              
+              <div style={{display: 'grid', gap: '0.8rem'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>주문자:</span>
+                  <span>{formData.name}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>수취인:</span>
+                  <span>{formData.recipientName}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>연락처:</span>
+                  <span>{formData.recipientPhone}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>배송지:</span>
+                  <span style={{textAlign: 'right', maxWidth: '60%'}}>{formData.address}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>상품:</span>
+                  <span>{selectedProduct?.name}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>수량:</span>
+                  <span>{formData.quantity}개</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginTop: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>총 금액:</span>
+                  <span style={{fontWeight: 'bold', color: 'var(--golden-brown)'}}>{totalPrice.toLocaleString()}원</span>
+                </div>
+              </div>
             </div>
 
             <div style={{margin: '2rem 0', padding: '1.5rem', background: 'var(--soft-beige)', borderRadius: '10px'}}>
@@ -171,6 +263,7 @@ export default function Purchase() {
                 onClick={() => {
                   setOrderComplete(false);
                   setOrderNumber('');
+                  setSameAsOrderer(false);
                   setFormData({
                     name: '',
                     recipientName: '',
@@ -197,7 +290,7 @@ export default function Purchase() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-            🌰 청양 칠갑산<br/>알밤 농장
+🌰 청양 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
@@ -207,6 +300,19 @@ export default function Purchase() {
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">농장 공지사항</Link>
+            {isAdmin && (
+              <>
+                <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                  📊 주문 현황
+                </Link>
+                <button onClick={() => {
+                  setIsAdmin(false);
+                  localStorage.removeItem('adminSession');
+                }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
+                  관리자 로그아웃
+                </button>
+              </>
+            )}
           </nav>
         </div>
       </header>
@@ -223,19 +329,19 @@ export default function Purchase() {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label className="form-label">상품 선택 *</label>
-                <select 
-                  name="productId" 
-                  value={formData.productId} 
-                  onChange={handleInputChange}
-                  className="form-input"
-                  required
-                >
-                  {products.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} - {product.price.toLocaleString()}원
-                    </option>
-                  ))}
-                </select>
+                                  <select 
+                    name="productId" 
+                    value={formData.productId} 
+                    onChange={handleInputChange}
+                    className="form-input"
+                    required
+                  >
+                    {products.map(product => (
+                      <option key={product.id} value={product.id.toString()}>
+                        {product.name} - {product.price}
+                      </option>
+                    ))}
+                  </select>
               </div>
 
               <div className="form-group">
@@ -294,6 +400,8 @@ export default function Purchase() {
                       onChange={handleInputChange}
                       className="form-input"
                       placeholder="010-0000-0000"
+                      pattern="01[0-9]-?[0-9]{3,4}-?[0-9]{4}|01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}"
+                      title="연락처 형식은 010-1234-5678로 작성하세요"
                       required
                     />
                   </div>
@@ -321,14 +429,27 @@ export default function Purchase() {
                 
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
                   <div className="form-group" style={{margin: 0}}>
-                    <label className="form-label">수취인 이름 *</label>
+                    <div style={{display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem'}}>
+                      <label className="form-label" style={{margin: 0}}>수취인 이름 *</label>
+                      <label style={{display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', color: 'var(--text-light)'}}>
+                        <input
+                          type="checkbox"
+                          checked={sameAsOrderer}
+                          onChange={(e) => handleSameAsOrderer(e.target.checked)}
+                          style={{accentColor: 'var(--chestnut-brown)'}}
+                        />
+                        주문자와 동일
+                      </label>
+                    </div>
                     <input
                       type="text"
                       name="recipientName"
                       value={formData.recipientName}
                       onChange={handleInputChange}
+                      disabled={sameAsOrderer}
                       className="form-input"
                       placeholder="받으실 분 이름"
+                      style={{background: sameAsOrderer ? '#f5f5f5' : 'white'}}
                       required
                     />
                   </div>
@@ -340,8 +461,12 @@ export default function Purchase() {
                       name="recipientPhone"
                       value={formData.recipientPhone}
                       onChange={handleInputChange}
+                      disabled={sameAsOrderer}
                       className="form-input"
                       placeholder="010-0000-0000"
+                      pattern="01[0-9]-?[0-9]{3,4}-?[0-9]{4}|01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}"
+                      title="연락처 형식은 010-1234-5678로 작성하세요"
+                      style={{background: sameAsOrderer ? '#f5f5f5' : 'white'}}
                       required
                     />
                   </div>
@@ -373,19 +498,114 @@ export default function Purchase() {
 
           {/* 주문 요약 */}
           <div className="card">
-            <h2>주문 요약</h2>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+              <h2>주문 요약</h2>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    if (isEditingOrder) {
+                      setIsEditingOrder(false);
+                      setEditableOrderData(null);
+                    } else {
+                      setIsEditingOrder(true);
+                      setEditableOrderData({
+                        productName: selectedProduct?.name || '',
+                        quantity: formData.quantity,
+                        unitPrice: selectedProduct ? parseInt(selectedProduct.price.replace(/[^0-9]/g, '')) : 0,
+                        totalPrice: totalPrice
+                      });
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{fontSize: '0.8rem', padding: '0.5rem 1rem'}}
+                >
+                  {isEditingOrder ? '편집 취소' : '✏️ 편집'}
+                </button>
+              )}
+            </div>
             
             {selectedProduct && (
               <>
-                <div style={{padding: '1rem', background: 'var(--soft-beige)', borderRadius: '10px', marginBottom: '1rem'}}>
-                  <h3 style={{marginBottom: '0.5rem'}}>{selectedProduct.name}</h3>
-                  <p style={{color: 'var(--text-light)'}}>단가: {selectedProduct.price.toLocaleString()}원</p>
-                  <p style={{color: 'var(--text-light)'}}>수량: {formData.quantity}개</p>
-                </div>
+                {isEditingOrder && editableOrderData ? (
+                  <div style={{padding: '1rem', background: 'var(--soft-beige)', borderRadius: '10px', marginBottom: '1rem'}}>
+                    <div className="form-group" style={{marginBottom: '1rem'}}>
+                      <label className="form-label">상품명</label>
+                      <input
+                        type="text"
+                        value={editableOrderData.productName}
+                        onChange={(e) => setEditableOrderData({...editableOrderData, productName: e.target.value})}
+                        className="form-input"
+                      />
+                    </div>
+                    
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
+                      <div className="form-group" style={{margin: 0}}>
+                        <label className="form-label">수량</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={editableOrderData.quantity}
+                          onChange={(e) => {
+                            const newQuantity = parseInt(e.target.value) || 1;
+                            setEditableOrderData({
+                              ...editableOrderData, 
+                              quantity: newQuantity,
+                              totalPrice: editableOrderData.unitPrice * newQuantity
+                            });
+                          }}
+                          className="form-input"
+                        />
+                      </div>
+                      <div className="form-group" style={{margin: 0}}>
+                        <label className="form-label">단가</label>
+                        <input
+                          type="number"
+                          value={editableOrderData.unitPrice}
+                          onChange={(e) => {
+                            const newUnitPrice = parseInt(e.target.value) || 0;
+                            setEditableOrderData({
+                              ...editableOrderData, 
+                              unitPrice: newUnitPrice,
+                              totalPrice: newUnitPrice * editableOrderData.quantity
+                            });
+                          }}
+                          className="form-input"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <strong>총 금액: {editableOrderData.totalPrice.toLocaleString()}원</strong>
+                      <button
+                        onClick={() => {
+                          // 편집된 내용을 실제 폼 데이터에 반영
+                          setFormData(prev => ({
+                            ...prev,
+                            quantity: editableOrderData.quantity
+                          }));
+                          setIsEditingOrder(false);
+                          setEditableOrderData(null);
+                        }}
+                        className="btn"
+                        style={{fontSize: '0.8rem', padding: '0.5rem 1rem'}}
+                      >
+                        적용
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{padding: '1rem', background: 'var(--soft-beige)', borderRadius: '10px', marginBottom: '1rem'}}>
+                      <h3 style={{marginBottom: '0.5rem'}}>{selectedProduct.name}</h3>
+                      <p style={{color: 'var(--text-light)'}}>단가: {selectedProduct.price}</p>
+                      <p style={{color: 'var(--text-light)'}}>수량: {formData.quantity}개</p>
+                    </div>
 
-                <div style={{fontSize: '1.2rem', fontWeight: '600', color: 'var(--warm-orange)', marginBottom: '2rem'}}>
-                  총 금액: {totalPrice.toLocaleString()}원
-                </div>
+                    <div style={{fontSize: '1.2rem', fontWeight: '600', color: 'var(--warm-orange)', marginBottom: '2rem'}}>
+                      총 금액: {totalPrice.toLocaleString()}원
+                    </div>
+                  </>
+                )}
               </>
             )}
 
