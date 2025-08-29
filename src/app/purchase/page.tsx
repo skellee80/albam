@@ -42,9 +42,44 @@ export default function Purchase() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
-  const [isEditingOrder, setIsEditingOrder] = useState(false);
-  const [editableOrderData, setEditableOrderData] = useState<any>(null);
+
   const [sameAsOrderer, setSameAsOrderer] = useState(false);
+  const [infoCards, setInfoCards] = useState([
+    {
+      id: 1,
+      title: '📦 배송 안내',
+      type: 'info',
+      items: [
+        '• 주문 확인 후 2-3일 내 배송',
+        '• 5kg 이상 주문 시 무료배송',
+        '• 제주도/도서지역 추가 배송비',
+        '• 신선도 유지를 위한 특수 포장'
+      ]
+    },
+    {
+      id: 2,
+      title: '💳 결제 안내',
+      type: 'success',
+      items: [
+        '• 농협 계좌 입금',
+        '• 현금 결제 (직접 방문 시)',
+        '• 주문 확인 전화 시 계좌 안내'
+      ]
+    },
+    {
+      id: 3,
+      title: '📞 농장 연락처',
+      type: 'contact',
+      items: [
+        '청양 칠갑산 알밤 농장',
+        '📱 010-9123-9287',
+        '📍 충남 청양군 남양면 충절로 265-27'
+      ]
+    }
+  ]);
+  const [editingCard, setEditingCard] = useState<any>(null);
+  const [showAddCardForm, setShowAddCardForm] = useState(false);
+  const [newCard, setNewCard] = useState({ title: '', type: 'info', items: [''] });
   const [products, setProducts] = useState([
     { id: 1, name: '알밤 1kg', price: '15,000원', emoji: '🌰' },
     { id: 2, name: '알밤 3kg', price: '40,000원', emoji: '🌰' },
@@ -61,6 +96,92 @@ export default function Purchase() {
       setProducts(JSON.parse(savedProducts));
     }
   }, []);
+
+  // 안내 카드 로드
+  useEffect(() => {
+    const savedInfoCards = localStorage.getItem('purchaseInfoCards');
+    if (savedInfoCards) {
+      setInfoCards(JSON.parse(savedInfoCards));
+    }
+  }, []);
+
+  // 안내 카드 관리 함수들
+  const handleAddCard = () => {
+    if (!newCard.title.trim() || newCard.items.some(item => !item.trim())) {
+      alert('제목과 모든 항목을 입력해주세요.');
+      return;
+    }
+
+    const cardToAdd = {
+      ...newCard,
+      id: Date.now(),
+      items: newCard.items.filter(item => item.trim())
+    };
+
+    const updatedCards = [...infoCards, cardToAdd];
+    setInfoCards(updatedCards);
+    localStorage.setItem('purchaseInfoCards', JSON.stringify(updatedCards));
+    
+    setNewCard({ title: '', type: 'info', items: [''] });
+    setShowAddCardForm(false);
+  };
+
+  const handleEditCard = (card: any) => {
+    setEditingCard({ ...card });
+  };
+
+  const handleUpdateCard = () => {
+    if (!editingCard.title.trim() || editingCard.items.some((item: string) => !item.trim())) {
+      alert('제목과 모든 항목을 입력해주세요.');
+      return;
+    }
+
+    const updatedCards = infoCards.map(card => 
+      card.id === editingCard.id 
+        ? { ...editingCard, items: editingCard.items.filter((item: string) => item.trim()) }
+        : card
+    );
+    
+    setInfoCards(updatedCards);
+    localStorage.setItem('purchaseInfoCards', JSON.stringify(updatedCards));
+    setEditingCard(null);
+  };
+
+  const handleDeleteCard = (cardId: number) => {
+    if (confirm('이 안내 카드를 삭제하시겠습니까?')) {
+      const updatedCards = infoCards.filter(card => card.id !== cardId);
+      setInfoCards(updatedCards);
+      localStorage.setItem('purchaseInfoCards', JSON.stringify(updatedCards));
+    }
+  };
+
+  const addNewCardItem = () => {
+    setNewCard({
+      ...newCard,
+      items: [...newCard.items, '']
+    });
+  };
+
+  const removeNewCardItem = (index: number) => {
+    setNewCard({
+      ...newCard,
+      items: newCard.items.filter((_, i) => i !== index)
+    });
+  };
+
+  const addEditCardItem = () => {
+    setEditingCard({
+      ...editingCard,
+      items: [...editingCard.items, '']
+    });
+  };
+
+  const removeEditCardItem = (index: number) => {
+    setEditingCard({
+      ...editingCard,
+      items: editingCard.items.filter((_: string, i: number) => i !== index)
+    });
+  };
 
   const selectedProduct = products.find(p => p.id.toString() === formData.productId);
   const totalPrice = selectedProduct ? parseInt(selectedProduct.price.replace(/[^0-9]/g, '')) * formData.quantity : 0;
@@ -100,14 +221,15 @@ export default function Purchase() {
 
   const generateOrderNumber = () => {
     // 한국 시간(KST) 기준으로 주문번호 생성 - 구매하기용 (A 접두사)
-    const kstTime = new Date(new Date().getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
-    const month = String(kstTime.getMonth() + 1).padStart(2, '0'); // MM
-    const year = kstTime.getFullYear().toString().slice(-2); // YY
-    const day = String(kstTime.getDate()).padStart(2, '0'); // DD
-    const hour = String(kstTime.getHours()).padStart(2, '0'); // HH
-    const minute = String(kstTime.getMinutes()).padStart(2, '0'); // MM
-    const second = String(kstTime.getSeconds()).padStart(2, '0'); // SS
-    return `A${month}${year}${day}${hour}${minute}${second}`;
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간 (KST)
+    const year = kstTime.getUTCFullYear().toString().slice(-2); // YY
+    const month = String(kstTime.getUTCMonth() + 1).padStart(2, '0'); // MM
+    const day = String(kstTime.getUTCDate()).padStart(2, '0'); // DD
+    const hour = String(kstTime.getUTCHours()).padStart(2, '0'); // HH
+    const minute = String(kstTime.getUTCMinutes()).padStart(2, '0'); // MM
+    const second = String(kstTime.getUTCSeconds()).padStart(2, '0'); // SS
+    return `A${year}${month}${day}${hour}${minute}${second}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -416,31 +538,53 @@ export default function Purchase() {
                 border: '2px solid var(--chestnut-light)',
                 marginBottom: '1.5rem'
               }}>
-                <h3 style={{
-                  color: 'var(--chestnut-brown)',
-                  marginBottom: '1.5rem',
-                  fontSize: '1.1rem',
+                <div style={{
                   display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  marginBottom: '1.5rem'
                 }}>
-                  📦 수취인 정보
-                </h3>
+                  <h3 style={{
+                    color: 'var(--chestnut-brown)',
+                    margin: 0,
+                    fontSize: '1.1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    📦 수취인 정보
+                  </h3>
+                  <label style={{
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.3rem', 
+                    fontSize: '0.9rem', 
+                    color: 'var(--chestnut-brown)',
+                    fontWeight: 'bold',
+                    background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                    padding: '0.3rem 0.6rem',
+                    borderRadius: '15px',
+                    border: '1px solid var(--chestnut-light)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={sameAsOrderer}
+                      onChange={(e) => handleSameAsOrderer(e.target.checked)}
+                      style={{
+                        accentColor: 'var(--chestnut-brown)',
+                        transform: 'scale(1.1)',
+                        cursor: 'pointer'
+                      }}
+                    />
+                    ✓ 주문자와 동일
+                  </label>
+                </div>
                 
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
                   <div className="form-group" style={{margin: 0}}>
-                    <div style={{display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem'}}>
-                      <label className="form-label" style={{margin: 0}}>수취인 이름 *</label>
-                      <label style={{display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', color: 'var(--text-light)'}}>
-                        <input
-                          type="checkbox"
-                          checked={sameAsOrderer}
-                          onChange={(e) => handleSameAsOrderer(e.target.checked)}
-                          style={{accentColor: 'var(--chestnut-brown)'}}
-                        />
-                        주문자와 동일
-                      </label>
-                    </div>
+                    <label className="form-label">수취인 이름 *</label>
                     <input
                       type="text"
                       name="recipientName"
@@ -498,141 +642,349 @@ export default function Purchase() {
 
           {/* 주문 요약 */}
           <div className="card">
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-              <h2>주문 요약</h2>
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    if (isEditingOrder) {
-                      setIsEditingOrder(false);
-                      setEditableOrderData(null);
-                    } else {
-                      setIsEditingOrder(true);
-                      setEditableOrderData({
-                        productName: selectedProduct?.name || '',
-                        quantity: formData.quantity,
-                        unitPrice: selectedProduct ? parseInt(selectedProduct.price.replace(/[^0-9]/g, '')) : 0,
-                        totalPrice: totalPrice
-                      });
-                    }
-                  }}
-                  className="btn btn-secondary"
-                  style={{fontSize: '0.8rem', padding: '0.5rem 1rem'}}
-                >
-                  {isEditingOrder ? '편집 취소' : '✏️ 편집'}
-                </button>
-              )}
-            </div>
+            <h2 style={{marginBottom: '1rem'}}>주문 요약</h2>
             
             {selectedProduct && (
               <>
-                {isEditingOrder && editableOrderData ? (
-                  <div style={{padding: '1rem', background: 'var(--soft-beige)', borderRadius: '10px', marginBottom: '1rem'}}>
-                    <div className="form-group" style={{marginBottom: '1rem'}}>
-                      <label className="form-label">상품명</label>
-                      <input
-                        type="text"
-                        value={editableOrderData.productName}
-                        onChange={(e) => setEditableOrderData({...editableOrderData, productName: e.target.value})}
-                        className="form-input"
-                      />
-                    </div>
-                    
-                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
-                      <div className="form-group" style={{margin: 0}}>
-                        <label className="form-label">수량</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={editableOrderData.quantity}
-                          onChange={(e) => {
-                            const newQuantity = parseInt(e.target.value) || 1;
-                            setEditableOrderData({
-                              ...editableOrderData, 
-                              quantity: newQuantity,
-                              totalPrice: editableOrderData.unitPrice * newQuantity
-                            });
-                          }}
-                          className="form-input"
-                        />
-                      </div>
-                      <div className="form-group" style={{margin: 0}}>
-                        <label className="form-label">단가</label>
-                        <input
-                          type="number"
-                          value={editableOrderData.unitPrice}
-                          onChange={(e) => {
-                            const newUnitPrice = parseInt(e.target.value) || 0;
-                            setEditableOrderData({
-                              ...editableOrderData, 
-                              unitPrice: newUnitPrice,
-                              totalPrice: newUnitPrice * editableOrderData.quantity
-                            });
-                          }}
-                          className="form-input"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                      <strong>총 금액: {editableOrderData.totalPrice.toLocaleString()}원</strong>
-                      <button
-                        onClick={() => {
-                          // 편집된 내용을 실제 폼 데이터에 반영
-                          setFormData(prev => ({
-                            ...prev,
-                            quantity: editableOrderData.quantity
-                          }));
-                          setIsEditingOrder(false);
-                          setEditableOrderData(null);
-                        }}
-                        className="btn"
-                        style={{fontSize: '0.8rem', padding: '0.5rem 1rem'}}
-                      >
-                        적용
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{padding: '1rem', background: 'var(--soft-beige)', borderRadius: '10px', marginBottom: '1rem'}}>
-                      <h3 style={{marginBottom: '0.5rem'}}>{selectedProduct.name}</h3>
-                      <p style={{color: 'var(--text-light)'}}>단가: {selectedProduct.price}</p>
-                      <p style={{color: 'var(--text-light)'}}>수량: {formData.quantity}개</p>
-                    </div>
+                <div style={{padding: '1rem', background: 'var(--soft-beige)', borderRadius: '10px', marginBottom: '1rem'}}>
+                  <h3 style={{marginBottom: '0.5rem'}}>{selectedProduct.name}</h3>
+                  <p style={{color: 'var(--text-light)'}}>단가: {selectedProduct.price}</p>
+                  <p style={{color: 'var(--text-light)'}}>수량: {formData.quantity}개</p>
+                </div>
 
-                    <div style={{fontSize: '1.2rem', fontWeight: '600', color: 'var(--warm-orange)', marginBottom: '2rem'}}>
-                      총 금액: {totalPrice.toLocaleString()}원
-                    </div>
-                  </>
-                )}
+                <div style={{fontSize: '1.2rem', fontWeight: '600', color: 'var(--warm-orange)', marginBottom: '2rem'}}>
+                  총 금액: {totalPrice.toLocaleString()}원
+                </div>
               </>
             )}
 
-            <div className="alert alert-info">
-              <h4>📦 배송 안내</h4>
-              <p>• 주문 확인 후 2-3일 내 배송</p>
-              <p>• 5kg 이상 주문 시 무료배송</p>
-              <p>• 제주도/도서지역 추가 배송비</p>
-              <p>• 신선도 유지를 위한 특수 포장</p>
-            </div>
+            {/* 동적 안내 카드들 */}
+            {infoCards.map(card => (
+              <div 
+                key={card.id} 
+                className={`alert ${card.type === 'info' ? 'alert-info' : card.type === 'success' ? 'alert-success' : ''}`}
+                style={card.type === 'contact' ? {
+                  marginTop: '2rem', 
+                  padding: '1rem', 
+                  background: 'var(--warm-gradient)', 
+                  borderRadius: '10px'
+                } : {}}
+              >
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                  <h4 style={{margin: 0}}>{card.title}</h4>
+                  {isAdmin && (
+                    <div style={{display: 'flex', gap: '0.5rem'}}>
+                      <button 
+                        onClick={() => handleEditCard(card)}
+                        style={{
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: '5px',
+                          background: 'rgba(255,255,255,0.2)'
+                        }}
+                      >
+                        ✏️ 편집
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteCard(card.id)}
+                        style={{
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: '5px',
+                          background: 'rgba(255,0,0,0.2)'
+                        }}
+                      >
+                        🗑️ 삭제
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {card.items.map((item: string, index: number) => (
+                  <p key={index} style={{margin: '0.5rem 0'}}>
+                    {card.type === 'contact' && index === 0 ? <strong>{item}</strong> : item}
+                  </p>
+                ))}
+              </div>
+            ))}
 
-            <div className="alert alert-success">
-              <h4>💳 결제 안내</h4>
-              <p>• 농협 계좌 입금</p>
-              <p>• 현금 결제 (직접 방문 시)</p>
-              <p>• 주문 확인 전화 시 계좌 안내</p>
-            </div>
-
-            <div style={{marginTop: '2rem', padding: '1rem', background: 'var(--warm-gradient)', borderRadius: '10px'}}>
-              <h4 style={{marginBottom: '1rem'}}>📞 농장 연락처</h4>
-              <p><strong>청양 칠갑산 알밤 농장</strong></p>
-              <p>📱 010-9123-9287</p>
-              <p>📍 충남 청양군 남양면 충절로 265-27</p>
-            </div>
+            {/* 관리자 카드 추가 버튼 */}
+            {isAdmin && (
+              <div style={{margin: '1rem 0', textAlign: 'center'}}>
+                <button 
+                  onClick={() => setShowAddCardForm(true)}
+                  className="btn btn-secondary"
+                  style={{fontSize: '0.9rem'}}
+                >
+                  ➕ 안내 카드 추가
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* 카드 추가 모달 */}
+      {showAddCardForm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '10px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{marginBottom: '1.5rem'}}>새 안내 카드 추가</h3>
+            
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: 'bold'}}>제목</label>
+              <input
+                type="text"
+                value={newCard.title}
+                onChange={(e) => setNewCard({...newCard, title: e.target.value})}
+                placeholder="예: 📦 배송 안내"
+                style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+              />
+            </div>
+
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: 'bold'}}>카드 유형</label>
+              <select
+                value={newCard.type}
+                onChange={(e) => setNewCard({...newCard, type: e.target.value})}
+                style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+              >
+                <option value="info">정보 (파란색)</option>
+                <option value="success">성공 (초록색)</option>
+                <option value="contact">연락처 (그라데이션)</option>
+              </select>
+            </div>
+
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: 'bold'}}>내용</label>
+              {newCard.items.map((item, index) => (
+                <div key={index} style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => {
+                      const updatedItems = [...newCard.items];
+                      updatedItems[index] = e.target.value;
+                      setNewCard({...newCard, items: updatedItems});
+                    }}
+                    placeholder="내용을 입력하세요"
+                    style={{flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+                  />
+                  {newCard.items.length > 1 && (
+                    <button
+                      onClick={() => removeNewCardItem(index)}
+                      style={{
+                        background: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        padding: '0.5rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addNewCardItem}
+                style={{
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer',
+                  marginTop: '0.5rem'
+                }}
+              >
+                ➕ 항목 추가
+              </button>
+            </div>
+
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+              <button
+                onClick={() => {
+                  setShowAddCardForm(false);
+                  setNewCard({ title: '', type: 'info', items: [''] });
+                }}
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleAddCard}
+                style={{
+                  background: 'var(--chestnut-brown)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                추가
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 카드 편집 모달 */}
+      {editingCard && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '10px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{marginBottom: '1.5rem'}}>안내 카드 편집</h3>
+            
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: 'bold'}}>제목</label>
+              <input
+                type="text"
+                value={editingCard.title}
+                onChange={(e) => setEditingCard({...editingCard, title: e.target.value})}
+                style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+              />
+            </div>
+
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: 'bold'}}>카드 유형</label>
+              <select
+                value={editingCard.type}
+                onChange={(e) => setEditingCard({...editingCard, type: e.target.value})}
+                style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+              >
+                <option value="info">정보 (파란색)</option>
+                <option value="success">성공 (초록색)</option>
+                <option value="contact">연락처 (그라데이션)</option>
+              </select>
+            </div>
+
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: 'bold'}}>내용</label>
+              {editingCard.items.map((item: string, index: number) => (
+                <div key={index} style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => {
+                      const updatedItems = [...editingCard.items];
+                      updatedItems[index] = e.target.value;
+                      setEditingCard({...editingCard, items: updatedItems});
+                    }}
+                    style={{flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+                  />
+                  {editingCard.items.length > 1 && (
+                    <button
+                      onClick={() => removeEditCardItem(index)}
+                      style={{
+                        background: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        padding: '0.5rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addEditCardItem}
+                style={{
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer',
+                  marginTop: '0.5rem'
+                }}
+              >
+                ➕ 항목 추가
+              </button>
+            </div>
+
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+              <button
+                onClick={() => setEditingCard(null)}
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleUpdateCard}
+                style={{
+                  background: 'var(--chestnut-brown)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                수정
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

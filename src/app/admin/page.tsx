@@ -972,14 +972,15 @@ export default function Admin() {
   // 주문 관리 함수들
   const generateOrderNumber = () => {
     // 한국 시간(KST) 기준으로 주문번호 생성 - 관리자 추가용 (B 접두사)
-    const kstTime = new Date(new Date().getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
-    const month = String(kstTime.getMonth() + 1).padStart(2, '0'); // MM
-    const year = kstTime.getFullYear().toString().slice(-2); // YY
-    const day = String(kstTime.getDate()).padStart(2, '0'); // DD
-    const hour = String(kstTime.getHours()).padStart(2, '0'); // HH
-    const minute = String(kstTime.getMinutes()).padStart(2, '0'); // MM
-    const second = String(kstTime.getSeconds()).padStart(2, '0'); // SS
-    return `B${month}${year}${day}${hour}${minute}${second}`;
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간 (KST)
+    const year = kstTime.getUTCFullYear().toString().slice(-2); // YY
+    const month = String(kstTime.getUTCMonth() + 1).padStart(2, '0'); // MM
+    const day = String(kstTime.getUTCDate()).padStart(2, '0'); // DD
+    const hour = String(kstTime.getUTCHours()).padStart(2, '0'); // HH
+    const minute = String(kstTime.getUTCMinutes()).padStart(2, '0'); // MM
+    const second = String(kstTime.getUTCSeconds()).padStart(2, '0'); // SS
+    return `B${year}${month}${day}${hour}${minute}${second}`;
   };
 
   // 상품 선택 시 가격 계산
@@ -1210,7 +1211,9 @@ export default function Admin() {
   const getDateStats = () => {
     const today = new Date();
     const dateStats = [];
+    const labelInterval = chartPeriod >= 60 ? 3 : chartPeriod >= 30 ? 2 : 1; // 라벨 표시 간격
     
+    // 모든 날짜에 대해 데이터 생성 (그래프는 매일 표시)
     for (let i = chartPeriod - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
@@ -1232,14 +1235,14 @@ export default function Admin() {
       // 날짜별 매출 = 입금 금액 합계 - 환불 금액 합계
       const dayRevenue = dailyPaidAmount - dailyRefundAmount;
       
-      // 디버깅용 로그 (개발 중에만 사용)
-      if (dayOrders.length > 0) {
-        console.log(`날짜: ${targetDate}, 주문수: ${dayOrders.length}, 입금액: ${dailyPaidAmount}, 환불액: ${dailyRefundAmount}, 매출: ${dayRevenue}`);
-      }
+      // 라벨 표시 여부 결정 (간격에 따라)
+      const dayIndex = chartPeriod - 1 - i;
+      const showLabel = dayIndex % labelInterval === 0;
       
       dateStats.push({
         date: date.toISOString().split('T')[0],
-        label: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+        label: showLabel ? date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) : '',
+        fullLabel: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }), // 호버링용 전체 날짜
         revenue: Math.max(dayRevenue, 0), // 음수 방지
         paidAmount: dailyPaidAmount,
         refundAmount: dailyRefundAmount,
@@ -1607,7 +1610,7 @@ export default function Admin() {
                         `;
                         tooltip.innerHTML = `
                           <div style="text-align: center;">
-                            <div>${stat.label}</div>
+                            <div>${stat.fullLabel}</div>
                             <div style="color: #ffcc80; margin-top: 2px;">
                               ${stat.revenue.toLocaleString()}원
                             </div>
@@ -2394,17 +2397,26 @@ export default function Admin() {
                   type="date"
                   value={newOrder.orderDate ? (() => {
                     try {
+                      // 한국 날짜 형식 "2024. 12. 25." -> "2024-12-25"
                       const dateStr = newOrder.orderDate.replace(/\. /g, '-').replace('.', '');
-                      const date = new Date(dateStr);
-                      return date.toISOString().split('T')[0];
+                      const [year, month, day] = dateStr.split('-');
+                      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
                     } catch {
-                      return new Date().toISOString().split('T')[0];
+                      // KST 기준 오늘 날짜
+                      const now = new Date();
+                      const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+                      return kstTime.toISOString().split('T')[0];
                     }
-                  })() : new Date().toISOString().split('T')[0]}
+                  })() : (() => {
+                    // KST 기준 오늘 날짜
+                    const now = new Date();
+                    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+                    return kstTime.toISOString().split('T')[0];
+                  })()}
                   onChange={(e) => {
-                    const selectedDate = new Date(e.target.value);
-                    const koreanDate = selectedDate.toLocaleDateString('ko-KR');
-                    setNewOrder({...newOrder, orderDate: koreanDate});
+                    const [year, month, day] = e.target.value.split('-');
+                    const formattedDate = `${year}. ${parseInt(month)}. ${parseInt(day)}.`;
+                    setNewOrder({...newOrder, orderDate: formattedDate});
                   }}
                   style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
                 />
@@ -2618,17 +2630,26 @@ export default function Admin() {
                   type="date"
                   value={editingOrder.orderDate ? (() => {
                     try {
+                      // 한국 날짜 형식 "2024. 12. 25." -> "2024-12-25"
                       const dateStr = editingOrder.orderDate.replace(/\. /g, '-').replace('.', '');
-                      const date = new Date(dateStr);
-                      return date.toISOString().split('T')[0];
+                      const [year, month, day] = dateStr.split('-');
+                      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
                     } catch {
-                      return new Date().toISOString().split('T')[0];
+                      // KST 기준 오늘 날짜
+                      const now = new Date();
+                      const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+                      return kstTime.toISOString().split('T')[0];
                     }
-                  })() : new Date().toISOString().split('T')[0]}
+                  })() : (() => {
+                    // KST 기준 오늘 날짜
+                    const now = new Date();
+                    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+                    return kstTime.toISOString().split('T')[0];
+                  })()}
                   onChange={(e) => {
-                    const selectedDate = new Date(e.target.value);
-                    const koreanDate = selectedDate.toLocaleDateString('ko-KR');
-                    setEditingOrder({...editingOrder, orderDate: koreanDate});
+                    const [year, month, day] = e.target.value.split('-');
+                    const formattedDate = `${year}. ${parseInt(month)}. ${parseInt(day)}.`;
+                    setEditingOrder({...editingOrder, orderDate: formattedDate});
                   }}
                   style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
                 />
