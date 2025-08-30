@@ -19,8 +19,19 @@ interface OrderData {
   note?: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  address: string;
+  provider: 'email' | 'google';
+  createdAt: string;
+}
+
 export default function Purchase() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     recipientName: '',
@@ -31,11 +42,29 @@ export default function Purchase() {
     quantity: 1
   });
 
-  // 관리자 세션 확인
+  // 관리자 세션 확인 및 사용자 정보 자동 입력
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
     if (adminSession === 'true') {
       setIsAdmin(true);
+    }
+
+    // 로그인한 사용자 정보 자동 입력 (주문자 정보만)
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+        setFormData(prev => ({
+          ...prev,
+          name: user.name,
+          phone: user.phone || '',
+          address: user.address || ''
+          // 수취인 정보는 자동 입력하지 않음
+        }));
+      } catch (error) {
+        console.error('사용자 데이터 파싱 오류:', error);
+      }
     }
   }, []);
 
@@ -44,6 +73,58 @@ export default function Purchase() {
   const [orderNumber, setOrderNumber] = useState('');
 
   const [sameAsOrderer, setSameAsOrderer] = useState(false);
+  
+  // 전화번호 유효성 검사 상태
+  const [phoneError, setPhoneError] = useState('');
+  const [recipientPhoneError, setRecipientPhoneError] = useState('');
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // 로그아웃 처리
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    setShowLogoutModal(false);
+  };
+
+  // 전화번호 포맷팅 함수
+  const formatPhoneNumber = (value: string, setError: (error: string) => void) => {
+    // 숫자만 추출
+    const numbersOnly = value.replace(/[^0-9]/g, '');
+    
+    // 에러 초기화
+    setError('');
+    
+    // 빈 값이면 그대로 반환
+    if (numbersOnly.length === 0) {
+      return '';
+    }
+    
+    // 한국 휴대폰 번호 형식 검증
+    if (!numbersOnly.startsWith('01')) {
+      setError('한국 이동통신 전화번호는 01로 시작해야 합니다.');
+      return value; // 현재 입력값 그대로 유지
+    }
+    
+    if (numbersOnly.length > 3 && !['010', '011', '016', '017', '018', '019'].includes(numbersOnly.substring(0, 3))) {
+      setError('올바른 한국 이동통신 번호가 아닙니다. (010, 011, 016, 017, 018, 019)');
+      return value; // 현재 입력값 그대로 유지
+    }
+    
+    if (numbersOnly.length > 11) {
+      setError('전화번호는 11자리를 초과할 수 없습니다.');
+      return numbersOnly.substring(0, 11); // 11자리까지만 잘라서 포맷팅
+    }
+    
+    // 자동 하이픈 추가
+    if (numbersOnly.length <= 3) {
+      return numbersOnly;
+    } else if (numbersOnly.length <= 7) {
+      return numbersOnly.substring(0, 3) + '-' + numbersOnly.substring(3);
+    } else {
+      return numbersOnly.substring(0, 3) + '-' + numbersOnly.substring(3, 7) + '-' + numbersOnly.substring(7);
+    }
+  };
   const [infoCards, setInfoCards] = useState([
     {
       id: 1,
@@ -204,6 +285,7 @@ export default function Purchase() {
   // 수취인 정보 동일 체크 처리
   const handleSameAsOrderer = (checked: boolean) => {
     setSameAsOrderer(checked);
+    setRecipientPhoneError(''); // 에러 상태 초기화
     if (checked) {
       setFormData({
         ...formData,
@@ -240,14 +322,15 @@ export default function Purchase() {
       return;
     }
 
-    // 연락처 형식 검증
-    if (!validatePhoneNumber(formData.phone)) {
-      alert('주문자 연락처 형식이 올바르지 않습니다.\n올바른 형식: 010-1234-5678 또는 01012345678');
+    // 전화번호 에러 상태 확인
+    if (phoneError) {
+      alert('주문자 연락처를 올바르게 입력해주세요.');
       return;
     }
 
-    if (!validatePhoneNumber(formData.recipientPhone)) {
-      alert('수취인 연락처 형식이 올바르지 않습니다.\n올바른 형식: 010-1234-5678 또는 01012345678');
+    // 수취인 연락처 에러 상태 확인
+    if (recipientPhoneError) {
+      alert('수취인 연락처를 올바르게 입력해주세요.');
       return;
     }
 
@@ -345,11 +428,15 @@ export default function Purchase() {
                   <span>{formData.name}</span>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>주문자 연락처:</span>
+                  <span>{formData.phone}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
                   <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>수취인:</span>
                   <span>{formData.recipientName}</span>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>연락처:</span>
+                  <span style={{fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>수취인 연락처:</span>
                   <span>{formData.recipientPhone}</span>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--warm-beige)', paddingBottom: '0.5rem'}}>
@@ -421,7 +508,7 @@ export default function Purchase() {
             <Link href="/production" className="nav-link">생산 과정</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
-            <Link href="/notice" className="nav-link">농장 공지사항</Link>
+            <Link href="/notice" className="nav-link">공지사항</Link>
             {isAdmin && (
               <>
                 <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
@@ -434,6 +521,58 @@ export default function Purchase() {
                   관리자 로그아웃
                 </button>
               </>
+            )}
+            {currentUser ? (
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                <div style={{
+                  color: 'white', 
+                  fontSize: '0.85rem', 
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)', 
+                  padding: '0.4rem 0.8rem', 
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                }}>
+                  안녕하세요, {currentUser.name}님! ✨
+                </div>
+                <Link href="/mypage" className="nav-link" style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
+                  fontWeight: 'bold',
+                  borderRadius: '20px',
+                  padding: '0.4rem 0.8rem',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  👤 마이페이지
+                </Link>
+                <button
+                  onClick={() => setShowLogoutModal(true)}
+                  className="nav-link"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    cursor: 'pointer',
+                    color: 'white',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '20px',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <Link href="/auth" className="nav-link" style={{
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
+                fontWeight: 'bold',
+                borderRadius: '20px',
+                padding: '0.4rem 0.8rem',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                🔐 로그인
+              </Link>
             )}
           </nav>
         </div>
@@ -468,16 +607,100 @@ export default function Purchase() {
 
               <div className="form-group">
                 <label className="form-label">수량 *</label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleInputChange}
-                  min="1"
-                  max="50"
-                  className="form-input"
-                  required
-                />
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  padding: '0.5rem',
+                  background: 'white'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.quantity > 1) {
+                        setFormData(prev => ({...prev, quantity: prev.quantity - 1}));
+                      }
+                    }}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      background: 'var(--soft-beige)',
+                      color: 'var(--chestnut-brown)',
+                      fontSize: '1.5rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'var(--chestnut-light)';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'var(--soft-beige)';
+                      e.currentTarget.style.color = 'var(--chestnut-brown)';
+                    }}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleInputChange}
+                    min="1"
+                    max="50"
+                    style={{
+                      width: '80px',
+                      textAlign: 'center',
+                      border: 'none',
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      background: 'transparent',
+                      outline: 'none'
+                    }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.quantity < 50) {
+                        setFormData(prev => ({...prev, quantity: prev.quantity + 1}));
+                      }
+                    }}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      background: 'var(--soft-beige)',
+                      color: 'var(--chestnut-brown)',
+                      fontSize: '1.5rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'var(--chestnut-light)';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'var(--soft-beige)';
+                      e.currentTarget.style.color = 'var(--chestnut-brown)';
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
 
               {/* 주문자 정보 그룹 */}
@@ -519,13 +742,30 @@ export default function Purchase() {
                       type="tel"
                       name="phone"
                       value={formData.phone}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        const formattedValue = formatPhoneNumber(e.target.value, setPhoneError);
+                        setFormData({...formData, phone: formattedValue});
+                      }}
                       className="form-input"
-                      placeholder="010-0000-0000"
-                      pattern="01[0-9]-?[0-9]{3,4}-?[0-9]{4}|01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}"
-                      title="연락처 형식은 010-1234-5678로 작성하세요"
+                      placeholder="010-1234-5678"
+                      style={{
+                        border: phoneError ? '1px solid #ff4444' : undefined
+                      }}
                       required
                     />
+                    {phoneError && (
+                      <div style={{
+                        color: '#ff4444',
+                        fontSize: '0.8rem',
+                        marginTop: '0.25rem',
+                        padding: '0.25rem',
+                        backgroundColor: '#fff5f5',
+                        border: '1px solid #ffcccc',
+                        borderRadius: '3px'
+                      }}>
+                        {phoneError}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -604,15 +844,32 @@ export default function Purchase() {
                       type="tel"
                       name="recipientPhone"
                       value={formData.recipientPhone}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        const formattedValue = formatPhoneNumber(e.target.value, setRecipientPhoneError);
+                        setFormData({...formData, recipientPhone: formattedValue});
+                      }}
                       disabled={sameAsOrderer}
                       className="form-input"
-                      placeholder="010-0000-0000"
-                      pattern="01[0-9]-?[0-9]{3,4}-?[0-9]{4}|01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}"
-                      title="연락처 형식은 010-1234-5678로 작성하세요"
-                      style={{background: sameAsOrderer ? '#f5f5f5' : 'white'}}
+                      placeholder="010-1234-5678"
+                      style={{
+                        background: sameAsOrderer ? '#f5f5f5' : 'white',
+                        border: recipientPhoneError ? '1px solid #ff4444' : undefined
+                      }}
                       required
                     />
+                    {recipientPhoneError && !sameAsOrderer && (
+                      <div style={{
+                        color: '#ff4444',
+                        fontSize: '0.8rem',
+                        marginTop: '0.25rem',
+                        padding: '0.25rem',
+                        backgroundColor: '#fff5f5',
+                        border: '1px solid #ffcccc',
+                        borderRadius: '3px'
+                      }}>
+                        {recipientPhoneError}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -982,6 +1239,26 @@ export default function Purchase() {
                 수정
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 세련된 로그아웃 모달 */}
+      {showLogoutModal && (
+        <div className="modal-overlay" onClick={() => setShowLogoutModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">🌰</div>
+            <div className="modal-title">안전하게 로그아웃</div>
+            <div className="modal-message">
+              소중한 시간을 함께해 주셔서 감사합니다.<br/>
+              다음에 또 만나요!
+            </div>
+            <button 
+              className="modal-button"
+              onClick={handleLogout}
+            >
+              확인
+            </button>
           </div>
         </div>
       )}

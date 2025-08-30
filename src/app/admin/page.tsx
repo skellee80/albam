@@ -258,7 +258,7 @@ function AdminBoard() {
                         width: '100%',
                         height: '150px',
                         objectFit: 'cover',
-                        borderRadius: '8px',
+                        borderRadius: '10px',
                         border: '1px solid #ddd'
                       }}
                     />
@@ -367,7 +367,7 @@ function AdminBoard() {
                             width: '100%',
                             height: '150px',
                             objectFit: 'cover',
-                            borderRadius: '8px',
+                            borderRadius: '10px',
                             border: '1px solid #ddd'
                           }}
                         />
@@ -656,7 +656,7 @@ function AdminBoard() {
                         width: '100%',
                         maxHeight: '400px',
                         objectFit: 'contain',
-                        borderRadius: '8px',
+                        borderRadius: '10px',
                         border: '1px solid #ddd',
                         cursor: 'pointer'
                       }}
@@ -695,6 +695,13 @@ export default function Admin() {
   const [composingNotes, setComposingNotes] = useState<{[key: string]: boolean}>({});
   const [noteValues, setNoteValues] = useState<{[key: string]: string}>({});
   const [chartPeriod, setChartPeriod] = useState(7);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   // 주문 관리 상태
   const [showAddOrderForm, setShowAddOrderForm] = useState(false);
@@ -723,6 +730,49 @@ export default function Admin() {
   
   // 수취인 정보 동일 체크 상태
   const [sameAsOrderer, setSameAsOrderer] = useState(false);
+  
+  // 전화번호 유효성 검사 상태
+  const [phoneError, setPhoneError] = useState('');
+  const [recipientPhoneError, setRecipientPhoneError] = useState('');
+
+  // 전화번호 포맷팅 함수
+  const formatPhoneNumber = (value: string, setError: (error: string) => void) => {
+    // 숫자만 추출
+    const numbersOnly = value.replace(/[^0-9]/g, '');
+    
+    // 에러 초기화
+    setError('');
+    
+    // 빈 값이면 그대로 반환
+    if (numbersOnly.length === 0) {
+      return '';
+    }
+    
+    // 한국 휴대폰 번호 형식 검증
+    if (!numbersOnly.startsWith('01')) {
+      setError('한국 이동통신 전화번호는 01로 시작해야 합니다.');
+      return value; // 현재 입력값 그대로 유지
+    }
+    
+    if (numbersOnly.length > 3 && !['010', '011', '016', '017', '018', '019'].includes(numbersOnly.substring(0, 3))) {
+      setError('올바른 한국 이동통신 번호가 아닙니다. (010, 011, 016, 017, 018, 019)');
+      return value; // 현재 입력값 그대로 유지
+    }
+    
+    if (numbersOnly.length > 11) {
+      setError('전화번호는 11자리를 초과할 수 없습니다.');
+      return numbersOnly.substring(0, 11); // 11자리까지만 잘라서 포맷팅
+    }
+    
+    // 자동 하이픈 추가
+    if (numbersOnly.length <= 3) {
+      return numbersOnly;
+    } else if (numbersOnly.length <= 7) {
+      return numbersOnly.substring(0, 3) + '-' + numbersOnly.substring(3);
+    } else {
+      return numbersOnly.substring(0, 3) + '-' + numbersOnly.substring(3, 7) + '-' + numbersOnly.substring(7);
+    }
+  };
   
   // 주문 완료 요약 상태
   const [showOrderSummary, setShowOrderSummary] = useState(false);
@@ -755,6 +805,17 @@ export default function Admin() {
       setAvailableProducts(defaultProducts);
     }
   }, []);
+
+  // 차트 업데이트 트리거 상태
+  const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0);
+
+  // 사용자 지정 날짜 변경 시 차트 자동 업데이트
+  useEffect(() => {
+    if (useCustomDate && customStartDate && customEndDate) {
+      // 차트 데이터 재계산을 위한 트리거
+      setChartUpdateTrigger(prev => prev + 1);
+    }
+  }, [customStartDate, customEndDate, useCustomDate]);
 
   const products = [
     { id: '1', name: '알밤 1kg' },
@@ -1043,6 +1104,7 @@ export default function Admin() {
   // 수취인 정보 동일 체크 처리
   const handleSameAsOrderer = (checked: boolean) => {
     setSameAsOrderer(checked);
+    setRecipientPhoneError(''); // 에러 상태 초기화
     if (checked) {
       setNewOrder({
         ...newOrder,
@@ -1064,14 +1126,15 @@ export default function Admin() {
       return;
     }
 
-    // 연락처 형식 검증
-    if (!validatePhoneNumber(newOrder.phone)) {
-      alert('주문자 연락처 형식이 올바르지 않습니다.\n올바른 형식: 010-1234-5678 또는 01012345678');
+    // 전화번호 에러 상태 확인
+    if (phoneError) {
+      alert('주문자 연락처를 올바르게 입력해주세요.');
       return;
     }
 
-    if (newOrder.recipientPhone && !validatePhoneNumber(newOrder.recipientPhone)) {
-      alert('수취인 연락처 형식이 올바르지 않습니다.\n올바른 형식: 010-1234-5678 또는 01012345678');
+    // 수취인 연락처 에러 상태 확인 (입력된 경우에만)
+    if (recipientPhoneError) {
+      alert('수취인 연락처를 올바르게 입력해주세요.');
       return;
     }
 
@@ -1110,6 +1173,8 @@ export default function Admin() {
       note: ''
     });
     setSameAsOrderer(false);
+    setPhoneError(''); // 전화번호 에러 상태 초기화
+    setRecipientPhoneError(''); // 수취인 전화번호 에러 상태 초기화
     setShowAddOrderForm(false);
   };
 
@@ -1227,14 +1292,27 @@ export default function Admin() {
 
   // 날짜별 매출 통계 (기간 조절 가능)
   const getDateStats = () => {
-    const today = new Date();
     const dateStats = [];
-    const labelInterval = chartPeriod >= 60 ? 3 : chartPeriod >= 30 ? 2 : 1; // 라벨 표시 간격
+    let startDate, endDate, totalDays;
     
-    // 모든 날짜에 대해 데이터 생성 (그래프는 매일 표시)
-    for (let i = chartPeriod - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
+    if (useCustomDate && customStartDate && customEndDate) {
+      // 사용자 지정 날짜 사용
+      startDate = new Date(customStartDate);
+      endDate = new Date(customEndDate);
+      totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    } else {
+      // 기본 기간 사용
+      const today = new Date();
+      endDate = today;
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() - (chartPeriod - 1));
+      totalDays = chartPeriod;
+    }
+    
+    // 모든 날짜에 대해 데이터 생성
+    for (let i = 0; i < totalDays; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
       const targetDate = date.toLocaleDateString('ko-KR'); // 예: 2024. 12. 25.
       
       // 해당 날짜의 모든 주문 확인 (필터링 없이)
@@ -1253,9 +1331,16 @@ export default function Admin() {
       // 날짜별 매출 = 입금 금액 합계 - 환불 금액 합계
       const dayRevenue = dailyPaidAmount - dailyRefundAmount;
       
-      // 라벨 표시 여부 결정 (간격에 따라)
-      const dayIndex = chartPeriod - 1 - i;
-      const showLabel = dayIndex % labelInterval === 0;
+      // 라벨 표시 여부 결정 (시작, 중간, 마지막만 표시)
+      let showLabel = false;
+      if (totalDays === 1) {
+        showLabel = true; // 1일만 있으면 표시
+      } else if (totalDays === 2) {
+        showLabel = i === 0 || i === totalDays - 1; // 시작과 끝만
+      } else {
+        const middleIndex = Math.floor(totalDays / 2);
+        showLabel = i === 0 || i === middleIndex || i === totalDays - 1; // 시작, 중간, 끝
+      }
       
       dateStats.push({
         date: date.toISOString().split('T')[0],
@@ -1377,31 +1462,31 @@ export default function Admin() {
         <section className="card" style={{marginBottom: '3rem'}}>
           <h2>📈 주문 통계</h2>
           
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginTop: '2rem'}}>
+          <div className="stats-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem', marginTop: '2rem'}}>
             <div style={{
-              padding: '1.2rem',
+              padding: '1rem',
               background: 'linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)',
-              borderRadius: '12px',
+              borderRadius: '10px',
               textAlign: 'center',
               border: '2px solid #f44336'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>⏳</div>
-              <h3 style={{fontSize: '0.9rem'}}>입금 대기</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#c62828'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>입금 대기</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {unpaidOrders}건
               </p>
             </div>
 
             <div style={{
-              padding: '1.2rem',
+              padding: '1rem',
               background: 'linear-gradient(135deg, #e3f2fd 0%, #90caf9 100%)',
-              borderRadius: '12px',
+              borderRadius: '10px',
               textAlign: 'center',
               border: '2px solid #2196f3'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>💳</div>
-              <h3 style={{fontSize: '0.9rem'}}>입금 완료</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#1565c0'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>입금 완료</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {paidOrders}건
               </p>
             </div>
@@ -1414,50 +1499,50 @@ export default function Admin() {
               border: '2px solid #ff9800'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>📦</div>
-              <h3 style={{fontSize: '0.9rem'}}>출고 대기</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#e65100'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>출고 대기</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {pendingOrders}건
               </p>
             </div>
 
             <div style={{
-              padding: '1.2rem',
+              padding: '1rem',
               background: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)',
-              borderRadius: '12px',
+              borderRadius: '10px',
               textAlign: 'center',
               border: '2px solid #4caf50'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>✅</div>
-              <h3 style={{fontSize: '0.9rem'}}>출고 완료</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#2e7d32'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>출고 완료</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {shippedOrders}건
               </p>
             </div>
 
             <div style={{
-              padding: '1.2rem',
+              padding: '1rem',
               background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
-              borderRadius: '12px',
+              borderRadius: '10px',
               textAlign: 'center',
               border: '2px solid #9c27b0'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>🔄</div>
-              <h3 style={{fontSize: '0.9rem'}}>교환 완료</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#7b1fa2'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>교환 완료</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {exchangedOrders}건
               </p>
             </div>
 
             <div style={{
-              padding: '1.2rem',
+              padding: '1rem',
               background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%)',
-              borderRadius: '12px',
+              borderRadius: '10px',
               textAlign: 'center',
               border: '2px solid #e91e63'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>💸</div>
-              <h3 style={{fontSize: '0.9rem'}}>환불 완료</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#c2185b'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>환불 완료</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {refundedOrders}건
               </p>
             </div>
@@ -1470,8 +1555,8 @@ export default function Admin() {
               border: '2px solid #ff9800'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>📊</div>
-              <h3 style={{fontSize: '0.9rem'}}>총 주문 수</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#e65100'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>총 주문 수</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {totalOrders}건
               </p>
             </div>
@@ -1484,8 +1569,8 @@ export default function Admin() {
               border: '2px solid #4caf50'
             }}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>💰</div>
-              <h3 style={{fontSize: '0.9rem'}}>총 매출</h3>
-              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#2e7d32'}}>
+              <h3 style={{fontSize: '0.9rem', color: '#000000'}}>총 매출</h3>
+              <p style={{fontSize: '1.3rem', fontWeight: 'bold', color: '#000000'}}>
                 {totalRevenue.toLocaleString()}원
               </p>
             </div>
@@ -1496,11 +1581,18 @@ export default function Admin() {
         <section className="card" style={{marginBottom: '3rem'}}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
             <h2>📈 매출 변화 추이</h2>
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'}}>
               <label style={{fontSize: '0.9rem', color: 'var(--text-light)'}}>기간 선택:</label>
               <select
-                value={chartPeriod}
-                onChange={(e) => setChartPeriod(Number(e.target.value))}
+                value={useCustomDate ? 'custom' : chartPeriod}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    setUseCustomDate(true);
+                  } else {
+                    setUseCustomDate(false);
+                    setChartPeriod(Number(e.target.value));
+                  }
+                }}
                 style={{
                   padding: '0.5rem',
                   borderRadius: '5px',
@@ -1512,7 +1604,59 @@ export default function Admin() {
                 <option value={14}>최근 14일</option>
                 <option value={30}>최근 30일</option>
                 <option value={60}>최근 60일</option>
+                <option value="custom">사용자 지정</option>
               </select>
+              
+              {useCustomDate && (
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    style={{
+                      padding: '0.4rem',
+                      borderRadius: '5px',
+                      border: '1px solid #ddd',
+                      fontSize: '0.8rem'
+                    }}
+                  />
+                  <span style={{fontSize: '0.8rem', color: 'var(--text-light)'}}>~</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    style={{
+                      padding: '0.4rem',
+                      borderRadius: '5px',
+                      border: '1px solid #ddd',
+                      fontSize: '0.8rem'
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (customStartDate && customEndDate) {
+                        // 차트 데이터 재계산을 위한 트리거
+                        setChartUpdateTrigger(prev => prev + 1);
+                        alert(`${customStartDate}부터 ${customEndDate}까지의 매출 데이터를 조회합니다.`);
+                      } else {
+                        alert('시작일과 종료일을 모두 선택해주세요.');
+                      }
+                    }}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      background: 'var(--chestnut-gradient)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    조회
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           
@@ -1533,7 +1677,7 @@ export default function Admin() {
               top: '50%',
               transform: 'rotate(-90deg) translateY(-50%)',
               fontSize: '0.8rem',
-              color: 'var(--chestnut-brown)',
+              color: '#000000',
               transformOrigin: 'center',
               fontWeight: 'bold'
             }}>
@@ -1564,7 +1708,7 @@ export default function Admin() {
                     left: '-50px',
                     top: '-8px',
                     fontSize: '0.7rem',
-                    color: 'var(--chestnut-brown)',
+                    color: '#000000',
                     fontWeight: '500'
                   }}>
                     {Math.round((maxRevenue * percent) / 100).toLocaleString()}
@@ -1684,7 +1828,7 @@ export default function Admin() {
                     width: `${Math.max(100 / dateStats.length - 1, 8)}%`,
                     textAlign: 'center',
                     fontSize: '0.7rem',
-                    color: 'var(--chestnut-brown)',
+                    color: '#000000',
                     fontWeight: '500',
                     transform: dateStats.length > 7 ? 'rotate(-90deg)' : 'none',
                     transformOrigin: 'center',
@@ -1772,9 +1916,9 @@ export default function Admin() {
                   
                   <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
                     <div style={{
-                      padding: '0.8rem',
+                      padding: '1rem',
                       background: 'rgba(255, 255, 255, 0.7)',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       textAlign: 'center'
                     }}>
                       <div style={{fontSize: '0.8rem', color: 'var(--text-light)', marginBottom: '0.3rem'}}>
@@ -1785,9 +1929,9 @@ export default function Admin() {
                       </div>
                     </div>
                     <div style={{
-                      padding: '0.8rem',
+                      padding: '1rem',
                       background: 'rgba(255, 255, 255, 0.7)',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       textAlign: 'center'
                     }}>
                       <div style={{fontSize: '0.8rem', color: 'var(--text-light)', marginBottom: '0.3rem'}}>
@@ -1893,7 +2037,30 @@ export default function Admin() {
         {/* 주문 목록 */}
         <section className="card">
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
-            <h2>📋 주문 목록 ({filteredOrders.length}건)</h2>
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              <h2>📋 주문 목록 ({filteredOrders.length}건)</h2>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <label style={{fontSize: '0.9rem', color: 'var(--text-light)'}}>페이지당:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    padding: '0.3rem',
+                    border: '1px solid var(--chestnut-light)',
+                    borderRadius: '5px',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  <option value={10}>10개</option>
+                  <option value={30}>30개</option>
+                  <option value={50}>50개</option>
+                  <option value={100}>100개</option>
+                </select>
+              </div>
+            </div>
             <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
               <button 
                 onClick={() => setShowAddOrderForm(true)}
@@ -1931,7 +2098,9 @@ export default function Admin() {
                 borderRadius: '15px',
                 overflow: 'hidden',
                 boxShadow: '0 8px 32px rgba(125, 79, 57, 0.1)',
-                border: '1px solid var(--chestnut-light)'
+                border: '1px solid var(--chestnut-light)',
+                maxHeight: '600px',
+                overflowY: 'auto'
               }}>
                 <table style={{
                   width: '100%',
@@ -1941,27 +2110,35 @@ export default function Admin() {
                   <thead>
                     <tr style={{
                       background: 'var(--chestnut-gradient)',
-                      color: 'white'
+                      color: 'white',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10
                     }}>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>주문번호</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>일자</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>주문자</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>수취인</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>연락처</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>주소</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>상품</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주문번호</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>일자</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주문자</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주문자<br/>연락처</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>수취인</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>수취인<br/>연락처</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주소</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>상품</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>수량</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'right', fontSize: '0.75rem'}}>금액</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>금액</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>입금</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>출고</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>교환</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>환불</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', fontSize: '0.75rem'}}>비고</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>비고</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>관리</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order, index) => (
+                    {(() => {
+                      const startIndex = (currentPage - 1) * itemsPerPage;
+                      const endIndex = startIndex + itemsPerPage;
+                      const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+                      return paginatedOrders.map((order, index) => (
                       <tr key={order.orderNumber} style={{
                         background: order.isShipped 
                           ? 'linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%)'
@@ -1985,37 +2162,81 @@ export default function Admin() {
                           padding: '0.6rem 0.4rem', 
                           fontFamily: 'monospace', 
                           fontSize: '0.7rem',
-                          color: 'var(--chestnut-dark)',
-                          whiteSpace: 'nowrap'
+                          color: '#000000',
+                          lineHeight: '1.2'
                         }}>
-                          {order.orderNumber}
+                          {order.orderNumber.replace(/(\d{6})(\d{6})/, '$1\n$2').split('\n').map((line, i) => (
+                            <div key={i}>{line}</div>
+                          ))}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
-                          {order.orderDate}
+                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', minWidth: '50px'}}>
+                          {(() => {
+                            const dateMatch = order.orderDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+                            if (dateMatch) {
+                              return (
+                                <>
+                                  <div>{dateMatch[1]}.</div>
+                                  <div>{dateMatch[2]}.{dateMatch[3]}.</div>
+                                </>
+                              );
+                            }
+                            return order.orderDate;
+                          })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontWeight: 'bold', color: 'var(--chestnut-brown)', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontWeight: 'bold', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
                           {order.name}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px'}}>
+                          {(() => {
+                            const phone = order.phone;
+                            const firstDashIndex = phone.indexOf('-');
+                            if (firstDashIndex !== -1) {
+                              return (
+                                <>
+                                  <div>{phone.substring(0, firstDashIndex + 1)}</div>
+                                  <div>{phone.substring(firstDashIndex + 1)}</div>
+                                </>
+                              );
+                            }
+                            return phone;
+                          })()}
+                        </td>
+                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
                           {order.recipientName || order.name}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap'}}>
-                          {order.recipientPhone || order.phone}
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px'}}>
+                          {(() => {
+                            const phone = order.recipientPhone || order.phone;
+                            const firstDashIndex = phone.indexOf('-');
+                            if (firstDashIndex !== -1) {
+                              return (
+                                <>
+                                  <div>{phone.substring(0, firstDashIndex + 1)}</div>
+                                  <div>{phone.substring(firstDashIndex + 1)}</div>
+                                </>
+                              );
+                            }
+                            return phone;
+                          })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: 'var(--text-secondary)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}} title={order.address}>
-                          {order.address.length > 10 ? order.address.substring(0, 10) + '...' : order.address}
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', maxWidth: '120px'}}>
+                          {order.address.match(/.{1,10}/g)?.map((line, i) => (
+                            <div key={i}>{line}</div>
+                          )) || order.address}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontWeight: '500', color: 'var(--chestnut-brown)', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
-                          {order.productName}
+                        <td style={{padding: '0.6rem 0.4rem', fontWeight: '500', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2'}}>
+                          {order.productName.match(/.{1,7}/g)?.map((line, i) => (
+                            <div key={i}>{line}</div>
+                          )) || order.productName}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.7rem'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.7rem', color: '#000000'}}>
                           {order.quantity}
                         </td>
                         <td style={{
                           padding: '0.6rem 0.4rem', 
                           textAlign: 'right', 
                           fontWeight: 'bold', 
-                          color: 'var(--golden-brown)',
+                          color: '#000000',
                           fontSize: '0.7rem',
                           whiteSpace: 'nowrap'
                         }}>
@@ -2191,10 +2412,56 @@ export default function Admin() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))})()}
                   </tbody>
                 </table>
               </div>
+              
+              {/* 페이지네이션 */}
+              {filteredOrders.length > itemsPerPage && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                  padding: '1rem'
+                }}>
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: currentPage === 1 ? '#ccc' : 'var(--chestnut-gradient)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    이전
+                  </button>
+                  
+                  <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                    {currentPage} / {Math.ceil(filteredOrders.length / itemsPerPage)}
+                  </span>
+                  
+                  <button
+                    onClick={() => setCurrentPage(Math.min(Math.ceil(filteredOrders.length / itemsPerPage), currentPage + 1))}
+                    disabled={currentPage >= Math.ceil(filteredOrders.length / itemsPerPage)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: currentPage >= Math.ceil(filteredOrders.length / itemsPerPage) ? '#ccc' : 'var(--chestnut-gradient)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: currentPage >= Math.ceil(filteredOrders.length / itemsPerPage) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -2262,11 +2529,31 @@ export default function Admin() {
                     <input
                       type="tel"
                       value={newOrder.phone}
-                      onChange={(e) => setNewOrder({...newOrder, phone: e.target.value})}
-                      pattern="01[0-9]-?[0-9]{3,4}-?[0-9]{4}|01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}"
-                      title="연락처 형식은 010-1234-5678로 작성하세요"
-                      style={{width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '5px'}}
+                      onChange={(e) => {
+                        const formattedValue = formatPhoneNumber(e.target.value, setPhoneError);
+                        setNewOrder({...newOrder, phone: formattedValue});
+                      }}
+                      placeholder="010-1234-5678"
+                      style={{
+                        width: '100%', 
+                        padding: '0.5rem', 
+                        border: phoneError ? '1px solid #ff4444' : '1px solid #ddd', 
+                        borderRadius: '5px'
+                      }}
                     />
+                    {phoneError && (
+                      <div style={{
+                        color: '#ff4444',
+                        fontSize: '0.8rem',
+                        marginTop: '0.25rem',
+                        padding: '0.25rem',
+                        backgroundColor: '#fff5f5',
+                        border: '1px solid #ffcccc',
+                        borderRadius: '3px'
+                      }}>
+                        {phoneError}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2324,18 +2611,33 @@ export default function Admin() {
                     <input
                       type="tel"
                       value={newOrder.recipientPhone}
-                      onChange={(e) => setNewOrder({...newOrder, recipientPhone: e.target.value})}
+                      onChange={(e) => {
+                        const formattedValue = formatPhoneNumber(e.target.value, setRecipientPhoneError);
+                        setNewOrder({...newOrder, recipientPhone: formattedValue});
+                      }}
                       disabled={sameAsOrderer}
-                      pattern="01[0-9]-?[0-9]{3,4}-?[0-9]{4}|01[0-9]\s?[0-9]{3,4}\s?[0-9]{4}"
-                      title="연락처 형식은 010-1234-5678로 작성하세요"
+                      placeholder="010-1234-5678"
                       style={{
                         width: '100%', 
                         padding: '0.5rem', 
-                        border: '1px solid #ddd', 
+                        border: recipientPhoneError ? '1px solid #ff4444' : '1px solid #ddd', 
                         borderRadius: '5px',
                         background: sameAsOrderer ? '#f5f5f5' : 'white'
                       }}
                     />
+                    {recipientPhoneError && !sameAsOrderer && (
+                      <div style={{
+                        color: '#ff4444',
+                        fontSize: '0.8rem',
+                        marginTop: '0.25rem',
+                        padding: '0.25rem',
+                        backgroundColor: '#fff5f5',
+                        border: '1px solid #ffcccc',
+                        borderRadius: '3px'
+                      }}>
+                        {recipientPhoneError}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2451,7 +2753,11 @@ export default function Admin() {
 
               <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
                 <button
-                  onClick={() => setShowAddOrderForm(false)}
+                  onClick={() => {
+                    setPhoneError(''); // 전화번호 에러 상태 초기화
+                    setRecipientPhoneError(''); // 수취인 전화번호 에러 상태 초기화
+                    setShowAddOrderForm(false);
+                  }}
                   style={{
                     padding: '0.7rem 1.5rem',
                     background: '#666',
@@ -2809,7 +3115,7 @@ export default function Admin() {
                     background: 'var(--chestnut-gradient)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     cursor: 'pointer',
                     fontSize: '1rem',
                     fontWeight: 'bold'

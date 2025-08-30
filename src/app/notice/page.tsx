@@ -13,6 +13,16 @@ interface Notice {
   isPinned?: boolean; // 상단 고정 여부
 }
 
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  address: string;
+  provider: 'email' | 'google';
+  createdAt: string;
+}
+
 export default function Notice() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
@@ -28,14 +38,33 @@ export default function Notice() {
   const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // 관리자 세션 확인
+  // 관리자 세션 및 사용자 로그인 확인
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
     if (adminSession === 'true') {
       setIsAdmin(true);
     }
+
+    // 현재 로그인한 사용자 확인
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+      try {
+        setCurrentUser(JSON.parse(userData));
+      } catch (error) {
+        console.error('사용자 데이터 파싱 오류:', error);
+      }
+    }
   }, []);
+
+  // 로그아웃 처리
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    setShowLogoutModal(false);
+  };
 
   // 공지사항 로드
   useEffect(() => {
@@ -296,7 +325,7 @@ export default function Notice() {
             <Link href="/production" className="nav-link">생산 과정</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
-            <Link href="/notice" className="nav-link nav-link-active">농장 공지사항</Link>
+            <Link href="/notice" className="nav-link nav-link-active">공지사항</Link>
             {isAdmin && (
               <>
                 <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
@@ -310,6 +339,58 @@ export default function Notice() {
                 </button>
               </>
             )}
+            {currentUser ? (
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                <div style={{
+                  color: 'white', 
+                  fontSize: '0.85rem', 
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)', 
+                  padding: '0.4rem 0.8rem', 
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                }}>
+                  안녕하세요, {currentUser.name}님! ✨
+                </div>
+                <Link href="/mypage" className="nav-link" style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
+                  fontWeight: 'bold',
+                  borderRadius: '20px',
+                  padding: '0.4rem 0.8rem',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  👤 마이페이지
+                </Link>
+                <button
+                  onClick={() => setShowLogoutModal(true)}
+                  className="nav-link"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    cursor: 'pointer',
+                    color: 'white',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '20px',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <Link href="/auth" className="nav-link" style={{
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
+                fontWeight: 'bold',
+                borderRadius: '20px',
+                padding: '0.4rem 0.8rem',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                🔐 로그인
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -317,7 +398,7 @@ export default function Notice() {
       <div className="container">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem'}}>
           <h1 style={{color: 'var(--primary-brown)'}}>
-            📢 농장 공지사항
+            📢 공지사항
           </h1>
           
           {/* 관리자 버튼 */}
@@ -992,6 +1073,26 @@ export default function Notice() {
           </div>
         </section>
       </div>
+
+      {/* 세련된 로그아웃 모달 */}
+      {showLogoutModal && (
+        <div className="modal-overlay" onClick={() => setShowLogoutModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">🌰</div>
+            <div className="modal-title">안전하게 로그아웃</div>
+            <div className="modal-message">
+              소중한 시간을 함께해 주셔서 감사합니다.<br/>
+              다음에 또 만나요!
+            </div>
+            <button 
+              className="modal-button"
+              onClick={handleLogout}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
