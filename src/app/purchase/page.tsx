@@ -444,7 +444,7 @@ export default function Purchase() {
           🛒 알밤 주문하기
         </h1>
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', alignItems: 'start'}}>
+        <div className="purchase-layout">
           {/* 주문 폼 */}
           <div className="card">
             <h2>주문 정보 입력</h2>
@@ -499,7 +499,7 @@ export default function Purchase() {
                   👤 주문자 정보
                 </h3>
                 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                <div className="form-row">
                   <div className="form-group" style={{margin: 0}}>
                     <label className="form-label">주문자 이름 *</label>
                     <input
@@ -582,7 +582,7 @@ export default function Purchase() {
                   </label>
                 </div>
                 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                <div className="form-row">
                   <div className="form-group" style={{margin: 0}}>
                     <label className="form-label">수취인 이름 *</label>
                     <input

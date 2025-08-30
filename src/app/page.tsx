@@ -277,19 +277,8 @@ export default function Home() {
 
         {/* 상품 편집 모달 */}
         {(editingProduct && !showAddForm) && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div className="card" style={{width: '500px', margin: 0, maxHeight: '80vh', overflow: 'auto'}}>
+          <div className="modal-overlay">
+            <div className="card modal-content">
               <h2>✏️ 상품 수정</h2>
               
               <div className="form-group">
@@ -411,19 +400,8 @@ export default function Home() {
 
         {/* 상품 추가 모달 */}
         {(editingProduct && showAddForm) && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div className="card" style={{width: '500px', margin: 0, maxHeight: '80vh', overflow: 'auto'}}>
+          <div className="modal-overlay">
+            <div className="card modal-content">
               <h2>➕ 새 상품 추가</h2>
               
               <div className="form-group">
