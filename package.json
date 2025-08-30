@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy": "echo '❌ 로컬 배포가 금지되었습니다. GitHub에 커밋하고 sync하여 자동 배포를 사용하세요.' && exit 1"
   },
   "dependencies": {
     "next": "15.0.0",

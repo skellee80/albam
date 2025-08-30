@@ -18,13 +18,13 @@ export default function Production() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-🌰 청양 칠갑산 알밤 농장
+칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 소개</Link>
-            <Link href="/production" className="nav-link">생산 과정</Link>
+            <Link href="/production" className="nav-link nav-link-active">생산 과정</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">농장 공지사항</Link>

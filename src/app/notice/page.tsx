@@ -287,7 +287,7 @@ export default function Notice() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-🌰 청양 칠갑산 알밤 농장
+칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
@@ -296,7 +296,7 @@ export default function Notice() {
             <Link href="/production" className="nav-link">생산 과정</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
-            <Link href="/notice" className="nav-link">농장 공지사항</Link>
+            <Link href="/notice" className="nav-link nav-link-active">농장 공지사항</Link>
             {isAdmin && (
               <>
                 <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
@@ -610,9 +610,9 @@ export default function Notice() {
           </div>
         )}
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '3rem'}}>
+        <div className="notice-layout">
           {/* 공지사항 목록 */}
-          <div className="card">
+          <div className={`card ${selectedNotice ? 'notice-list-hidden' : ''}`}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
             <h2>📋 공지사항 목록</h2>
               <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
@@ -702,51 +702,30 @@ export default function Notice() {
                               e.stopPropagation();
                               togglePinNotice(notice.id);
                             }}
-                            style={{
-                              background: notice.isPinned ? '#ff9800' : '#9e9e9e',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              padding: '0.3rem 0.6rem',
-                              fontSize: '0.7rem',
-                              cursor: 'pointer'
-                            }}
+                            className={`btn-icon btn-icon-pin ${notice.isPinned ? 'pinned' : ''}`}
+                            title={notice.isPinned ? '고정 해제' : '상단 고정'}
                           >
-                            {notice.isPinned ? '📌 고정해제' : '📌 고정'}
+                            📌
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditNotice(notice);
                             }}
-                            style={{
-                              background: '#2196f3',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              padding: '0.3rem 0.6rem',
-                              fontSize: '0.7rem',
-                              cursor: 'pointer'
-                            }}
+                            className="btn-icon btn-icon-edit"
+                            title="편집"
                           >
-                            ✏️ 편집
+                            ✏️
                           </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteNotice(notice.id);
                           }}
-                          style={{
-                              background: '#f44336',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '5px',
-                            padding: '0.3rem 0.6rem',
-                              fontSize: '0.7rem',
-                            cursor: 'pointer'
-                          }}
+                          className="btn-icon btn-icon-delete"
+                          title="삭제"
                         >
-                            🗑️ 삭제
+                            🗑️
                         </button>
                         </div>
                       )}
@@ -823,9 +802,50 @@ export default function Notice() {
           </div>
 
           {/* 공지사항 내용 */}
-          <div className="card">
+          <div className={`card ${selectedNotice ? 'notice-detail-visible' : 'notice-detail-hidden'}`}>
             {selectedNotice ? (
               <>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: '1rem'
+                }}>
+                  <button
+                    onClick={() => setSelectedNotice(null)}
+                    className="btn btn-secondary"
+                    style={{fontSize: '0.9rem', padding: '0.5rem 1rem'}}
+                  >
+                    ← 목록으로
+                  </button>
+                  
+                  {isAdmin && (
+                    <div style={{display: 'flex', gap: '0.5rem'}}>
+                      <button
+                        onClick={() => togglePinNotice(selectedNotice.id)}
+                        className={`btn-icon btn-icon-pin ${selectedNotice.isPinned ? 'pinned' : ''}`}
+                        title={selectedNotice.isPinned ? '고정 해제' : '상단 고정'}
+                      >
+                        📌
+                      </button>
+                      <button
+                        onClick={() => handleEditNotice(selectedNotice)}
+                        className="btn-icon btn-icon-edit"
+                        title="편집"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteNotice(selectedNotice.id)}
+                        className="btn-icon btn-icon-delete"
+                        title="삭제"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
                 <div style={{
                   padding: '1rem',
                   background: 'var(--soft-beige)',
@@ -843,6 +863,18 @@ export default function Notice() {
                   }}>
                     <span>📅 {selectedNotice.date}</span>
                     <span>👨‍🌾 {selectedNotice.author}</span>
+                    {selectedNotice.isPinned && (
+                      <span style={{
+                        background: '#ff9800',
+                        color: 'white',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold'
+                      }}>
+                        📌 고정
+                      </span>
+                    )}
                   </div>
                 </div>
                 

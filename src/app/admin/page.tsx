@@ -415,9 +415,9 @@ function AdminBoard() {
           </div>
         )}
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '3rem'}}>
+        <div className="notice-layout">
         {/* 메모 목록 */}
-        <div className="card">
+        <div className={`card ${selectedNote ? 'notice-list-hidden' : ''}`}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
             <h3>📋 메모 목록</h3>
             <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
@@ -488,34 +488,20 @@ function AdminBoard() {
                             e.stopPropagation();
                             handleEditNote(note);
                           }}
-                          style={{
-                            background: '#2196f3',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '5px',
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.8rem',
-                            cursor: 'pointer'
-                          }}
+                          className="btn-icon btn-icon-edit"
+                          title="편집"
                         >
-                          편집
+                          ✏️
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteNote(note.id);
                           }}
-                          style={{
-                            background: '#f44336',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '5px',
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.8rem',
-                            cursor: 'pointer'
-                          }}
+                          className="btn-icon btn-icon-delete"
+                          title="삭제"
                         >
-                          삭제
+                          🗑️
                         </button>
                       </div>
                     </div>
@@ -591,9 +577,41 @@ function AdminBoard() {
         </div>
 
         {/* 메모 내용 */}
-        <div className="card">
+        <div className={`card ${selectedNote ? 'notice-detail-visible' : 'notice-detail-hidden'}`}>
           {selectedNote ? (
             <>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '1rem'
+              }}>
+                <button
+                  onClick={() => setSelectedNote(null)}
+                  className="btn btn-secondary"
+                  style={{fontSize: '0.9rem', padding: '0.5rem 1rem'}}
+                >
+                  ← 목록으로
+                </button>
+                
+                <div style={{display: 'flex', gap: '0.5rem'}}>
+                  <button
+                    onClick={() => handleEditNote(selectedNote)}
+                    className="btn-icon btn-icon-edit"
+                    title="편집"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDeleteNote(selectedNote.id)}
+                    className="btn-icon btn-icon-delete"
+                    title="삭제"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+              
               <div style={{
                 padding: '1rem',
                 background: 'var(--soft-beige)',
@@ -1262,7 +1280,7 @@ export default function Admin() {
         <header className="header">
           <div className="header-content">
             <Link href="/" className="logo">
-  🌰 청양 칠갑산 알밤 농장
+  칠갑산 알밤 농장
             </Link>
             <nav className="nav">
               <Link href="/" className="nav-link">홈</Link>
@@ -1321,7 +1339,7 @@ export default function Admin() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-🌰 청양 칠갑산 알밤 농장
+칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
@@ -1331,9 +1349,9 @@ export default function Admin() {
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">농장 공지사항</Link>
-            <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
-              📊 주문 현황
-            </Link>
+                            <Link href="/admin" className="nav-link nav-link-active" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                  📊 주문 현황
+                </Link>
             <button onClick={() => {
               setIsAdmin(false);
               localStorage.removeItem('adminSession');

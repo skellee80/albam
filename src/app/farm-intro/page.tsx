@@ -18,12 +18,12 @@ export default function FarmIntro() {
       <header className="header">
         <div className="header-content">
           <Link href="/" className="logo">
-🌰 청양 칠갑산 알밤 농장
+칠갑산 알밤 농장
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
-            <Link href="/farm-intro" className="nav-link">농장 소개</Link>
+            <Link href="/farm-intro" className="nav-link nav-link-active">농장 소개</Link>
             <Link href="/production" className="nav-link">생산 과정</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
@@ -53,7 +53,7 @@ export default function FarmIntro() {
         {/* 농장주 소개 */}
         <section className="card">
           <h2>👨‍🌾 농장주 이기영을 소개합니다</h2>
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'center'}}>
+          <div className="farmer-intro-layout">
             <div style={{
               width: '200px',
               height: '200px',
