@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 interface User {
@@ -25,11 +26,12 @@ interface User {
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLoginSuccessModal, setShowLoginSuccessModal] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  
+  const { currentUser, userData, login, register, logout, resetPassword } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -41,23 +43,14 @@ export default function Auth() {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // 현재 사용자 확인
-  useEffect(() => {
-    const userData = localStorage.getItem('currentUser');
-    if (userData) {
-      try {
-        setCurrentUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('사용자 데이터 파싱 오류:', error);
-      }
-    }
-  }, []);
-
   // 로그아웃 처리
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setShowLogoutModal(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowLogoutModal(false);
+    } catch (error) {
+      console.error('로그아웃 오류:', error);
+    }
   };
 
   // 비밀번호 찾기 처리
@@ -75,30 +68,28 @@ export default function Auth() {
     }
 
     try {
-      // 등록된 사용자 확인
-      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      const user = existingUsers.find((u: User) => u.email === resetEmail);
-      
-      if (!user) {
-        alert('등록되지 않은 이메일입니다.');
-        return;
-      }
-
-      // 임시 비밀번호 생성 (6자리 숫자)
-      const tempPassword = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // 새 비밀번호 저장
-      localStorage.setItem(`password_${user.id}`, tempPassword);
-      
-      // 실제로는 이메일 발송 서비스를 사용해야 하지만, 
-      // 현재는 alert로 임시 비밀번호를 보여줍니다
-      alert(`임시 비밀번호가 발급되었습니다.\n\n임시 비밀번호: ${tempPassword}\n\n로그인 후 반드시 비밀번호를 변경해주세요.`);
-      
+      await resetPassword(resetEmail);
+      alert('비밀번호 재설정 이메일이 발송되었습니다.\n이메일을 확인해주세요.');
       setShowPasswordReset(false);
       setResetEmail('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('비밀번호 재설정 오류:', error);
-      alert('오류가 발생했습니다. 다시 시도해주세요.');
+      
+      let errorMessage = '오류가 발생했습니다. 다시 시도해주세요.';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = '등록되지 않은 이메일입니다.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = '올바르지 않은 이메일 형식입니다.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.';
+          break;
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -172,7 +163,7 @@ export default function Auth() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // 이메일 로그인/가입 처리
+  // Firebase 인증 처리
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -183,66 +174,46 @@ export default function Auth() {
     setIsLoading(true);
 
     try {
-      // 기존 사용자 데이터 가져오기
-      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-
       if (isLogin) {
         // 로그인 처리
-        const user = existingUsers.find((u: User) => 
-          u.email === formData.email && u.provider === 'email'
-        );
-
-        if (!user) {
-          setErrors({ email: '등록되지 않은 이메일입니다.' });
-          return;
-        }
-
-        // 실제로는 비밀번호 해시 비교를 해야 하지만, 데모용으로 간단히 처리
-        const storedPassword = localStorage.getItem(`password_${user.id}`);
-        if (storedPassword !== formData.password) {
-          setErrors({ password: '비밀번호가 일치하지 않습니다.' });
-          return;
-        }
-
-        // 로그인 성공
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        setShowLoginSuccessModal(true);
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
+        await login(formData.email, formData.password);
       } else {
         // 회원가입 처리
-        const existingUser = existingUsers.find((u: User) => u.email === formData.email);
-        if (existingUser) {
-          setErrors({ email: '이미 등록된 이메일입니다.' });
-          return;
-        }
-
-        // 새 사용자 생성
-        const newUser: User = {
-          id: Date.now().toString(),
-          email: formData.email,
-          name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          provider: 'email',
-          createdAt: new Date().toISOString()
-        };
-
-        // 사용자 정보 저장
-        existingUsers.push(newUser);
-        localStorage.setItem('users', JSON.stringify(existingUsers));
-        localStorage.setItem(`password_${newUser.id}`, formData.password);
-        localStorage.setItem('currentUser', JSON.stringify(newUser));
-
-        setShowLoginSuccessModal(true);
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
+        await register(formData.email, formData.password, formData.name, formData.phone, formData.address);
       }
-    } catch (error) {
+      
+      setShowLoginSuccessModal(true);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    } catch (error: any) {
       console.error('인증 오류:', error);
-      alert('오류가 발생했습니다. 다시 시도해주세요.');
+      
+      // Firebase 에러 메시지 처리
+      let errorMessage = '오류가 발생했습니다. 다시 시도해주세요.';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = '등록되지 않은 이메일입니다.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = '비밀번호가 일치하지 않습니다.';
+          break;
+        case 'auth/email-already-in-use':
+          errorMessage = '이미 등록된 이메일입니다.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = '비밀번호가 너무 약합니다. 6자 이상 입력해주세요.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = '올바르지 않은 이메일 형식입니다.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.';
+          break;
+      }
+      
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -281,7 +252,7 @@ export default function Auth() {
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/notice" className="nav-link">공지사항</Link>
             <Link href="/admin" className="nav-link">주문 현황</Link>
-            {currentUser ? (
+            {currentUser && userData ? (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
@@ -293,7 +264,7 @@ export default function Auth() {
                   backdropFilter: 'blur(10px)',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}>
-                  안녕하세요, {currentUser.name}님! ✨
+                  안녕하세요, {userData.name}님! ✨
                 </div>
                 <Link href="/mypage" className="nav-link" style={{
                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
@@ -343,6 +314,21 @@ export default function Auth() {
             <h1 style={{textAlign: 'center', marginBottom: '2rem', color: 'var(--chestnut-brown)'}}>
               {isLogin ? '로그인' : '회원가입'}
             </h1>
+
+            {errors.general && (
+              <div style={{
+                color: '#ff4444',
+                fontSize: '0.9rem',
+                marginBottom: '1rem',
+                padding: '0.8rem',
+                background: '#fff5f5',
+                border: '1px solid #ffcccc',
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                {errors.general}
+              </div>
+            )}
 
             <form onSubmit={handleEmailAuth}>
               {!isLogin && (

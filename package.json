@@ -10,17 +10,18 @@
     "deploy": "echo '❌ 로컬 배포가 금지되었습니다. GitHub에 커밋하고 sync하여 자동 배포를 사용하세요.' && exit 1"
   },
   "dependencies": {
+    "file-saver": "^2.0.5",
+    "firebase": "^12.2.1",
     "next": "15.0.0",
     "react": "^18",
     "react-dom": "^18",
-    "xlsx": "^0.18.5",
-    "file-saver": "^2.0.5"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/file-saver": "^2.0.7",
     "eslint": "^9",
     "eslint-config-next": "15.0.0",
     "typescript": "^5"

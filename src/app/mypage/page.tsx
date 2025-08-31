@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 interface User {
@@ -33,8 +34,8 @@ interface OrderData {
 }
 
 export default function MyPage() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { currentUser, userData, logout } = useAuth();
   const [userOrders, setUserOrders] = useState<OrderData[]>([]);
   const [activeTab, setActiveTab] = useState<'info' | 'orders'>('info');
   const [isEditing, setIsEditing] = useState(false);
@@ -181,7 +182,7 @@ export default function MyPage() {
     window.location.href = '/';
   };
 
-  if (!currentUser) {
+  if (!currentUser || !userData) {
     return <div>로딩 중...</div>;
   }
 
@@ -200,7 +201,7 @@ export default function MyPage() {
             <Link href="/notice" className="nav-link">공지사항</Link>
             <Link href="/admin" className="nav-link">주문 현황</Link>
             <Link href="/mypage" className="nav-link nav-link-active">마이페이지</Link>
-            {currentUser && (
+            {currentUser && userData && (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
@@ -212,7 +213,7 @@ export default function MyPage() {
                   backdropFilter: 'blur(10px)',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}>
-                  안녕하세요, {currentUser.name}님! ✨
+                  안녕하세요, {userData.name}님! ✨
                 </div>
                 <button
                   onClick={() => setShowLogoutModal(true)}

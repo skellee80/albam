@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 interface OrderData {
@@ -522,7 +523,7 @@ export default function Purchase() {
                 </button>
               </>
             )}
-            {currentUser ? (
+            {currentUser && userData ? (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
@@ -534,7 +535,7 @@ export default function Purchase() {
                   backdropFilter: 'blur(10px)',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}>
-                  안녕하세요, {currentUser.name}님! ✨
+                  안녕하세요, {userData.name}님! ✨
                 </div>
                 <Link href="/mypage" className="nav-link" style={{
                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
