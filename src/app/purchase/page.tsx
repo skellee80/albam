@@ -373,12 +373,28 @@ export default function Purchase() {
             createdAt: new Date().toISOString()
           };
           
-          await addDoc(collection(db, 'orders'), firestoreOrderData);
-          console.log('주문 데이터가 Firestore에 저장되었습니다.');
-        } catch (firestoreError) {
-          console.warn('Firestore 주문 저장 실패:', firestoreError);
+          console.log('Firestore 주문 저장 시도:', {
+            collection: 'orders',
+            userId: currentUser.uid,
+            orderNumber: orderData.orderNumber,
+            projectId: db.app.options.projectId
+          });
+          
+          const docRef = await addDoc(collection(db, 'orders'), firestoreOrderData);
+          console.log('✅ 주문 데이터가 Firestore에 저장되었습니다!', {
+            docId: docRef.id,
+            collection: 'orders'
+          });
+        } catch (firestoreError: any) {
+          console.error('❌ Firestore 주문 저장 실패:', {
+            code: firestoreError?.code,
+            message: firestoreError?.message,
+            stack: firestoreError?.stack
+          });
           // Firestore 저장 실패해도 주문은 계속 진행
         }
+      } else {
+        console.log('⚠ 비로그인 사용자 - Firestore 저장 건너뜀');
       }
 
       setOrderNumber(orderNum);

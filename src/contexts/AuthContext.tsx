@@ -239,19 +239,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       
       try {
-        console.log('Firestore 저장 요청 중...', { collection: 'users', docId: user.uid });
+        console.log('Firestore 저장 요청 중...', { 
+          collection: 'users', 
+          docId: user.uid,
+          data: userDocData,
+          projectId: db.app.options.projectId
+        });
         
-        // Firestore 저장에 타임아웃 추가
-        const firestorePromise = setDoc(doc(db, 'users', user.uid), userDocData);
-        const firestoreTimeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => {
-            console.error('❌ Firestore 저장 타임아웃 (15초)');
-            reject(new Error('Firestore 저장 시간 초과'));
-          }, 15000)
-        );
+        // Firestore 연결 상태 확인
+        console.log('Firestore 인스턴스 상태:', {
+          db: !!db,
+          app: !!db?.app,
+          projectId: db?.app?.options?.projectId
+        });
         
-        await Promise.race([firestorePromise, firestoreTimeoutPromise]);
-        console.log('✓ Firestore 저장 성공');
+        // 직접 setDoc 호출 (타임아웃 제거)
+        await setDoc(doc(db, 'users', user.uid), userDocData);
+        console.log('✅ Firestore 사용자 데이터 저장 성공!', {
+          uid: user.uid,
+          collection: 'users'
+        });
       } catch (firestoreError: any) {
         console.warn('⚠ Firestore 저장 실패, 로컬에서 계속 진행:', {
           code: firestoreError?.code,
