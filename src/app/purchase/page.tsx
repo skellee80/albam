@@ -32,7 +32,7 @@ interface User {
 
 export default function Purchase() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { currentUser, userData, logout } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     recipientName: '',
@@ -50,23 +50,7 @@ export default function Purchase() {
       setIsAdmin(true);
     }
 
-    // 로그인한 사용자 정보 자동 입력 (주문자 정보만)
-    const userData = localStorage.getItem('currentUser');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        setCurrentUser(user);
-        setFormData(prev => ({
-          ...prev,
-          name: user.name,
-          phone: user.phone || '',
-          address: user.address || ''
-          // 수취인 정보는 자동 입력하지 않음
-        }));
-      } catch (error) {
-        console.error('사용자 데이터 파싱 오류:', error);
-      }
-    }
+    // Firebase userData로 자동 입력은 별도 useEffect에서 처리
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,10 +66,13 @@ export default function Purchase() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // 로그아웃 처리
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setShowLogoutModal(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowLogoutModal(false);
+    } catch (error) {
+      console.error('로그아웃 오류:', error);
+    }
   };
 
   // 전화번호 포맷팅 함수

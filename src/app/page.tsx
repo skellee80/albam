@@ -80,16 +80,7 @@ export default function Home() {
       setIsAdmin(true);
     }
 
-    // 현재 로그인한 사용자 확인
-    const userData = localStorage.getItem('currentUser');
-    if (userData) {
-      try {
-        setCurrentUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('사용자 데이터 파싱 오류:', error);
-        localStorage.removeItem('currentUser');
-      }
-    }
+    // Firebase Auth에서 사용자 상태 자동 관리
     
     // 저장된 상품 데이터 로드
     const savedProducts = localStorage.getItem('chestnutProducts');
@@ -99,10 +90,13 @@ export default function Home() {
   }, []);
 
   // 로그아웃 처리
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setShowLogoutModal(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowLogoutModal(false);
+    } catch (error) {
+      console.error('로그아웃 오류:', error);
+    }
   };
 
   // 상품 저장

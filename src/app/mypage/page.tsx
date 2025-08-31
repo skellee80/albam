@@ -63,38 +63,7 @@ export default function MyPage() {
     }
   };
 
-  useEffect(() => {
-    // 현재 사용자 정보 확인
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) {
-      alert('로그인이 필요합니다.');
-      window.location.href = '/auth';
-      return;
-    }
-
-    try {
-      const user = JSON.parse(userData);
-      setCurrentUser(user);
-      setEditForm({
-        name: user.name,
-        phone: user.phone || '',
-        address: user.address || ''
-      });
-
-      // 사용자의 주문 내역 가져오기
-      const allOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      const myOrders = allOrders.filter((order: OrderData) => 
-        order.name === user.name || order.phone === user.phone
-      );
-      setUserOrders(myOrders.sort((a: OrderData, b: OrderData) => 
-        new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
-      ));
-    } catch (error) {
-      console.error('사용자 데이터 오류:', error);
-      alert('사용자 정보를 불러올 수 없습니다.');
-      window.location.href = '/';
-    }
-  }, []);
+  // 이 useEffect는 이미 위에서 Firebase userData로 처리됨
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -118,25 +87,25 @@ export default function MyPage() {
   };
 
   const handleSaveInfo = () => {
-    if (!validateForm() || !currentUser) return;
+    if (!validateForm() || !currentUser || !userData) return;
 
     try {
       // 사용자 정보 업데이트
+            // TODO: Firebase Firestore에서 사용자 정보 업데이트 구현 필요
+      // 현재는 localStorage 사용 (임시)
       const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const updatedUsers = users.map((user: User) => 
-        user.id === currentUser.id 
+      const updatedUsers = users.map((user: any) =>
+        user.email === userData.email
           ? { ...user, name: editForm.name, phone: editForm.phone, address: editForm.address }
           : user
       );
 
-      const updatedUser = { ...currentUser, name: editForm.name, phone: editForm.phone, address: editForm.address };
-
       localStorage.setItem('users', JSON.stringify(updatedUsers));
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       
-      setCurrentUser(updatedUser);
       setIsEditing(false);
       alert('정보가 성공적으로 수정되었습니다.');
+      // 페이지 새로고침으로 업데이트된 정보 반영
+      window.location.reload();
     } catch (error) {
       console.error('정보 수정 오류:', error);
       alert('정보 수정 중 오류가 발생했습니다.');
@@ -175,11 +144,14 @@ export default function MyPage() {
   };
 
   // 로그아웃 처리
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setShowLogoutModal(false);
-    window.location.href = '/';
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowLogoutModal(false);
+      window.location.href = '/';
+    } catch (error) {
+      console.error('로그아웃 오류:', error);
+    }
   };
 
   if (!currentUser || !userData) {
@@ -329,7 +301,7 @@ export default function MyPage() {
                       <label className="form-label">이메일</label>
                       <input
                         type="email"
-                        value={currentUser.email}
+                        value={currentUser.email || ''}
                         className="form-input"
                         disabled
                         style={{background: '#f5f5f5', color: '#666'}}
@@ -384,9 +356,9 @@ export default function MyPage() {
                         onClick={() => {
                           setIsEditing(false);
                           setEditForm({
-                            name: currentUser.name,
-                            phone: currentUser.phone || '',
-                            address: currentUser.address || ''
+                            name: userData?.name || '',
+                            phone: userData?.phone || '',
+                            address: userData?.address || ''
                           });
                           setErrors({});
                         }}
@@ -410,7 +382,7 @@ export default function MyPage() {
                   }}>
                     <div style={{marginBottom: '1rem'}}>
                       <strong style={{color: 'var(--chestnut-brown)'}}>이름:</strong>
-                      <span style={{marginLeft: '1rem'}}>{currentUser.name}</span>
+                      <span style={{marginLeft: '1rem'}}>{userData?.name || '등록되지 않음'}</span>
                     </div>
                     <div style={{marginBottom: '1rem'}}>
                       <strong style={{color: 'var(--chestnut-brown)'}}>이메일:</strong>
@@ -418,16 +390,16 @@ export default function MyPage() {
                     </div>
                     <div style={{marginBottom: '1rem'}}>
                       <strong style={{color: 'var(--chestnut-brown)'}}>전화번호:</strong>
-                      <span style={{marginLeft: '1rem'}}>{currentUser.phone || '등록되지 않음'}</span>
+                      <span style={{marginLeft: '1rem'}}>{userData?.phone || '등록되지 않음'}</span>
                     </div>
                     <div style={{marginBottom: '1rem'}}>
                       <strong style={{color: 'var(--chestnut-brown)'}}>주소:</strong>
-                      <span style={{marginLeft: '1rem'}}>{currentUser.address || '등록되지 않음'}</span>
+                      <span style={{marginLeft: '1rem'}}>{userData?.address || '등록되지 않음'}</span>
                     </div>
                     <div>
                       <strong style={{color: 'var(--chestnut-brown)'}}>가입일:</strong>
                       <span style={{marginLeft: '1rem'}}>
-                        {new Date(currentUser.createdAt).toLocaleDateString('ko-KR')}
+                        {userData?.createdAt ? new Date(userData.createdAt).toLocaleDateString('ko-KR') : '등록되지 않음'}
                       </span>
                     </div>
                   </div>

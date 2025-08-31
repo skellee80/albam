@@ -45,28 +45,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 회원가입
   async function register(email: string, password: string, name: string, phone?: string, address?: string) {
-    const { user } = await createUserWithEmailAndPassword(auth, email, password);
-    
-    // 프로필 업데이트
-    await updateProfile(user, { displayName: name });
-    
-    // Firestore에 사용자 데이터 저장
-    const userDocData: UserData = {
-      uid: user.uid,
-      email: user.email!,
-      name,
-      phone: phone || '',
-      address: address || '',
-      createdAt: new Date().toISOString()
-    };
-    
-    await setDoc(doc(db, 'users', user.uid), userDocData);
-    setUserData(userDocData);
+    try {
+      const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // 프로필 업데이트
+      await updateProfile(user, { displayName: name });
+      
+      // Firestore에 사용자 데이터 저장
+      const userDocData: UserData = {
+        uid: user.uid,
+        email: user.email!,
+        name,
+        phone: phone || '',
+        address: address || '',
+        createdAt: new Date().toISOString()
+      };
+      
+      await setDoc(doc(db, 'users', user.uid), userDocData);
+      setUserData(userDocData);
+    } catch (error) {
+      console.error('회원가입 오류:', error);
+      throw error;
+    }
   }
 
   // 로그인
-  async function login(email: string, password: string) {
-    return signInWithEmailAndPassword(auth, email, password);
+  async function login(email: string, password: string): Promise<void> {
+    await signInWithEmailAndPassword(auth, email, password);
   }
 
   // 로그아웃
@@ -76,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // 비밀번호 재설정
-  async function resetPassword(email: string) {
-    return sendPasswordResetEmail(auth, email);
+  async function resetPassword(email: string): Promise<void> {
+    await sendPasswordResetEmail(auth, email);
   }
 
   // 사용자 데이터 로드
@@ -101,6 +106,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('사용자 데이터 로드 오류:', error);
+      // Firestore 연결 실패 시 기본 사용자 데이터 설정
+      const fallbackUserData: UserData = {
+        uid: user.uid,
+        email: user.email!,
+        name: user.displayName || '사용자',
+        phone: '',
+        address: '',
+        createdAt: new Date().toISOString()
+      };
+      setUserData(fallbackUserData);
     }
   }
 
