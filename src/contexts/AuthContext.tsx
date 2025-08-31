@@ -48,24 +48,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Firebase 연결 상태 확인
   const isFirebaseConfigured = () => {
-    const config = {
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    };
-    
-    // Firebase 설정이 제대로 되어 있는지 확인
-    return config.apiKey && 
-           config.authDomain && 
-           config.projectId &&
-           config.apiKey !== "demo-api-key";
+    try {
+      // auth 객체가 정상적으로 초기화되었는지 확인
+      return auth && auth.app && auth.app.options.projectId !== undefined;
+    } catch (error) {
+      console.error('Firebase 설정 확인 오류:', error);
+      return false;
+    }
   };
 
   // 회원가입
   async function register(email: string, password: string, name: string, phone?: string, address?: string) {
     try {
       if (!isFirebaseConfigured()) {
-        throw new Error('Firebase가 설정되지 않았습니다. 관리자에게 문의하세요.');
+        console.error('Firebase 설정 상태:', {
+          auth: !!auth,
+          app: !!auth?.app,
+          projectId: auth?.app?.options?.projectId
+        });
+        throw new Error('Firebase 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.');
       }
 
       // Firebase 회원가입
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(email: string, password: string): Promise<void> {
     try {
       if (!isFirebaseConfigured()) {
-        throw new Error('Firebase가 설정되지 않았습니다. 관리자에게 문의하세요.');
+        throw new Error('Firebase 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.');
       }
 
       // Firebase 로그인
