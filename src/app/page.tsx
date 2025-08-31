@@ -269,7 +269,7 @@ export default function Home() {
       <div className="container">
         {/* 히어로 섹션 */}
         <section className="hero">
-          <h1>🍂 수확의 계절, 청양 알밤 🍂</h1>
+          <h1>🍂 청양 알밤 🍂</h1>
           <p>
             충남 청양의 청정 자연에서 정성껏 키운 달콤하고 고소한 알밤을 
             농가에서 직접 판매합니다. 신선함과 품질을 보장하는 청양 칠갑산 알밤 농장의 알밤을 만나보세요.

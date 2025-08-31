@@ -8,9 +8,10 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  deleteUser
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 interface UserData {
@@ -29,6 +30,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, phone?: string, address?: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateUserData: (data: Partial<UserData>) => void;
   loading: boolean;
 }
@@ -52,58 +54,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
     };
     
-    // 환경변수가 설정되지 않았거나 데모 값인 경우
-    // 임시로 Firebase 사용 안함 - localStorage 시스템 테스트용
-    return false; // config.apiKey && 
-           // config.authDomain && 
-           // config.projectId &&
-           // config.apiKey !== "demo-api-key" &&
-           // config.apiKey !== "AIzaSyC_UBILTyP5hLYszfcwBws_GuHTUWaY3hI";
+    // Firebase 설정이 제대로 되어 있는지 확인
+    return config.apiKey && 
+           config.authDomain && 
+           config.projectId &&
+           config.apiKey !== "demo-api-key";
   };
 
   // 회원가입
   async function register(email: string, password: string, name: string, phone?: string, address?: string) {
     try {
-      // Firebase가 제대로 설정되지 않은 경우 localStorage 사용
       if (!isFirebaseConfigured()) {
-        console.log('Firebase 미설정 - localStorage 사용');
-        
-        // localStorage 기반 회원가입
-        const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        const existingUser = existingUsers.find((u: any) => u.email === email);
-        
-        if (existingUser) {
-          throw { code: 'auth/email-already-in-use' };
-        }
-
-        const newUser: UserData = {
-          uid: Date.now().toString(),
-          email,
-          name,
-          phone: phone || '',
-          address: address || '',
-          createdAt: new Date().toISOString()
-        };
-
-        existingUsers.push(newUser);
-        localStorage.setItem('users', JSON.stringify(existingUsers));
-        localStorage.setItem(`password_${newUser.uid}`, password);
-        
-        // 가짜 Firebase User 객체 생성
-        const mockUser = {
-          uid: newUser.uid,
-          email: newUser.email,
-          displayName: newUser.name,
-          emailVerified: false
-        } as any;
-
-        setCurrentUser(mockUser);
-        setUserData(newUser);
-        localStorage.setItem('currentUser', JSON.stringify(newUser));
-        return;
+        throw new Error('Firebase가 설정되지 않았습니다. 관리자에게 문의하세요.');
       }
 
-      // 실제 Firebase 회원가입
+      // Firebase 회원가입
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
       
       // 프로필 업데이트
@@ -119,7 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString()
       };
       
-      await setDoc(doc(db, 'users', user.uid), userDocData);
+      try {
+        await setDoc(doc(db, 'users', user.uid), userDocData);
+      } catch (firestoreError) {
+        console.warn('Firestore 저장 실패, 로컬에서 계속 진행:', firestoreError);
+        // Firestore 저장이 실패해도 회원가입은 성공으로 처리
+      }
+      
       setUserData(userDocData);
     } catch (error) {
       console.error('회원가입 오류:', error);
@@ -130,37 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 로그인
   async function login(email: string, password: string): Promise<void> {
     try {
-      // Firebase가 제대로 설정되지 않은 경우 localStorage 사용
       if (!isFirebaseConfigured()) {
-        console.log('Firebase 미설정 - localStorage 로그인');
-        
-        const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        const user = existingUsers.find((u: any) => u.email === email);
-        
-        if (!user) {
-          throw { code: 'auth/user-not-found' };
-        }
-
-        const storedPassword = localStorage.getItem(`password_${user.uid}`);
-        if (storedPassword !== password) {
-          throw { code: 'auth/wrong-password' };
-        }
-
-        // 가짜 Firebase User 객체 생성
-        const mockUser = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.name,
-          emailVerified: false
-        } as any;
-
-        setCurrentUser(mockUser);
-        setUserData(user);
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        return;
+        throw new Error('Firebase가 설정되지 않았습니다. 관리자에게 문의하세요.');
       }
 
-      // 실제 Firebase 로그인
+      // Firebase 로그인
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error('로그인 오류:', error);
@@ -172,9 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function logout() {
     setUserData(null);
     setCurrentUser(null);
-    localStorage.removeItem('currentUser');
     
-    // Firebase가 제대로 설정되지 않은 경우 localStorage만 정리
     if (!isFirebaseConfigured()) {
       return Promise.resolve();
     }
@@ -184,31 +127,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 비밀번호 재설정
   async function resetPassword(email: string): Promise<void> {
-    // Firebase가 제대로 설정되지 않은 경우 localStorage 기반 처리
     if (!isFirebaseConfigured()) {
-      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      const user = existingUsers.find((u: any) => u.email === email);
-      
-      if (!user) {
-        throw { code: 'auth/user-not-found' };
-      }
-
-      // 임시 비밀번호 생성
-      const tempPassword = Math.floor(100000 + Math.random() * 900000).toString();
-      localStorage.setItem(`password_${user.uid}`, tempPassword);
-      
-      // 실제로는 이메일 발송이지만, 여기서는 alert로 표시
-      alert(`임시 비밀번호가 발급되었습니다.\n\n임시 비밀번호: ${tempPassword}\n\n로그인 후 반드시 비밀번호를 변경해주세요.`);
-      return;
+      throw new Error('Firebase가 설정되지 않았습니다. 관리자에게 문의하세요.');
     }
 
     await sendPasswordResetEmail(auth, email);
   }
 
+  // 회원 탈퇴
+  async function deleteAccount(): Promise<void> {
+    if (!currentUser) {
+      throw new Error('로그인된 사용자가 없습니다.');
+    }
+
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase가 설정되지 않았습니다. 관리자에게 문의하세요.');
+    }
+
+    try {
+      // Firestore에서 사용자 데이터 삭제
+      try {
+        await deleteDoc(doc(db, 'users', currentUser.uid));
+      } catch (firestoreError) {
+        console.warn('Firestore 사용자 데이터 삭제 실패:', firestoreError);
+      }
+
+      // Firebase Authentication에서 사용자 삭제
+      await deleteUser(currentUser);
+      
+      // 로컬 상태 초기화
+      setCurrentUser(null);
+      setUserData(null);
+    } catch (error) {
+      console.error('회원 탈퇴 오류:', error);
+      throw error;
+    }
+  }
+
   // 사용자 데이터 업데이트
-  function updateUserData(data: Partial<UserData>) {
-    if (userData) {
-      setUserData({ ...userData, ...data });
+  async function updateUserData(data: Partial<UserData>) {
+    if (userData && currentUser) {
+      const updatedUserData = { ...userData, ...data };
+      setUserData(updatedUserData);
+      
+      // Firestore에도 업데이트 (Firebase가 설정된 경우)
+      if (isFirebaseConfigured()) {
+        try {
+          await setDoc(doc(db, 'users', currentUser.uid), updatedUserData, { merge: true });
+        } catch (error) {
+          console.error('Firestore 업데이트 오류:', error);
+        }
+      }
     }
   }
 
@@ -228,11 +197,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           address: '',
           createdAt: new Date().toISOString()
         };
-        await setDoc(doc(db, 'users', user.uid), defaultUserData);
+        
+        try {
+          await setDoc(doc(db, 'users', user.uid), defaultUserData);
+        } catch (setDocError) {
+          console.warn('Firestore 기본 데이터 저장 실패:', setDocError);
+        }
+        
         setUserData(defaultUserData);
       }
     } catch (error) {
-      console.error('사용자 데이터 로드 오류:', error);
+      console.warn('사용자 데이터 로드 오류, 기본 데이터 사용:', error);
       // Firestore 연결 실패 시 기본 사용자 데이터 설정
       const fallbackUserData: UserData = {
         uid: user.uid,
@@ -247,32 +222,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Firebase가 제대로 설정되지 않은 경우 localStorage에서 사용자 정보 로드
     if (!isFirebaseConfigured()) {
-      console.log('Firebase 미설정 - localStorage에서 사용자 정보 로드');
-      
-      const savedUser = localStorage.getItem('currentUser');
-      if (savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
-          const mockUser = {
-            uid: userData.uid,
-            email: userData.email,
-            displayName: userData.name,
-            emailVerified: false
-          } as any;
-          
-          setCurrentUser(mockUser);
-          setUserData(userData);
-        } catch (error) {
-          console.error('사용자 데이터 로드 오류:', error);
-        }
-      }
+      console.log('Firebase가 설정되지 않았습니다.');
       setLoading(false);
       return;
     }
 
-    // 실제 Firebase Auth 상태 변경 감지
+    // Firebase Auth 상태 변경 감지
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
@@ -293,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     resetPassword,
+    deleteAccount,
     updateUserData,
     loading
   };

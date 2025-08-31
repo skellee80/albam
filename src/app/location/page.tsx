@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 interface User {
@@ -15,32 +16,25 @@ interface User {
 
 export default function Location() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { currentUser, userData, logout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // 관리자 세션 및 사용자 로그인 확인
+  // 관리자 세션 확인
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
     if (adminSession === 'true') {
       setIsAdmin(true);
     }
-
-    // 현재 로그인한 사용자 확인
-    const userData = localStorage.getItem('currentUser');
-    if (userData) {
-      try {
-        setCurrentUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('사용자 데이터 파싱 오류:', error);
-      }
-    }
   }, []);
 
   // 로그아웃 처리
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setShowLogoutModal(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowLogoutModal(false);
+    } catch (error) {
+      console.error('로그아웃 오류:', error);
+    }
   };
   return (
     <>
@@ -70,7 +64,7 @@ export default function Location() {
                 </button>
               </>
             )}
-            {currentUser ? (
+            {currentUser && userData ? (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
@@ -82,7 +76,7 @@ export default function Location() {
                   backdropFilter: 'blur(10px)',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}>
-                  안녕하세요, {currentUser.name}님! ✨
+                  안녕하세요, {userData.name}님! ✨
                 </div>
                 <Link href="/mypage" className="nav-link" style={{
                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 

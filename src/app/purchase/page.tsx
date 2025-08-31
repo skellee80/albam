@@ -43,15 +43,30 @@ export default function Purchase() {
     quantity: 1
   });
 
-  // 관리자 세션 확인 및 사용자 정보 자동 입력
+  // 관리자 세션 확인
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
     if (adminSession === 'true') {
       setIsAdmin(true);
     }
-
-    // Firebase userData로 자동 입력은 별도 useEffect에서 처리
   }, []);
+
+  // 로그인한 사용자 정보로 폼 자동 채우기
+  useEffect(() => {
+    if (userData) {
+      setFormData(prev => ({
+        ...prev,
+        name: userData.name || '',
+        phone: userData.phone || '',
+        address: userData.address || '',
+        // 수취인 정보는 기본적으로 주문자와 동일하게 설정
+        recipientName: userData.name || '',
+        recipientPhone: userData.phone || ''
+      }));
+      // 주문자와 수취인이 동일하다고 체크
+      setSameAsOrderer(true);
+    }
+  }, [userData]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -342,10 +357,31 @@ export default function Purchase() {
         note: ''
       };
 
-      // 로컬 스토리지에 주문 데이터 저장 (실제로는 서버 API 호출)
+      // 로컬 스토리지에 주문 데이터 저장
       const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
       existingOrders.push(orderData);
       localStorage.setItem('orders', JSON.stringify(existingOrders));
+
+      // Firebase Firestore에도 주문 데이터 저장
+      if (currentUser) {
+        try {
+          const { collection, addDoc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase');
+          
+          const firestoreOrderData = {
+            ...orderData,
+            userId: currentUser.uid,
+            userEmail: currentUser.email,
+            createdAt: new Date().toISOString()
+          };
+          
+          await addDoc(collection(db, 'orders'), firestoreOrderData);
+          console.log('주문 데이터가 Firestore에 저장되었습니다.');
+        } catch (firestoreError) {
+          console.warn('Firestore 주문 저장 실패:', firestoreError);
+          // Firestore 저장 실패해도 주문은 계속 진행
+        }
+      }
 
       setOrderNumber(orderNum);
       setOrderComplete(true);

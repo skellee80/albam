@@ -35,7 +35,7 @@ interface OrderData {
 
 export default function MyPage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { currentUser, userData, logout, updateUserData } = useAuth();
+  const { currentUser, userData, logout, updateUserData, deleteAccount } = useAuth();
   const [userOrders, setUserOrders] = useState<OrderData[]>([]);
   const [activeTab, setActiveTab] = useState<'info' | 'orders'>('info');
   const [isEditing, setIsEditing] = useState(false);
@@ -48,6 +48,8 @@ export default function MyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -66,7 +68,74 @@ export default function MyPage() {
     }
   };
 
-  // 이 useEffect는 이미 위에서 Firebase userData로 처리됨
+  // 사용자 주문 내역 로드 함수
+  const loadUserOrders = async (userData: any) => {
+    try {
+      // Firebase Firestore에서 주문 내역 로드 시도
+      if (currentUser) {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const ordersQuery = query(
+          collection(db, 'orders'),
+          where('userId', '==', currentUser.uid)
+        );
+        
+        const querySnapshot = await getDocs(ordersQuery);
+        const firestoreOrders: OrderData[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          firestoreOrders.push({
+            name: data.name,
+            recipientName: data.recipientName,
+            phone: data.phone,
+            recipientPhone: data.recipientPhone,
+            address: data.address,
+            productId: data.productId,
+            productName: data.productName,
+            quantity: data.quantity,
+            totalPrice: data.totalPrice,
+            orderDate: data.orderDate,
+            orderNumber: data.orderNumber,
+            isShipped: data.isShipped || false,
+            isPaid: data.isPaid || false,
+            isExchanged: data.isExchanged || false,
+            isRefunded: data.isRefunded || false,
+            note: data.note || ''
+          });
+        });
+        
+        if (firestoreOrders.length > 0) {
+          setUserOrders(firestoreOrders);
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('Firestore 주문 내역 로드 실패, localStorage 사용:', error);
+    }
+    
+    // Firestore에서 로드 실패하거나 주문이 없는 경우 localStorage에서 로드
+    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+    const userOrderList = orders.filter((order: OrderData) => 
+      order.name === userData.name || order.phone === userData.phone
+    );
+    setUserOrders(userOrderList);
+  };
+
+  // 사용자 데이터 로드 및 폼 초기화
+  useEffect(() => {
+    if (userData) {
+      setEditForm({
+        name: userData.name || '',
+        phone: userData.phone || '',
+        address: userData.address || ''
+      });
+      
+      // 사용자 주문 내역 로드
+      loadUserOrders(userData);
+    }
+  }, [userData, currentUser]);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -180,6 +249,30 @@ export default function MyPage() {
       window.location.href = '/';
     } catch (error) {
       console.error('로그아웃 오류:', error);
+    }
+  };
+
+  // 회원 탈퇴 처리
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    
+    try {
+      await deleteAccount();
+      alert('회원 탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.');
+      window.location.href = '/';
+    } catch (error: any) {
+      console.error('회원 탈퇴 오류:', error);
+      
+      let errorMessage = '회원 탈퇴 중 오류가 발생했습니다.';
+      
+      if (error.code === 'auth/requires-recent-login') {
+        errorMessage = '보안을 위해 최근에 로그인한 사용자만 탈퇴할 수 있습니다. 다시 로그인 후 시도해주세요.';
+      }
+      
+      alert(errorMessage);
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -435,6 +528,38 @@ export default function MyPage() {
                     </div>
                   </div>
                 )}
+
+                {/* 회원 탈퇴 버튼 */}
+                {!isEditing && (
+                  <div style={{
+                    marginTop: '2rem',
+                    paddingTop: '2rem',
+                    borderTop: '1px solid var(--soft-beige)',
+                    textAlign: 'center'
+                  }}>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      style={{
+                        background: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#cc3333';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#ff4444';
+                      }}
+                    >
+                      회원 탈퇴
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -607,6 +732,55 @@ export default function MyPage() {
             >
               확인
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 회원 탈퇴 확인 모달 */}
+      {showDeleteModal && (
+        <div className="modal-overlay" onClick={() => !isDeleting && setShowDeleteModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">⚠️</div>
+            <div className="modal-title">회원 탈퇴</div>
+            <div className="modal-message">
+              정말로 회원 탈퇴를 하시겠습니까?<br/>
+              <strong style={{color: '#ff4444'}}>탈퇴 후에는 모든 데이터가 삭제되며 복구할 수 없습니다.</strong><br/>
+              구매 내역과 개인정보가 모두 삭제됩니다.
+            </div>
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem'}}>
+              <button 
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.8rem 1.5rem',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.6 : 1
+                }}
+              >
+                취소
+              </button>
+              <button 
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                style={{
+                  background: '#ff4444',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.8rem 1.5rem',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.6 : 1
+                }}
+              >
+                {isDeleting ? '탈퇴 처리 중...' : '탈퇴하기'}
+              </button>
+            </div>
           </div>
         </div>
       )}
