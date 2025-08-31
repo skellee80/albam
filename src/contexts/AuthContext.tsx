@@ -79,69 +79,116 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Firebase 연결 테스트 시작...');
       
-      // 더 간단한 테스트: auth 객체 접근
+      // 1. Auth 객체 확인
       if (!auth || !auth.app) {
         console.error('Auth 객체가 초기화되지 않음');
         return false;
       }
       
-      // 프로젝트 ID 확인
-      const projectId = auth.app.options.projectId;
-      console.log('프로젝트 ID:', projectId);
+      // 2. 프로젝트 설정 확인
+      const config = auth.app.options;
+      console.log('Firebase 설정:', {
+        projectId: config.projectId,
+        authDomain: config.authDomain,
+        apiKey: config.apiKey?.substring(0, 10) + '...'
+      });
       
-      if (!projectId || projectId === 'demo-project') {
+      if (!config.projectId || config.projectId === 'demo-project') {
         console.error('유효하지 않은 프로젝트 ID');
         return false;
       }
       
-      console.log('Firebase 연결 테스트 성공');
+      // 3. Auth 서비스 상태 확인
+      try {
+        const currentUser = auth.currentUser;
+        console.log('현재 Auth 상태:', {
+          currentUser: !!currentUser,
+          authReady: true
+        });
+      } catch (authError) {
+        console.error('Auth 상태 확인 실패:', authError);
+        return false;
+      }
+      
+      console.log('✓ Firebase 연결 테스트 성공');
       return true;
     } catch (error) {
-      console.error('Firebase 연결 테스트 실패:', error);
+      console.error('❌ Firebase 연결 테스트 실패:', error);
       return false;
     }
   };
 
   // 회원가입
   async function register(email: string, password: string, name: string, phone?: string, address?: string) {
+    console.log('=== 회원가입 프로세스 시작 ===');
+    console.log('입력 데이터:', { email, name, phone: phone?.substring(0, 3) + '***' });
+    
     try {
-      console.log('회원가입 시작:', { email, name });
-      
+      // 1단계: Firebase 설정 확인
+      console.log('1단계: Firebase 설정 확인 중...');
       if (!isFirebaseConfigured()) {
-        console.error('Firebase 설정 상태:', {
+        console.error('Firebase 설정 실패:', {
           auth: !!auth,
           app: !!auth?.app,
           projectId: auth?.app?.options?.projectId
         });
         throw new Error('Firebase 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.');
       }
+      console.log('✓ Firebase 설정 확인 완료');
 
-      // Firebase 연결 테스트 (선택적)
+      // 2단계: Firebase 연결 테스트
+      console.log('2단계: Firebase 연결 테스트 중...');
       try {
         const connectionTest = await testFirebaseConnection();
         if (!connectionTest) {
-          console.warn('Firebase 연결 테스트 실패, 직접 시도');
+          console.warn('⚠ Firebase 연결 테스트 실패, 직접 시도');
+        } else {
+          console.log('✓ Firebase 연결 테스트 성공');
         }
       } catch (testError) {
-        console.warn('Firebase 연결 테스트 오류, 직접 시도:', testError);
+        console.warn('⚠ Firebase 연결 테스트 오류, 직접 시도:', testError);
       }
 
-      console.log('Firebase 회원가입 시도 중...');
-      // Firebase 회원가입 (타임아웃 추가)
+      // 3단계: Firebase Authentication 회원가입
+      console.log('3단계: Firebase Authentication 회원가입 시도 중...');
+      console.log('사용할 auth 객체:', {
+        auth: !!auth,
+        config: auth?.config,
+        app: !!auth?.app
+      });
+      
       const signupPromise = createUserWithEmailAndPassword(auth, email, password);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('회원가입 요청 시간 초과')), 30000)
+        setTimeout(() => {
+          console.error('❌ 회원가입 타임아웃 (10초) - Firebase 서버 응답 없음');
+          reject(new Error('Firebase 서버 응답 시간 초과. 프로젝트 설정을 확인해주세요.'));
+        }, 10000) // 30초에서 10초로 단축
       );
       
-      const { user } = await Promise.race([signupPromise, timeoutPromise]) as any;
-      console.log('Firebase 회원가입 성공:', user.uid);
+      console.log('Firebase 회원가입 요청 전송 중...');
+      console.log('요청 URL 예상:', `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${auth.app.options.apiKey?.substring(0, 10)}...`);
       
-      // 프로필 업데이트
-      console.log('프로필 업데이트 중...');
-      await updateProfile(user, { displayName: name });
-      console.log('프로필 업데이트 완료');
+      const result = await Promise.race([signupPromise, timeoutPromise]) as any;
+      const { user } = result;
+      console.log('✓ Firebase 회원가입 성공:', { 
+        uid: user.uid, 
+        email: user.email,
+        emailVerified: user.emailVerified,
+        creationTime: user.metadata?.creationTime
+      });
       
-      // Firestore에 사용자 데이터 저장
+      // 4단계: 프로필 업데이트
+      console.log('4단계: 프로필 업데이트 중...');
+      try {
+        await updateProfile(user, { displayName: name });
+        console.log('✓ 프로필 업데이트 완료');
+      } catch (profileError) {
+        console.error('⚠ 프로필 업데이트 실패:', profileError);
+        // 프로필 업데이트 실패해도 계속 진행
+      }
+      
+      // 5단계: Firestore에 사용자 데이터 저장
+      console.log('5단계: Firestore에 사용자 데이터 저장 중...');
       const userDocData: UserData = {
         uid: user.uid,
         email: user.email!,
@@ -151,20 +198,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString()
       };
       
-      console.log('Firestore 저장 시도 중...');
       try {
+        console.log('Firestore 저장 요청 중...', { collection: 'users', docId: user.uid });
         await setDoc(doc(db, 'users', user.uid), userDocData);
-        console.log('Firestore 저장 성공');
+        console.log('✓ Firestore 저장 성공');
       } catch (firestoreError) {
-        console.warn('Firestore 저장 실패, 로컬에서 계속 진행:', firestoreError);
+        console.warn('⚠ Firestore 저장 실패, 로컬에서 계속 진행:', firestoreError);
         // Firestore 저장이 실패해도 회원가입은 성공으로 처리
       }
       
-      console.log('사용자 데이터 설정 중...');
+      // 6단계: 로컬 상태 업데이트
+      console.log('6단계: 로컬 상태 업데이트 중...');
       setUserData(userDocData);
-      console.log('회원가입 완료');
-    } catch (error) {
-      console.error('회원가입 오류:', error);
+      console.log('✓ 사용자 데이터 설정 완료');
+      
+      console.log('🎉 회원가입 프로세스 완료!');
+      return userDocData;
+    } catch (error: any) {
+      console.error('❌ 회원가입 프로세스 실패');
+      console.error('오류 상세:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack?.substring(0, 200) + '...'
+      });
+      
+      // Firebase 특정 오류 처리
+      if (error?.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            console.error('이미 사용 중인 이메일');
+            break;
+          case 'auth/weak-password':
+            console.error('비밀번호가 너무 약함');
+            break;
+          case 'auth/invalid-email':
+            console.error('잘못된 이메일 형식');
+            break;
+          case 'auth/network-request-failed':
+            console.error('네트워크 연결 실패 - 인터넷 연결을 확인하세요');
+            break;
+          case 'auth/api-key-not-valid':
+            console.error('유효하지 않은 API 키 - Firebase 프로젝트 설정을 확인하세요');
+            break;
+          case 'auth/project-not-found':
+            console.error('Firebase 프로젝트를 찾을 수 없음');
+            break;
+          case 'auth/app-not-authorized':
+            console.error('앱이 Firebase 프로젝트에 인증되지 않음');
+            break;
+          default:
+            console.error('알 수 없는 Firebase 오류:', error.code);
+            console.error('Firebase 콘솔에서 Authentication이 활성화되어 있는지 확인하세요');
+            console.error('프로젝트 URL: https://console.firebase.google.com/project/albam-bb07e/authentication');
+        }
+      }
+      
       throw error;
     }
   }
