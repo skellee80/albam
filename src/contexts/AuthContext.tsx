@@ -252,7 +252,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✓ 사용자 데이터 설정 완료');
       
       console.log('🎉 회원가입 프로세스 완료!');
-      return userDocData;
     } catch (error: any) {
       console.error('❌ 회원가입 프로세스 실패');
       console.error('오류 상세:', {
