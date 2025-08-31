@@ -54,11 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // 환경 변수도 함께 확인
       const envVars = {
-        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-      };
-      
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    };
+    
       console.log('Firebase 설정 상태:', {
         auth: !!auth,
         app: !!auth?.app,
@@ -170,34 +170,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('3단계: Firebase Authentication 회원가입 시도 중...');
       console.log('사용할 auth 객체:', {
         auth: !!auth,
-        config: auth?.config,
-        app: !!auth?.app
+        app: !!auth?.app,
+        projectId: auth?.app?.options?.projectId
       });
       
-      const signupPromise = createUserWithEmailAndPassword(auth, email, password);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => {
-          console.error('❌ 회원가입 타임아웃 (10초) - Firebase 서버 응답 없음');
-          reject(new Error('Firebase 서버 응답 시간 초과. 프로젝트 설정을 확인해주세요.'));
-        }, 10000) // 30초에서 10초로 단축
-      );
+      // Firebase Auth 초기화 상태 재확인
+      if (!auth || !auth.app) {
+        throw new Error('Firebase Authentication이 초기화되지 않았습니다.');
+      }
       
       console.log('Firebase 회원가입 요청 전송 중...');
-      console.log('요청 URL 예상:', `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${auth.app.options.apiKey?.substring(0, 10)}...`);
-      
-      const result = await Promise.race([signupPromise, timeoutPromise]) as any;
-      const { user } = result;
-      console.log('✓ Firebase 회원가입 성공:', { 
-        uid: user.uid, 
-        email: user.email,
-        emailVerified: user.emailVerified,
-        creationTime: user.metadata?.creationTime
+      console.log('프로젝트 정보:', {
+        projectId: auth.app.options.projectId,
+        authDomain: auth.app.options.authDomain
       });
+      
+      let user;
+      try {
+        // 직접 createUserWithEmailAndPassword 호출 (타임아웃 없이)
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        user = userCredential.user;
+        console.log('✓ Firebase 회원가입 성공:', { 
+          uid: user.uid, 
+          email: user.email,
+          emailVerified: user.emailVerified,
+          creationTime: user.metadata?.creationTime
+        });
+      } catch (authError: any) {
+        console.error('❌ Firebase 회원가입 실패:', {
+          code: authError?.code,
+          message: authError?.message,
+          customData: authError?.customData
+        });
+        
+        // 구체적인 오류 메시지 제공
+        if (authError?.code === 'auth/email-already-in-use') {
+          throw new Error('이미 사용 중인 이메일입니다.');
+        } else if (authError?.code === 'auth/weak-password') {
+          throw new Error('비밀번호가 너무 약합니다. 6자 이상 입력해주세요.');
+        } else if (authError?.code === 'auth/invalid-email') {
+          throw new Error('유효하지 않은 이메일 형식입니다.');
+        } else if (authError?.code === 'auth/network-request-failed') {
+          throw new Error('네트워크 연결을 확인해주세요.');
+        } else {
+          throw new Error(`회원가입 중 오류가 발생했습니다: ${authError?.message || '알 수 없는 오류'}`);
+        }
+      }
       
       // 4단계: 프로필 업데이트
       console.log('4단계: 프로필 업데이트 중...');
       try {
-        await updateProfile(user, { displayName: name });
+      await updateProfile(user, { displayName: name });
         console.log('✓ 프로필 업데이트 완료');
       } catch (profileError) {
         console.error('⚠ 프로필 업데이트 실패:', profileError);
@@ -465,7 +488,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         
         try {
-          await setDoc(doc(db, 'users', user.uid), defaultUserData);
+        await setDoc(doc(db, 'users', user.uid), defaultUserData);
         } catch (setDocError) {
           console.warn('Firestore 기본 데이터 저장 실패:', setDocError);
         }
@@ -488,24 +511,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!isFirebaseConfigured()) {
-      console.log('Firebase가 설정되지 않았습니다.');
-      setLoading(false);
-      return;
-    }
+    let mounted = true;
+    
+    const initializeAuth = async () => {
+      try {
+        console.log('Firebase Auth 초기화 시작...');
+        
+        if (!isFirebaseConfigured()) {
+          console.error('Firebase가 설정되지 않았습니다.');
+          if (mounted) setLoading(false);
+          return;
+        }
 
-    // Firebase Auth 상태 변경 감지
+        // Firebase Auth가 완전히 초기화될 때까지 대기
+        await new Promise<void>((resolve) => {
+          const checkAuthReady = () => {
+            if (auth && auth.app && auth.currentUser !== undefined) {
+              console.log('✓ Firebase Auth 초기화 완료');
+              resolve();
+            } else {
+              setTimeout(checkAuthReady, 100);
+            }
+          };
+          checkAuthReady();
+        });
+
+        // Auth 상태 변경 감지
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (!mounted) return;
+          
+          console.log('Auth 상태 변경:', { 
+            hasUser: !!user, 
+            uid: user?.uid,
+            email: user?.email 
+          });
+          
       setCurrentUser(user);
       if (user) {
         await loadUserData(user);
       } else {
         setUserData(null);
       }
-      setLoading(false);
+          if (mounted) setLoading(false);
     });
 
     return unsubscribe;
+      } catch (error) {
+        console.error('Firebase Auth 초기화 오류:', error);
+        if (mounted) setLoading(false);
+        return () => {};
+      }
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    
+    initializeAuth().then((unsub) => {
+      unsubscribe = unsub;
+    });
+
+    return () => {
+      console.log('AuthProvider 정리 중...');
+      mounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const value = {

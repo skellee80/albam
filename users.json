@@ -1,2 +1,12 @@
 {"users": [
-]}
+{
+  "localId": "I4M8YoRzLbZTZ63bRPm4FsG2EP92",
+  "email": "skellee@naver.com",
+  "emailVerified": false,
+  "passwordHash": "1E9uGc2ANdfhbXnOG7SeX5bZ5XWjoLknr8IWDhqjGWwLlysV1nx+6nE3Iy/m/b8zGqqiLOeA8L/jk1ebBEM5PQ==",
+  "salt": "LXKH6OtB/TgxjQ==",
+  "lastSignedInAt": "1756637729024",
+  "createdAt": "1756637698905",
+  "disabled": false,
+  "providerUserInfo": []
+}]}
