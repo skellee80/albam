@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
@@ -69,7 +69,7 @@ export default function MyPage() {
   };
 
   // 사용자 주문 내역 로드 함수
-  const loadUserOrders = async (userData: any) => {
+  const loadUserOrders = useCallback(async (userData: any) => {
     try {
       // Firebase Firestore에서 주문 내역 로드 시도
       if (currentUser) {
@@ -121,7 +121,7 @@ export default function MyPage() {
       order.name === userData.name || order.phone === userData.phone
     );
     setUserOrders(userOrderList);
-  };
+  }, [currentUser]);
 
   // 사용자 데이터 로드 및 폼 초기화
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function MyPage() {
       // 사용자 주문 내역 로드
       loadUserOrders(userData);
     }
-  }, [userData, currentUser]);
+  }, [userData, currentUser, loadUserOrders]);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
