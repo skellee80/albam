@@ -243,7 +243,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           collection: 'users', 
           docId: user.uid,
           data: userDocData,
-          projectId: db.app.options.projectId
+          projectId: db.app.options.projectId,
+          databaseId: 'albam'
         });
         
         // Firestore 연결 상태 확인
@@ -257,7 +258,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(doc(db, 'users', user.uid), userDocData);
         console.log('✅ Firestore 사용자 데이터 저장 성공!', {
           uid: user.uid,
-          collection: 'users'
+          collection: 'users',
+          databaseId: 'albam'
         });
       } catch (firestoreError: any) {
         console.warn('⚠ Firestore 저장 실패, 로컬에서 계속 진행:', {

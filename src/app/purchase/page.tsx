@@ -377,13 +377,15 @@ export default function Purchase() {
             collection: 'orders',
             userId: currentUser.uid,
             orderNumber: orderData.orderNumber,
-            projectId: db.app.options.projectId
+            projectId: db.app.options.projectId,
+            databaseId: 'albam'
           });
           
           const docRef = await addDoc(collection(db, 'orders'), firestoreOrderData);
           console.log('✅ 주문 데이터가 Firestore에 저장되었습니다!', {
             docId: docRef.id,
-            collection: 'orders'
+            collection: 'orders',
+            databaseId: 'albam'
           });
         } catch (firestoreError: any) {
           console.error('❌ Firestore 주문 저장 실패:', {
