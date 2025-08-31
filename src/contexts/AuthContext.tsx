@@ -29,6 +29,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, phone?: string, address?: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updateUserData: (data: Partial<UserData>) => void;
   loading: boolean;
 }
 
@@ -83,6 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 비밀번호 재설정
   async function resetPassword(email: string): Promise<void> {
     await sendPasswordResetEmail(auth, email);
+  }
+
+  // 사용자 데이터 업데이트
+  function updateUserData(data: Partial<UserData>) {
+    if (userData) {
+      setUserData({ ...userData, ...data });
+    }
   }
 
   // 사용자 데이터 로드
@@ -140,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     resetPassword,
+    updateUserData,
     loading
   };
 

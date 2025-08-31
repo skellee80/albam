@@ -172,6 +172,7 @@ export default function Auth() {
     }
 
     setIsLoading(true);
+    setErrors({}); // 기존 에러 초기화
 
     try {
       if (isLogin) {
@@ -192,11 +193,12 @@ export default function Auth() {
       // Firebase 에러 메시지 처리
       let errorMessage = '오류가 발생했습니다. 다시 시도해주세요.';
       
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = '등록되지 않은 이메일입니다.';
-          break;
-        case 'auth/wrong-password':
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/user-not-found':
+            errorMessage = '등록되지 않은 이메일입니다.';
+            break;
+          case 'auth/wrong-password':
           errorMessage = '비밀번호가 일치하지 않습니다.';
           break;
         case 'auth/email-already-in-use':
@@ -211,6 +213,19 @@ export default function Auth() {
         case 'auth/too-many-requests':
           errorMessage = '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.';
           break;
+        case 'auth/network-request-failed':
+          errorMessage = '네트워크 연결을 확인해주세요.';
+          break;
+        case 'auth/configuration-not-found':
+          errorMessage = 'Firebase 설정을 확인해주세요. Authentication이 활성화되지 않았을 수 있습니다.';
+          break;
+        default:
+          errorMessage = `인증 오류: ${error.message || '알 수 없는 오류가 발생했습니다.'}`;
+          break;
+        }
+      } else {
+        // Firebase 에러 코드가 없는 경우
+        errorMessage = `오류: ${error.message || '알 수 없는 오류가 발생했습니다.'}`;
       }
       
       setErrors({ general: errorMessage });

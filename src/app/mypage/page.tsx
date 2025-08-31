@@ -35,7 +35,7 @@ interface OrderData {
 
 export default function MyPage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { currentUser, userData, logout } = useAuth();
+  const { currentUser, userData, logout, updateUserData } = useAuth();
   const [userOrders, setUserOrders] = useState<OrderData[]>([]);
   const [activeTab, setActiveTab] = useState<'info' | 'orders'>('info');
   const [isEditing, setIsEditing] = useState(false);
@@ -45,6 +45,9 @@ export default function MyPage() {
     address: ''
   });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -86,29 +89,55 @@ export default function MyPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveInfo = () => {
+  const handleSaveInfo = async () => {
     if (!validateForm() || !currentUser || !userData) return;
 
+    setIsLoading(true);
+
     try {
-      // 사용자 정보 업데이트
-            // TODO: Firebase Firestore에서 사용자 정보 업데이트 구현 필요
-      // 현재는 localStorage 사용 (임시)
+      // Firebase Firestore에서 사용자 정보 업데이트
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const updatedData = {
+        name: editForm.name,
+        phone: editForm.phone,
+        address: editForm.address
+      };
+
+      await updateDoc(userDocRef, updatedData);
+
+      // Firebase Auth 프로필 업데이트
+      const { updateProfile } = await import('firebase/auth');
+      await updateProfile(currentUser, { displayName: editForm.name });
+
+      // AuthContext의 userData 실시간 업데이트
+      updateUserData(updatedData);
+
+      // 임시로 localStorage도 업데이트 (기존 주문 데이터 호환성을 위해)
       const users = JSON.parse(localStorage.getItem('users') || '[]');
       const updatedUsers = users.map((user: any) =>
-        user.email === userData.email
-          ? { ...user, name: editForm.name, phone: editForm.phone, address: editForm.address }
-          : user
+        user.email === userData.email ? { ...user, ...updatedData } : user
       );
-
       localStorage.setItem('users', JSON.stringify(updatedUsers));
       
       setIsEditing(false);
-      alert('정보가 성공적으로 수정되었습니다.');
-      // 페이지 새로고침으로 업데이트된 정보 반영
-      window.location.reload();
+      setShowSuccessModal(true);
+      
+      // 성공 모달 후 자동으로 닫기
+      setTimeout(() => {
+        setShowSuccessModal(false);
+      }, 2000);
+
     } catch (error) {
       console.error('정보 수정 오류:', error);
-      alert('정보 수정 중 오류가 발생했습니다.');
+      setShowErrorModal(true);
+      setTimeout(() => {
+        setShowErrorModal(false);
+      }, 3000);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -368,9 +397,11 @@ export default function MyPage() {
                       </button>
                       <button
                         onClick={handleSaveInfo}
+                        disabled={isLoading}
                         className="btn"
+                        style={{ opacity: isLoading ? 0.6 : 1 }}
                       >
-                        저장
+                        {isLoading ? '저장 중...' : '저장'}
                       </button>
                     </div>
                   </div>
@@ -539,6 +570,40 @@ export default function MyPage() {
             <button 
               className="modal-button"
               onClick={handleLogout}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 정보 수정 성공 모달 */}
+      {showSuccessModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-icon">✨</div>
+            <div className="modal-title">정보 수정 완료!</div>
+            <div className="modal-message">
+              회원 정보가 성공적으로 수정되었습니다.<br/>
+              변경된 정보가 즉시 반영됩니다.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 정보 수정 오류 모달 */}
+      {showErrorModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-icon">❌</div>
+            <div className="modal-title">수정 실패</div>
+            <div className="modal-message">
+              정보 수정 중 오류가 발생했습니다.<br/>
+              잠시 후 다시 시도해주세요.
+            </div>
+            <button 
+              className="modal-button"
+              onClick={() => setShowErrorModal(false)}
             >
               확인
             </button>
