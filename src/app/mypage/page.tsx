@@ -289,7 +289,7 @@ export default function MyPage() {
           </Link>
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
-            <Link href="/intro" className="nav-link">농장 소개</Link>
+            <Link href="/farm-intro" className="nav-link">농장 소개</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/notice" className="nav-link">공지사항</Link>

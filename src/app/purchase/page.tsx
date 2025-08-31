@@ -58,13 +58,11 @@ export default function Purchase() {
         ...prev,
         name: userData.name || '',
         phone: userData.phone || '',
-        address: userData.address || '',
-        // 수취인 정보는 기본적으로 주문자와 동일하게 설정
-        recipientName: userData.name || '',
-        recipientPhone: userData.phone || ''
+        address: userData.address || ''
+        // 수취인 정보는 사용자가 직접 입력하도록 변경
       }));
-      // 주문자와 수취인이 동일하다고 체크
-      setSameAsOrderer(true);
+      // 주문자와 수취인이 동일 체크박스는 기본적으로 체크되지 않음
+      setSameAsOrderer(false);
     }
   }, [userData]);
 
