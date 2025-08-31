@@ -51,12 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // auth 객체가 정상적으로 초기화되었는지 확인
       const isConfigured = auth && auth.app && auth.app.options.projectId !== undefined;
+      
+      // 환경 변수도 함께 확인
+      const envVars = {
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      };
+      
       console.log('Firebase 설정 상태:', {
         auth: !!auth,
         app: !!auth?.app,
         projectId: auth?.app?.options?.projectId,
+        envVars,
         isConfigured
       });
+      
       return isConfigured;
     } catch (error) {
       console.error('Firebase 설정 확인 오류:', error);

@@ -2,22 +2,79 @@
 # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
 runConfig:
   minInstances: 0
-  # maxInstances: 100
-  # concurrency: 80
-  # cpu: 1
-  # memoryMiB: 512
+  maxInstances: 10
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+  # 타임아웃 설정 (Firebase 연결 문제 해결을 위해)
+  timeoutSeconds: 300
 
 # Environment variables and secrets.
-# env:
-  # Configure environment variables.
+env:
+  # Firebase Configuration Environment Variables
   # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
-  # - variable: MESSAGE
-  #   value: Hello world!
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyC_UBILTyP5hLYszfcwBws_GuHTUWaY3hI
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: albam-bb07e.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: albam-bb07e
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: albam-bb07e.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "214464229053"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:214464229053:web:b2cd7266cdcce7aa8851d4
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Node.js 환경 설정
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Next.js 빌드 최적화
+  - variable: NEXT_TELEMETRY_DISABLED
+    value: "1"
+    availability:
+      - BUILD
+      - RUNTIME
 
   # Grant access to secrets in Cloud Secret Manager.
   # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
   # - variable: MY_SECRET
   #   secret: mySecretRef
+
+# Build settings
+# See https://firebase.google.com/docs/app-hosting/configure#build-settings
+buildConfig:
+  # Node.js 버전 지정
+  runtime: nodejs20
+  # 빌드 명령어 (기본값: npm run build)
+  buildCommand: npm run build
+  # 빌드 결과물 디렉토리 (Next.js 기본값)
+  outputDir: .next
