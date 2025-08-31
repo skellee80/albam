@@ -98,7 +98,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       
-      // 3. Auth 서비스 상태 확인
+      // 3. Firestore 연결 테스트 추가
+      try {
+        console.log('Firestore 연결 테스트 중...');
+        // 간단한 Firestore 연결 테스트 - 실제 데이터를 읽지 않고 연결만 확인
+        const testDoc = doc(db, 'test', 'connection');
+        console.log('Firestore 연결 성공');
+      } catch (firestoreError: any) {
+        console.error('Firestore 연결 실패:', {
+          code: firestoreError?.code,
+          message: firestoreError?.message
+        });
+        if (firestoreError?.code === 'permission-denied') {
+          console.warn('⚠ Firestore 권한 문제 - 보안 규칙 확인 필요');
+        }
+        // Firestore 연결 실패해도 Auth는 작동할 수 있으므로 계속 진행
+      }
+      
+      // 4. Auth 서비스 상태 확인
       try {
         const currentUser = auth.currentUser;
         console.log('현재 Auth 상태:', {
@@ -200,10 +217,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       try {
         console.log('Firestore 저장 요청 중...', { collection: 'users', docId: user.uid });
-        await setDoc(doc(db, 'users', user.uid), userDocData);
+        
+        // Firestore 저장에 타임아웃 추가
+        const firestorePromise = setDoc(doc(db, 'users', user.uid), userDocData);
+        const firestoreTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => {
+            console.error('❌ Firestore 저장 타임아웃 (15초)');
+            reject(new Error('Firestore 저장 시간 초과'));
+          }, 15000)
+        );
+        
+        await Promise.race([firestorePromise, firestoreTimeoutPromise]);
         console.log('✓ Firestore 저장 성공');
-      } catch (firestoreError) {
-        console.warn('⚠ Firestore 저장 실패, 로컬에서 계속 진행:', firestoreError);
+      } catch (firestoreError: any) {
+        console.warn('⚠ Firestore 저장 실패, 로컬에서 계속 진행:', {
+          code: firestoreError?.code,
+          message: firestoreError?.message
+        });
+        
+        // 특정 Firestore 오류 처리
+        if (firestoreError?.code === 'permission-denied') {
+          console.error('Firestore 권한 거부 - 보안 규칙을 확인하세요');
+          console.error('Firebase 콘솔: https://console.firebase.google.com/project/albam-bb07e/firestore/rules');
+        } else if (firestoreError?.code === 'unavailable') {
+          console.error('Firestore 서비스 사용 불가 - 네트워크 연결을 확인하세요');
+        }
+        
         // Firestore 저장이 실패해도 회원가입은 성공으로 처리
       }
       
@@ -323,29 +362,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Firestore에서 사용자 데이터 삭제
       console.log('Firestore 사용자 데이터 삭제 시도 중...');
       try {
-        await deleteDoc(doc(db, 'users', currentUser.uid));
-        console.log('Firestore 사용자 데이터 삭제 성공');
-      } catch (firestoreError) {
-        console.warn('Firestore 사용자 데이터 삭제 실패:', firestoreError);
+        const firestoreDeletePromise = deleteDoc(doc(db, 'users', currentUser.uid));
+        const firestoreTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => {
+            console.error('❌ Firestore 삭제 타임아웃 (15초)');
+            reject(new Error('Firestore 삭제 시간 초과'));
+          }, 15000)
+        );
+        
+        await Promise.race([firestoreDeletePromise, firestoreTimeoutPromise]);
+        console.log('✓ Firestore 사용자 데이터 삭제 성공');
+      } catch (firestoreError: any) {
+        console.warn('⚠ Firestore 사용자 데이터 삭제 실패:', {
+          code: firestoreError?.code,
+          message: firestoreError?.message
+        });
+        
+        if (firestoreError?.code === 'permission-denied') {
+          console.error('Firestore 권한 거부 - 보안 규칙을 확인하세요');
+        } else if (firestoreError?.code === 'not-found') {
+          console.warn('삭제할 사용자 데이터가 Firestore에 없음');
+        }
       }
 
       // Firebase Authentication에서 사용자 삭제 (타임아웃 추가)
       console.log('Firebase Authentication 사용자 삭제 시도 중...');
       const deletePromise = deleteUser(currentUser);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('회원 탈퇴 요청 시간 초과')), 30000)
+        setTimeout(() => {
+          console.error('❌ 회원 탈퇴 타임아웃 (30초) - Firebase 서버 응답 없음');
+          reject(new Error('회원 탈퇴 요청 시간 초과 (30초). Firebase 서버 응답이 없습니다.'));
+        }, 30000)
       );
       
       await Promise.race([deletePromise, timeoutPromise]);
-      console.log('Firebase Authentication 사용자 삭제 성공');
+      console.log('✓ Firebase Authentication 사용자 삭제 성공');
       
       // 로컬 상태 초기화
       console.log('로컬 상태 초기화 중...');
       setCurrentUser(null);
       setUserData(null);
-      console.log('회원 탈퇴 완료');
-    } catch (error) {
-      console.error('회원 탈퇴 오류:', error);
+      console.log('🎉 회원 탈퇴 완료');
+    } catch (error: any) {
+      console.error('❌ 회원 탈퇴 오류:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack?.substring(0, 200) + '...'
+      });
+      
+      // Firebase 특정 오류 처리
+      if (error?.code) {
+        switch (error.code) {
+          case 'auth/requires-recent-login':
+            console.error('최근 로그인이 필요함 - 다시 로그인 후 탈퇴를 시도하세요');
+            break;
+          case 'auth/network-request-failed':
+            console.error('네트워크 연결 실패 - 인터넷 연결을 확인하세요');
+            break;
+          case 'auth/user-token-expired':
+            console.error('사용자 토큰 만료 - 다시 로그인 후 탈퇴를 시도하세요');
+            break;
+          default:
+            console.error('알 수 없는 Firebase 오류:', error.code);
+        }
+      }
+      
       throw error;
     }
   }

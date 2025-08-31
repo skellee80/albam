@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 사용자 문서 규칙 - 인증된 사용자만 자신의 데이터에 접근 가능
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 주문 문서 규칙 - 인증된 사용자만 자신의 주문에 접근 가능
+    match /orders/{orderId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.uid == request.resource.data.userId);
+    }
+    
+    // 기본적으로 다른 모든 문서는 접근 거부
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
