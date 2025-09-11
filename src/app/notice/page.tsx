@@ -315,20 +315,19 @@ export default function Notice() {
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
-            <Link href="/farm-intro" className="nav-link">농장 소개</Link>
-            <Link href="/production" className="nav-link">생산 과정</Link>
+            <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link nav-link-active">공지사항</Link>
             {isAdmin && (
               <>
-                <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                <Link href="/admin" className="nav-link">
                   📊 주문 현황
                 </Link>
                 <button onClick={() => {
                   setIsAdmin(false);
                   localStorage.removeItem('adminSession');
-                }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
+                }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
                   관리자 로그아웃
                 </button>
               </>
@@ -374,14 +373,7 @@ export default function Notice() {
                 </button>
               </div>
             ) : (
-              <Link href="/auth" className="nav-link" style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                fontWeight: 'bold',
-                borderRadius: '20px',
-                padding: '0.4rem 0.8rem',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
-              }}>
+              <Link href="/auth" className="nav-link">
                 🔐 로그인
               </Link>
             )}
@@ -1017,55 +1009,6 @@ export default function Notice() {
           </div>
         </div>
 
-        {/* 안내 */}
-        <section className="card" style={{marginTop: '3rem'}}>
-          <h2>📢 공지사항 안내</h2>
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem', marginTop: '2rem'}}>
-            <div style={{textAlign: 'center'}}>
-              <div style={{fontSize: '3rem', marginBottom: '1rem'}}>🌰</div>
-              <h3>농장 소식</h3>
-              <p>알밤 수확 소식, 품질 정보, 특별 이벤트 등 농장의 최신 소식을 전해드립니다.</p>
-            </div>
-            
-            <div style={{textAlign: 'center'}}>
-              <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📦</div>
-              <h3>배송 안내</h3>
-              <p>배송 지연, 휴무일, 특별 배송 서비스 등 배송 관련 중요한 정보를 공지합니다.</p>
-            </div>
-            
-            <div style={{textAlign: 'center'}}>
-              <div style={{fontSize: '3rem', marginBottom: '1rem'}}>🎉</div>
-              <h3>이벤트</h3>
-              <p>할인 이벤트, 무료 증정, 체험 프로그램 등 고객 혜택 정보를 안내합니다.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* 연락처 */}
-        <section className="card" style={{background: 'var(--warm-gradient)', textAlign: 'center'}}>
-          <h2>📞 문의사항이 있으시면 언제든 연락주세요</h2>
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2rem', marginTop: '2rem'}}>
-            <div>
-              <h3>📱 전화 문의</h3>
-              <p style={{fontSize: '1.2rem', fontWeight: 'bold'}}>010-9123-9287</p>
-              <p>오전 8시 ~ 오후 6시</p>
-            </div>
-            
-            <div>
-              <h3>📍 농장 방문</h3>
-              <p>충남 청양군 남양면 충절로 265-27</p>
-              <p>사전 연락 후 방문 부탁드립니다</p>
-            </div>
-            
-            <div>
-              <h3>🌐 온라인 주문</h3>
-              <p>홈페이지에서 간편하게</p>
-              <Link href="/purchase" className="btn btn-secondary" style={{marginTop: '0.5rem'}}>
-                주문하기
-              </Link>
-            </div>
-          </div>
-        </section>
       </div>
 
       {/* 세련된 로그아웃 모달 */}

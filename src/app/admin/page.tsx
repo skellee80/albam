@@ -1370,8 +1370,7 @@ export default function Admin() {
             <nav className="nav">
               <Link href="/" className="nav-link">홈</Link>
               <Link href="/purchase" className="nav-link">구매하기</Link>
-              <Link href="/farm-intro" className="nav-link">농장 소개</Link>
-              <Link href="/production" className="nav-link">생산 과정</Link>
+            <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
               <Link href="/storage" className="nav-link">저장 방법</Link>
               <Link href="/location" className="nav-link">오시는 길</Link>
               <Link href="/notice" className="nav-link">농장 공지사항</Link>
@@ -1429,18 +1428,17 @@ export default function Admin() {
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
-            <Link href="/farm-intro" className="nav-link">농장 소개</Link>
-            <Link href="/production" className="nav-link">생산 과정</Link>
+            <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">농장 공지사항</Link>
-                            <Link href="/admin" className="nav-link nav-link-active" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                            <Link href="/admin" className="nav-link nav-link-active">
                   📊 주문 현황
                 </Link>
             <button onClick={() => {
               setIsAdmin(false);
               localStorage.removeItem('adminSession');
-            }} className="nav-link" style={{background: 'none', border: 'none', color: 'white'}}>
+            }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
               관리자 로그아웃
             </button>
           </nav>
@@ -1921,10 +1919,10 @@ export default function Admin() {
                       borderRadius: '10px',
                       textAlign: 'center'
                     }}>
-                      <div style={{fontSize: '0.8rem', color: 'var(--text-light)', marginBottom: '0.3rem'}}>
+                      <div style={{fontSize: '0.9rem', color: '#795548', marginBottom: '0.4rem', fontWeight: '500'}}>
                         주문 수
                       </div>
-                      <div style={{fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>
+                      <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#5d4037', letterSpacing: '0.5px'}}>
                         {stat.orderCount}건
                       </div>
                     </div>
@@ -1934,10 +1932,10 @@ export default function Admin() {
                       borderRadius: '10px',
                       textAlign: 'center'
                     }}>
-                      <div style={{fontSize: '0.8rem', color: 'var(--text-light)', marginBottom: '0.3rem'}}>
+                      <div style={{fontSize: '0.9rem', color: '#795548', marginBottom: '0.4rem', fontWeight: '500'}}>
                         총 수량
                       </div>
-                      <div style={{fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--chestnut-brown)'}}>
+                      <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#5d4037', letterSpacing: '0.5px'}}>
                         {stat.totalQuantity}개
                       </div>
                     </div>
@@ -1949,10 +1947,10 @@ export default function Admin() {
                     borderRadius: '10px',
                     textAlign: 'center'
                   }}>
-                    <div style={{fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '0.3rem'}}>
+                    <div style={{fontSize: '1rem', color: '#e65100', marginBottom: '0.5rem', fontWeight: '600'}}>
                       총 매출
                     </div>
-                    <div style={{fontSize: '1.4rem', color: 'var(--golden-brown)', fontWeight: 'bold'}}>
+                    <div style={{fontSize: '1.7rem', color: '#bf360c', fontWeight: 'bold', letterSpacing: '0.5px'}}>
                       {stat.totalAmount.toLocaleString()}원
                     </div>
                   </div>
@@ -2115,21 +2113,21 @@ export default function Admin() {
                       top: 0,
                       zIndex: 10
                     }}>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주문번호</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>일자</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주문자</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주문자<br/>연락처</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>수취인</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>수취인<br/>연락처</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>주소</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>상품</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>수량</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>금액</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>입금</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>출고</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>교환</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>환불</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>비고</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주문번호</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>일자</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주문자</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주문자<br/>연락처</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>수취인</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>수취인<br/>연락처</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주소</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>상품</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>수량</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>금액</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>입금</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>출고</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>교환</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>환불</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>비고</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>관리</th>
                     </tr>
                   </thead>
@@ -2163,13 +2161,14 @@ export default function Admin() {
                           fontFamily: 'monospace', 
                           fontSize: '0.7rem',
                           color: '#000000',
-                          lineHeight: '1.2'
+                          lineHeight: '1.2',
+                          borderRight: '1px solid var(--warm-beige)'
                         }}>
                           {order.orderNumber.replace(/(\d{6})(\d{6})/, '$1\n$2').split('\n').map((line, i) => (
                             <div key={i}>{line}</div>
                           ))}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', minWidth: '50px'}}>
+                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', minWidth: '50px', borderRight: '1px solid var(--warm-beige)'}}>
                           {(() => {
                             const dateMatch = order.orderDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
                             if (dateMatch) {
@@ -2183,10 +2182,10 @@ export default function Admin() {
                             return order.orderDate;
                           })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontWeight: 'bold', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontWeight: 'bold', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--warm-beige)'}}>
                           {order.name}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px', borderRight: '1px solid var(--warm-beige)'}}>
                           {(() => {
                             const phone = order.phone;
                             const firstDashIndex = phone.indexOf('-');
@@ -2201,10 +2200,10 @@ export default function Admin() {
                             return phone;
                           })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap'}}>
+                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--warm-beige)'}}>
                           {order.recipientName || order.name}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px', borderRight: '1px solid var(--warm-beige)'}}>
                           {(() => {
                             const phone = order.recipientPhone || order.phone;
                             const firstDashIndex = phone.indexOf('-');
@@ -2219,17 +2218,17 @@ export default function Admin() {
                             return phone;
                           })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', maxWidth: '120px'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', maxWidth: '120px', borderRight: '1px solid var(--warm-beige)'}}>
                           {order.address.match(/.{1,10}/g)?.map((line, i) => (
                             <div key={i}>{line}</div>
                           )) || order.address}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontWeight: '500', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontWeight: '500', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', borderRight: '1px solid var(--warm-beige)'}}>
                           {order.productName.match(/.{1,7}/g)?.map((line, i) => (
                             <div key={i}>{line}</div>
                           )) || order.productName}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.7rem', color: '#000000'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.7rem', color: '#000000', borderRight: '1px solid var(--warm-beige)'}}>
                           {order.quantity}
                         </td>
                         <td style={{
@@ -2238,11 +2237,12 @@ export default function Admin() {
                           fontWeight: 'bold', 
                           color: '#000000',
                           fontSize: '0.7rem',
-                          whiteSpace: 'nowrap'
+                          whiteSpace: 'nowrap',
+                          borderRight: '1px solid var(--warm-beige)'
                         }}>
                           {order.totalPrice.toLocaleString()}원
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2269,7 +2269,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2296,7 +2296,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2323,7 +2323,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',

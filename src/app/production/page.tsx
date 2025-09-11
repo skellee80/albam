@@ -46,20 +46,19 @@ export default function Production() {
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
-            <Link href="/farm-intro" className="nav-link">농장 소개</Link>
-            <Link href="/production" className="nav-link nav-link-active">생산 과정</Link>
+            <Link href="/farm-intro" className="nav-link nav-link-active">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">공지사항</Link>
             {isAdmin && (
               <>
-                <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                <Link href="/admin" className="nav-link">
                   📊 주문 현황
                 </Link>
                 <button onClick={() => {
                   setIsAdmin(false);
                   localStorage.removeItem('adminSession');
-                }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
+                }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
                   관리자 로그아웃
                 </button>
               </>
@@ -105,14 +104,7 @@ export default function Production() {
                 </button>
               </div>
             ) : (
-              <Link href="/auth" className="nav-link" style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                fontWeight: 'bold',
-                borderRadius: '20px',
-                padding: '0.4rem 0.8rem',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
-              }}>
+              <Link href="/auth" className="nav-link">
                 🔐 로그인
               </Link>
             )}

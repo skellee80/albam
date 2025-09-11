@@ -47,20 +47,19 @@ export default function FarmIntro() {
           <nav className="nav">
             <Link href="/" className="nav-link">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
-            <Link href="/farm-intro" className="nav-link nav-link-active">농장 소개</Link>
-            <Link href="/production" className="nav-link">생산 과정</Link>
+            <Link href="/farm-intro" className="nav-link nav-link-active">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">공지사항</Link>
             {isAdmin && (
               <>
-                <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                <Link href="/admin" className="nav-link">
                   📊 주문 현황
                 </Link>
                 <button onClick={() => {
                   setIsAdmin(false);
                   localStorage.removeItem('adminSession');
-                }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
+                }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
                   관리자 로그아웃
                 </button>
               </>
@@ -106,14 +105,7 @@ export default function FarmIntro() {
                 </button>
               </div>
             ) : (
-              <Link href="/auth" className="nav-link" style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                fontWeight: 'bold',
-                borderRadius: '20px',
-                padding: '0.4rem 0.8rem',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
-              }}>
+              <Link href="/auth" className="nav-link">
                 🔐 로그인
               </Link>
             )}
@@ -123,7 +115,7 @@ export default function FarmIntro() {
 
       <div className="container">
         <h1 style={{textAlign: 'center', color: 'var(--primary-brown)', marginBottom: '3rem'}}>
-          🚜 청양 칠갑산 알밤 농장 소개
+          🚜 청양 칠갑산 알밤 농장 이야기
         </h1>
 
         {/* 농장주 소개 */}
@@ -351,6 +343,182 @@ export default function FarmIntro() {
             <p>
               고객 여러분의 건강과 행복이 바로 저희 농장의 가장 큰 보람입니다.
             </p>
+          </div>
+        </section>
+
+        {/* 알밤 생산 과정 */}
+        <section className="card">
+          <h2>🌱 알밤 생산 과정</h2>
+          <div style={{textAlign: 'center', marginBottom: '2rem'}}>
+            <p style={{fontSize: '1.1rem', color: 'var(--text-secondary)'}}>
+              정성과 시간이 만들어내는 최고의 알밤. 1년 동안의 정성스러운 관리를 통해 탄생합니다.
+            </p>
+          </div>
+          
+          {/* 연간 생산 일정 */}
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '2rem'}}>
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #98FB98 0%, #90EE90 100%)',
+              borderRadius: '15px',
+              textAlign: 'center',
+              color: 'var(--text-primary)'
+            }}>
+              <div style={{fontSize: '2.5rem', marginBottom: '1rem'}}>🌸</div>
+              <h3>봄 (3-5월)</h3>
+              <p><strong>새싹 관리 및 토양 준비</strong></p>
+              <p>• 밭갈이 및 비료 주기</p>
+              <p>• 새순 정리 및 가지치기</p>
+              <p>• 해충 방제 (천연 방법)</p>
+            </div>
+
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #87CEEB 0%, #87CEFA 100%)',
+              borderRadius: '15px',
+              textAlign: 'center',
+              color: 'var(--text-primary)'
+            }}>
+              <div style={{fontSize: '2.5rem', marginBottom: '1rem'}}>☀️</div>
+              <h3>여름 (6-8월)</h3>
+              <p><strong>성장기 집중 관리</strong></p>
+              <p>• 물주기 및 제초작업</p>
+              <p>• 열매 솎기 작업</p>
+              <p>• 병해충 예방 관리</p>
+            </div>
+
+            <div style={{
+              padding: '1.5rem',
+              background: 'var(--chestnut-gradient)',
+              borderRadius: '15px',
+              textAlign: 'center',
+              color: 'white'
+            }}>
+              <div style={{fontSize: '2.5rem', marginBottom: '1rem'}}>🍂</div>
+              <h3>가을 (9-11월)</h3>
+              <p><strong>수확 및 저장</strong></p>
+              <p>• 알밤 수확 (9월 중순~)</p>
+              <p>• 선별 및 품질 관리</p>
+              <p>• 저장 및 출하 준비</p>
+            </div>
+
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #E6E6FA 0%, #DDA0DD 100%)',
+              borderRadius: '15px',
+              textAlign: 'center',
+              color: 'var(--text-primary)'
+            }}>
+              <div style={{fontSize: '2.5rem', marginBottom: '1rem'}}>❄️</div>
+              <h3>겨울 (12-2월)</h3>
+              <p><strong>휴식기 및 준비</strong></p>
+              <p>• 나무 정지 작업</p>
+              <p>• 농기구 정비</p>
+              <p>• 다음 해 계획 수립</p>
+            </div>
+          </div>
+        </section>
+
+        {/* 무농약 재배 방법 */}
+        <section className="card">
+          <h2>🌿 무농약 재배의 비밀</h2>
+          
+          <div style={{background: 'var(--soft-beige)', padding: '2rem', borderRadius: '15px', marginBottom: '2rem'}}>
+            <h3 style={{textAlign: 'center', marginBottom: '2rem'}}>💚 자연 친화적 관리 방법</h3>
+            
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem'}}>
+              <div>
+                <h4>🐛 천연 방제법</h4>
+                <ul>
+                  <li>님오일, 계피 우린 물 활용</li>
+                  <li>천적 곤충 활용한 생물학적 방제</li>
+                  <li>규조토, 황토를 이용한 물리적 차단</li>
+                  <li>동반식물 재배로 해충 기피</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h4>🌱 유기농 비료</h4>
+                <ul>
+                  <li>자가 제조 퇴비 활용</li>
+                  <li>해조류 우린 물 영양제</li>
+                  <li>쌀겨, 깻묵 등 천연 유기물</li>
+                  <li>미생물 발효액 정기 공급</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h4>💧 물 관리</h4>
+                <ul>
+                  <li>빗물 저장 시설 활용</li>
+                  <li>점적 관수 시스템 도입</li>
+                  <li>멀칭으로 수분 증발 방지</li>
+                  <li>토양 수분 센서 활용</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h4>🌾 토양 관리</h4>
+                <ul>
+                  <li>녹비작물 재배로 토양 개선</li>
+                  <li>미생물 활성화 관리</li>
+                  <li>유기물 함량 증대</li>
+                  <li>토양 압축 방지 작업</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 품질 관리 */}
+        <section className="card">
+          <h2>✅ 품질 관리 기준</h2>
+          
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem'}}>
+            <div style={{
+              padding: '1.5rem',
+              border: '2px solid var(--chestnut-brown)',
+              borderRadius: '15px'
+            }}>
+              <h3>🔍 선별 기준</h3>
+              <ul>
+                <li><strong>크기:</strong> 직경 2.5cm 이상</li>
+                <li><strong>무게:</strong> 개당 15g 이상</li>
+                <li><strong>외관:</strong> 상처, 벌레구멍 없음</li>
+                <li><strong>색상:</strong> 균일한 갈색</li>
+                <li><strong>촉감:</strong> 단단하고 묵직함</li>
+              </ul>
+            </div>
+            
+            <div style={{
+              padding: '1.5rem',
+              border: '2px solid var(--chestnut-brown)',
+              borderRadius: '15px'
+            }}>
+              <h3>📦 포장 기준</h3>
+              <ul>
+                <li><strong>세척:</strong> 깨끗한 물로 3회 세척</li>
+                <li><strong>건조:</strong> 자연 건조 24시간</li>
+                <li><strong>포장:</strong> 통풍이 잘 되는 망 포장</li>
+                <li><strong>라벨:</strong> 수확일, 중량 표시</li>
+                <li><strong>보관:</strong> 저온(0-2℃) 보관</li>
+              </ul>
+            </div>
+            
+            <div style={{
+              padding: '1.5rem',
+              border: '2px solid var(--chestnut-brown)',
+              borderRadius: '15px'
+            }}>
+              <h3>🚚 배송 기준</h3>
+              <ul>
+                <li><strong>포장재:</strong> 친환경 완충재 사용</li>
+                <li><strong>온도:</strong> 냉장 택배 발송</li>
+                <li><strong>시간:</strong> 수확 후 24시간 내 발송</li>
+                <li><strong>추적:</strong> 실시간 배송 현황 안내</li>
+                <li><strong>보장:</strong> 신선도 100% 보장</li>
+              </ul>
+            </div>
           </div>
         </section>
 

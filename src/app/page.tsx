@@ -191,20 +191,19 @@ export default function Home() {
           <nav className="nav">
             <Link href="/" className="nav-link nav-link-active">홈</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
-            <Link href="/farm-intro" className="nav-link">농장 소개</Link>
-            <Link href="/production" className="nav-link">생산 과정</Link>
+            <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
             <Link href="/notice" className="nav-link">공지사항</Link>
             {isAdmin && (
               <>
-                <Link href="/admin" className="nav-link" style={{background: 'rgba(255, 255, 255, 0.2)', fontWeight: 'bold'}}>
+                <Link href="/admin" className="nav-link">
                   📊 주문 현황
                 </Link>
                 <button onClick={() => {
                   setIsAdmin(false);
                   localStorage.removeItem('adminSession');
-                }} className="nav-link" style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer'}}>
+                }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
                   관리자 로그아웃
                 </button>
               </>
@@ -223,41 +222,23 @@ export default function Home() {
                 }}>
                   안녕하세요, {userData.name}님! ✨
                 </div>
-                <Link href="/mypage" className="nav-link" style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                  fontWeight: 'bold',
-                  borderRadius: '20px',
-                  padding: '0.4rem 0.8rem',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  backdropFilter: 'blur(10px)'
-                }}>
+                <Link href="/mypage" className="nav-link">
                   👤 마이페이지
                 </Link>
                 <button
                   onClick={() => setShowLogoutModal(true)}
                   className="nav-link"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    cursor: 'pointer',
-                    color: 'white',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '20px',
-                    backdropFilter: 'blur(10px)'
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer'
                   }}
                 >
                   로그아웃
                 </button>
               </div>
             ) : (
-              <Link href="/auth" className="nav-link" style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                fontWeight: 'bold',
-                borderRadius: '20px',
-                padding: '0.4rem 0.8rem',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
-              }}>
+              <Link href="/auth" className="nav-link">
                 🔐 로그인
               </Link>
             )}
@@ -610,7 +591,7 @@ export default function Home() {
             끊임없이 연구하고 노력하고 있습니다.
           </p>
           <Link href="/farm-intro" className="btn" style={{marginTop: '1rem'}}>
-            농장 소개 자세히 보기
+            농장 이야기 자세히 보기
           </Link>
         </section>
 
