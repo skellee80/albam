@@ -418,7 +418,7 @@ export default function Purchase() {
   칠갑산 알밤 농장
             </Link>
             <nav className="nav">
-              <Link href="/" className="nav-link">홈</Link>
+              <Link href="/" className="nav-link">상품</Link>
               <Link href="/purchase" className="nav-link">구매하기</Link>
               <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
               <Link href="/storage" className="nav-link">저장 방법</Link>
@@ -541,7 +541,7 @@ export default function Purchase() {
 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
-            <Link href="/" className="nav-link">홈</Link>
+            <Link href="/" className="nav-link">상품</Link>
             <Link href="/purchase" className="nav-link nav-link-active">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
@@ -943,6 +943,15 @@ export default function Purchase() {
                 <div style={{fontSize: '1.2rem', fontWeight: '600', color: 'var(--warm-orange)', marginBottom: '2rem'}}>
                   총 금액: {totalPrice.toLocaleString()}원
                 </div>
+
+                {/* 구분선 */}
+                <div style={{
+                  width: '100%',
+                  height: '2px',
+                  background: 'linear-gradient(90deg, transparent 0%, var(--chestnut-light) 20%, var(--chestnut-light) 80%, transparent 100%)',
+                  margin: '2rem 0',
+                  borderRadius: '1px'
+                }}></div>
               </>
             )}
 

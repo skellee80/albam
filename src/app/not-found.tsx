@@ -7,7 +7,7 @@ export default function NotFound() {
         <div className="header-content">
           <Link href="/" className="logo">🌰 청양 칠갑산 알밤 농장</Link>
           <nav className="nav">
-            <Link href="/" className="nav-link">홈</Link>
+            <Link href="/" className="nav-link">상품</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 소개</Link>
             <Link href="/notice" className="nav-link">농장 공지사항</Link>
@@ -57,7 +57,7 @@ export default function NotFound() {
             flexWrap: 'wrap'
           }}>
             <Link href="/" className="btn">
-              🏠 홈으로 돌아가기
+              🌰 상품 페이지로 돌아가기
             </Link>
             <Link href="/purchase" className="btn btn-secondary">
               🌰 알밤 주문하기

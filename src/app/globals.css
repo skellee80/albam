@@ -163,6 +163,21 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0 auto;
 }
 
+/* 상품 헤더 */
+.product-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+}
+
+.product-title {
+  font-size: 2.5rem;
+  color: var(--primary-brown);
+  font-weight: 700;
+  margin: 0;
+}
+
 /* 썸네일 그리드 */
 .thumbnails-grid {
   display: grid;
@@ -318,8 +333,8 @@ h1, h2, h3, h4, h5, h6 {
 .table td {
   padding: 1rem;
   text-align: left;
-  border-bottom: 1px solid var(--warm-beige);
-  border-right: 1px solid var(--warm-beige);
+  border-bottom: 2px solid var(--chestnut-light);
+  border-right: 1px solid var(--chestnut-light);
 }
 
 .table th:last-child,
@@ -468,6 +483,23 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 0.85rem;
     padding: 0.6rem 1.2rem;
     white-space: nowrap;
+  }
+
+  /* 모바일 상품 헤더 */
+  .product-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .product-title {
+    font-size: 2rem; /* 20% 축소: 2.5rem -> 2rem */
+  }
+
+  .product-add-btn {
+    align-self: flex-start;
+    margin-top: 0.5rem;
   }
 
   .thumbnails-grid {
@@ -653,22 +685,18 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .table {
-    font-size: 0.8rem;
-  }
-
-  .table {
     font-size: 0.7rem;
-    min-width: 800px;
+    min-width: 1000px;
+    width: max-content;
   }
   
   .table th,
   .table td {
     padding: 0.4rem 0.2rem;
-    word-break: break-all;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 80px;
+    min-width: 60px;
   }
   
   .table th:first-child,

@@ -1368,7 +1368,7 @@ export default function Admin() {
   칠갑산 알밤 농장
             </Link>
             <nav className="nav">
-              <Link href="/" className="nav-link">홈</Link>
+              <Link href="/" className="nav-link">상품</Link>
               <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
               <Link href="/storage" className="nav-link">저장 방법</Link>
@@ -1426,7 +1426,7 @@ export default function Admin() {
 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
-            <Link href="/" className="nav-link">홈</Link>
+            <Link href="/" className="nav-link">상품</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
@@ -2098,7 +2098,8 @@ export default function Admin() {
                 boxShadow: '0 8px 32px rgba(125, 79, 57, 0.1)',
                 border: '1px solid var(--chestnut-light)',
                 maxHeight: '600px',
-                overflowY: 'auto'
+                overflowY: 'auto',
+                overflowX: 'auto'
               }}>
                 <table style={{
                   width: '100%',
@@ -2113,21 +2114,21 @@ export default function Admin() {
                       top: 0,
                       zIndex: 10
                     }}>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주문번호</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>일자</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주문자</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주문자<br/>연락처</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>수취인</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>수취인<br/>연락처</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>주소</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>상품</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>수량</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>금액</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>입금</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>출고</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>교환</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>환불</th>
-                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.3)'}}>비고</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>주문번호</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>일자</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>주문자</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>주문자<br/>연락처</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>수취인</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>수취인<br/>연락처</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>주소</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>상품</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>수량</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>금액</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>입금</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>출고</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>교환</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>환불</th>
+                      <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem', borderRight: '1px solid rgba(255, 255, 255, 0.5)'}}>비고</th>
                       <th style={{padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', fontSize: '0.75rem'}}>관리</th>
                     </tr>
                   </thead>
@@ -2143,7 +2144,7 @@ export default function Admin() {
                           : index % 2 === 0 
                             ? '#fefefe' 
                             : 'var(--creamy-white)',
-                        borderBottom: '1px solid var(--warm-beige)',
+                        borderBottom: '2px solid var(--chestnut-light)',
                         transition: 'all 0.3s ease'
                       }} onMouseEnter={(e) => {
                         if (!order.isShipped) {
@@ -2162,13 +2163,13 @@ export default function Admin() {
                           fontSize: '0.7rem',
                           color: '#000000',
                           lineHeight: '1.2',
-                          borderRight: '1px solid var(--warm-beige)'
+                          borderRight: '1px solid var(--chestnut-light)'
                         }}>
                           {order.orderNumber.replace(/(\d{6})(\d{6})/, '$1\n$2').split('\n').map((line, i) => (
                             <div key={i}>{line}</div>
                           ))}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', minWidth: '50px', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', minWidth: '50px', borderRight: '1px solid var(--chestnut-light)'}}>
                           {(() => {
                             const dateMatch = order.orderDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
                             if (dateMatch) {
@@ -2182,10 +2183,10 @@ export default function Admin() {
                             return order.orderDate;
                           })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontWeight: 'bold', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontWeight: 'bold', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--chestnut-light)'}}>
                           {order.name}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px', borderRight: '1px solid var(--chestnut-light)'}}>
                           {(() => {
                             const phone = order.phone;
                             const firstDashIndex = phone.indexOf('-');
@@ -2200,10 +2201,10 @@ export default function Admin() {
                             return phone;
                           })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', color: '#000000', fontSize: '0.7rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--chestnut-light)'}}>
                           {order.recipientName || order.name}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', minWidth: '72px', maxWidth: '72px', borderRight: '1px solid var(--chestnut-light)'}}>
                           {(() => {
                             const phone = order.recipientPhone || order.phone;
                             const firstDashIndex = phone.indexOf('-');
@@ -2218,17 +2219,17 @@ export default function Admin() {
                             return phone;
                           })()}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', maxWidth: '120px', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', maxWidth: '120px', borderRight: '1px solid var(--chestnut-light)'}}>
                           {order.address.match(/.{1,10}/g)?.map((line, i) => (
                             <div key={i}>{line}</div>
                           )) || order.address}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', fontWeight: '500', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', fontWeight: '500', color: '#000000', fontSize: '0.7rem', lineHeight: '1.2', borderRight: '1px solid var(--chestnut-light)'}}>
                           {order.productName.match(/.{1,7}/g)?.map((line, i) => (
                             <div key={i}>{line}</div>
                           )) || order.productName}
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.7rem', color: '#000000', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.7rem', color: '#000000', borderRight: '1px solid var(--chestnut-light)'}}>
                           {order.quantity}
                         </td>
                         <td style={{
@@ -2238,11 +2239,11 @@ export default function Admin() {
                           color: '#000000',
                           fontSize: '0.7rem',
                           whiteSpace: 'nowrap',
-                          borderRight: '1px solid var(--warm-beige)'
+                          borderRight: '1px solid var(--chestnut-light)'
                         }}>
                           {order.totalPrice.toLocaleString()}원
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--chestnut-light)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2269,7 +2270,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--chestnut-light)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2296,7 +2297,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--chestnut-light)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2323,7 +2324,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--warm-beige)'}}>
+                        <td style={{padding: '0.6rem 0.4rem', textAlign: 'center', borderRight: '1px solid var(--chestnut-light)'}}>
                           <label style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2350,7 +2351,7 @@ export default function Admin() {
                             )}
                           </label>
                         </td>
-                        <td style={{padding: '0.6rem 0.4rem'}}>
+                        <td style={{padding: '0.6rem 0.4rem', borderRight: '1px solid var(--chestnut-light)'}}>
                           <input
                             type="text"
                             value={noteValues[order.orderNumber] || ''}

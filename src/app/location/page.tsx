@@ -44,7 +44,7 @@ export default function Location() {
 칠갑산 알밤 농장
           </Link>
           <nav className="nav">
-            <Link href="/" className="nav-link">홈</Link>
+            <Link href="/" className="nav-link">상품</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>

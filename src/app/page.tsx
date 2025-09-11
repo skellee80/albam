@@ -189,7 +189,7 @@ export default function Home() {
             칠갑산 알밤 농장
           </Link>
           <nav className="nav">
-            <Link href="/" className="nav-link nav-link-active">홈</Link>
+            <Link href="/" className="nav-link nav-link-active">상품</Link>
             <Link href="/purchase" className="nav-link">구매하기</Link>
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
@@ -259,13 +259,8 @@ export default function Home() {
 
         {/* 알밤 상품 썸네일 */}
         <section>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem'}}>
-            <h2 style={{ 
-              fontSize: '2.5rem', 
-              color: 'var(--primary-brown)', 
-              fontWeight: '700',
-              margin: 0
-            }}>
+          <div className="product-header">
+            <h2 className="product-title">
               🌰 알밤 상품 둘러보기
             </h2>
             {isAdmin && (
@@ -274,7 +269,7 @@ export default function Home() {
                                           setEditingProduct({name: '', description: '', price: '', emoji: ''});
                         setShowAddForm(true);
                 }}
-                className="btn"
+                className="btn product-add-btn"
               >
                 ➕ 상품 추가
               </button>
