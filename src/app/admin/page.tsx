@@ -788,22 +788,64 @@ export default function Admin() {
       setIsAdmin(true);
     }
     
-    // 상품 목록 로드
-    const savedProducts = localStorage.getItem('chestnutProducts');
-    if (savedProducts) {
-      setAvailableProducts(JSON.parse(savedProducts));
-    } else {
-      // 기본 상품 목록
-      const defaultProducts = [
-        { id: 1, name: "알밤 1kg", price: "15,000원" },
-        { id: 2, name: "알밤 3kg", price: "40,000원" },
-        { id: 3, name: "알밤 5kg", price: "65,000원" },
-        { id: 4, name: "껍질 깐 알밤 500g", price: "12,000원" },
-        { id: 5, name: "구운 알밤 1kg", price: "18,000원" },
-        { id: 6, name: "알밤 선물세트", price: "35,000원" }
-      ];
-      setAvailableProducts(defaultProducts);
-    }
+    // Firestore에서 상품 데이터 로드
+    const loadProductsFromFirestore = async () => {
+      try {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        console.log('관리자 페이지: Firestore에서 상품 데이터 로드 시도...');
+        const productsCollection = collection(db, 'products');
+        const productsSnapshot = await getDocs(productsCollection);
+        
+        if (!productsSnapshot.empty) {
+          const firestoreProducts = productsSnapshot.docs.map(doc => ({
+            id: parseInt(doc.id),
+            ...doc.data()
+          }));
+          
+          // ID 순으로 정렬
+          firestoreProducts.sort((a, b) => a.id - b.id);
+          
+          console.log('✅ 관리자 페이지: Firestore에서 상품 데이터 로드 완료:', firestoreProducts.length);
+          setAvailableProducts(firestoreProducts);
+          return true;
+        } else {
+          console.log('⚠ 관리자 페이지: Firestore에 상품 데이터가 없음');
+          return false;
+        }
+      } catch (error) {
+        console.error('❌ 관리자 페이지: Firestore 상품 로드 실패:', error);
+        return false;
+      }
+    };
+
+    // 상품 목록 로드 (Firestore 우선, 실패 시 localStorage)
+    const loadProducts = async () => {
+      const firestoreLoaded = await loadProductsFromFirestore();
+      
+      if (!firestoreLoaded) {
+        // Firestore 로드 실패 시 localStorage에서 로드
+        const savedProducts = localStorage.getItem('chestnutProducts');
+        if (savedProducts) {
+          console.log('관리자 페이지: localStorage에서 상품 데이터 로드');
+          setAvailableProducts(JSON.parse(savedProducts));
+        } else {
+          // 기본 상품 목록
+          const defaultProducts = [
+            { id: 1, name: "알밤 1kg", price: "15,000원" },
+            { id: 2, name: "알밤 3kg", price: "40,000원" },
+            { id: 3, name: "알밤 5kg", price: "65,000원" },
+            { id: 4, name: "껍질 깐 알밤 500g", price: "12,000원" },
+            { id: 5, name: "구운 알밤 1kg", price: "18,000원" },
+            { id: 6, name: "알밤 선물세트", price: "35,000원" }
+          ];
+          setAvailableProducts(defaultProducts);
+        }
+      }
+    };
+    
+    loadProducts();
   }, []);
 
   // 차트 업데이트 트리거 상태

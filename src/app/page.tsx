@@ -73,6 +73,39 @@ export default function Home() {
   const [selectedProductFile, setSelectedProductFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string>('');
 
+  // Firestore에서 상품 데이터 로드
+  const loadProductsFromFirestore = async () => {
+    try {
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      
+      console.log('Firestore에서 상품 데이터 로드 시도...');
+      const productsCollection = collection(db, 'products');
+      const productsSnapshot = await getDocs(productsCollection);
+      
+      if (!productsSnapshot.empty) {
+        const firestoreProducts = productsSnapshot.docs.map(doc => ({
+          id: parseInt(doc.id),
+          ...doc.data()
+        }));
+        
+        // ID 순으로 정렬
+        firestoreProducts.sort((a, b) => a.id - b.id);
+        
+        console.log('✅ Firestore에서 상품 데이터 로드 완료:', firestoreProducts.length);
+        setProducts(firestoreProducts);
+        localStorage.setItem('chestnutProducts', JSON.stringify(firestoreProducts));
+        return true;
+      } else {
+        console.log('⚠ Firestore에 상품 데이터가 없음');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Firestore 상품 로드 실패:', error);
+      return false;
+    }
+  };
+
   // 관리자 세션 및 사용자 로그인 확인
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
@@ -82,11 +115,21 @@ export default function Home() {
 
     // Firebase Auth에서 사용자 상태 자동 관리
     
-    // 저장된 상품 데이터 로드
-    const savedProducts = localStorage.getItem('chestnutProducts');
-    if (savedProducts) {
-      setProducts(JSON.parse(savedProducts));
-    }
+    // 상품 데이터 로드 (Firestore 우선, 실패 시 localStorage)
+    const loadProducts = async () => {
+      const firestoreLoaded = await loadProductsFromFirestore();
+      
+      if (!firestoreLoaded) {
+        // Firestore 로드 실패 시 localStorage에서 로드
+        const savedProducts = localStorage.getItem('chestnutProducts');
+        if (savedProducts) {
+          console.log('localStorage에서 상품 데이터 로드');
+          setProducts(JSON.parse(savedProducts));
+        }
+      }
+    };
+    
+    loadProducts();
   }, []);
 
   // 로그아웃 처리
@@ -99,10 +142,54 @@ export default function Home() {
     }
   };
 
-  // 상품 저장
-  const saveProducts = (updatedProducts: any[]) => {
-    setProducts(updatedProducts);
-    localStorage.setItem('chestnutProducts', JSON.stringify(updatedProducts));
+  // 상품 저장 (Firebase Firestore + localStorage)
+  const saveProducts = async (updatedProducts: any[]) => {
+    try {
+      setProducts(updatedProducts);
+      localStorage.setItem('chestnutProducts', JSON.stringify(updatedProducts));
+
+      // Firebase Firestore에 상품 데이터 저장
+      if (currentUser) {
+        const { collection, doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        console.log('Firestore 상품 저장 시도:', {
+          collection: 'products',
+          userId: currentUser.uid,
+          productsCount: updatedProducts.length,
+          projectId: db.app.options.projectId,
+          databaseId: 'albam'
+        });
+
+        // 각 상품을 개별 문서로 저장
+        for (const product of updatedProducts) {
+          const productDocRef = doc(db, 'products', product.id.toString());
+          const productData = {
+            ...product,
+            updatedBy: currentUser.uid,
+            updatedAt: new Date().toISOString()
+          };
+          
+          await setDoc(productDocRef, productData);
+        }
+        
+        console.log('✅ 상품 데이터가 Firestore에 저장되었습니다!', {
+          collection: 'products',
+          databaseId: 'albam',
+          productsCount: updatedProducts.length
+        });
+      } else {
+        console.log('⚠ 비로그인 사용자 - Firestore 저장 건너뜀');
+      }
+    } catch (firestoreError: any) {
+      console.error('❌ Firestore 상품 저장 실패:', {
+        code: firestoreError?.code,
+        message: firestoreError?.message,
+        stack: firestoreError?.stack
+      });
+      // Firestore 저장 실패해도 로컬 저장은 완료되었으므로 계속 진행
+      alert('상품이 로컬에 저장되었지만 서버 동기화에 실패했습니다. 네트워크를 확인해주세요.');
+    }
   };
 
   // 상품 수정
@@ -131,7 +218,7 @@ export default function Home() {
   };
 
     // 상품 업데이트
-  const handleUpdateProduct = () => {
+  const handleUpdateProduct = async () => {
     if (!editingProduct.name?.trim() || !editingProduct.description?.trim() || !editingProduct.price?.trim()) {
       alert('이름, 설명, 가격을 모두 입력해주세요.');
       return;
@@ -145,22 +232,22 @@ export default function Home() {
     const updatedProducts = products.map(p => 
       p.id === editingProduct.id ? updatedProduct : p
     );
-    saveProducts(updatedProducts);
+    await saveProducts(updatedProducts);
     setEditingProduct(null);
     setSelectedProductFile(null);
     setProductImagePreview('');
   };
 
   // 상품 삭제
-  const handleDeleteProduct = (id: number) => {
+  const handleDeleteProduct = async (id: number) => {
     if (confirm('정말로 이 상품을 삭제하시겠습니까?')) {
       const updatedProducts = products.filter(p => p.id !== id);
-      saveProducts(updatedProducts);
+      await saveProducts(updatedProducts);
     }
   };
 
   // 새 상품 추가
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     if (!editingProduct?.name?.trim() || !editingProduct?.description?.trim() || !editingProduct?.price?.trim()) {
       alert('이름, 설명, 가격을 모두 입력해주세요.');
       return;
@@ -173,7 +260,7 @@ export default function Home() {
     };
     
     const updatedProducts = [...products, newProduct];
-    saveProducts(updatedProducts);
+    await saveProducts(updatedProducts);
     setEditingProduct(null);
     setShowAddForm(false);
     setSelectedProductFile(null);
