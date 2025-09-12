@@ -117,7 +117,7 @@ function AdminBoard() {
   };
 
   // 새 노트 추가
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!newNote.title.trim() || !newNote.content.trim()) {
       alert('제목과 내용을 모두 입력해주세요.');
       return;
@@ -135,6 +135,27 @@ function AdminBoard() {
     const updatedNotes = [note, ...adminNotes];
     setAdminNotes(updatedNotes);
     localStorage.setItem('adminNotes', JSON.stringify(updatedNotes));
+
+    // Firebase Firestore에 메모 저장
+    try {
+      const { collection, doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const noteDocRef = doc(db, 'adminNotes', note.id);
+        const noteData = {
+          ...note,
+          createdBy: auth.currentUser.uid,
+          createdAt: new Date().toISOString()
+        };
+        
+        await setDoc(noteDocRef, noteData);
+        console.log('✅ 관리자 메모가 Firestore에 저장되었습니다');
+      }
+    } catch (error) {
+      console.error('❌ Firestore 메모 저장 실패:', error);
+    }
     
     setNewNote({ title: '', content: '' });
     setSelectedNoteFiles([]);
@@ -143,12 +164,24 @@ function AdminBoard() {
   };
 
   // 노트 삭제
-  const handleDeleteNote = (id: string) => {
+  const handleDeleteNote = async (id: string) => {
     if (confirm('정말로 이 메모를 삭제하시겠습니까?')) {
       const updatedNotes = adminNotes.filter(note => note.id !== id);
       setAdminNotes(updatedNotes);
       localStorage.setItem('adminNotes', JSON.stringify(updatedNotes));
       setSelectedNote(null);
+
+      // Firebase Firestore에서 메모 삭제
+      try {
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const noteDocRef = doc(db, 'adminNotes', id);
+        await deleteDoc(noteDocRef);
+        console.log('✅ 관리자 메모가 Firestore에서 삭제되었습니다');
+      } catch (error) {
+        console.error('❌ Firestore 메모 삭제 실패:', error);
+      }
     }
   };
 
@@ -159,7 +192,7 @@ function AdminBoard() {
   };
 
   // 노트 업데이트
-  const handleUpdateNote = () => {
+  const handleUpdateNote = async () => {
     if (!editingNote?.title.trim() || !editingNote?.content.trim()) {
       alert('제목과 내용을 모두 입력해주세요.');
       return;
@@ -175,6 +208,27 @@ function AdminBoard() {
     );
     setAdminNotes(updatedNotes);
     localStorage.setItem('adminNotes', JSON.stringify(updatedNotes));
+
+    // Firebase Firestore에 메모 업데이트
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const noteDocRef = doc(db, 'adminNotes', updatedNote.id);
+        const noteData = {
+          ...updatedNote,
+          updatedBy: auth.currentUser.uid,
+          updatedAt: new Date().toISOString()
+        };
+        
+        await setDoc(noteDocRef, noteData);
+        console.log('✅ 관리자 메모가 Firestore에 업데이트되었습니다');
+      }
+    } catch (error) {
+      console.error('❌ Firestore 메모 업데이트 실패:', error);
+    }
     
     setEditingNote(null);
     setEditNoteFiles([]);
@@ -1117,7 +1171,7 @@ export default function Admin() {
   };
 
   // 비고 업데이트 (저장)
-  const updateOrderNote = (orderNumber: string, note: string) => {
+  const updateOrderNote = async (orderNumber: string, note: string) => {
     const updatedOrders = orders.map(order => 
       order.orderNumber === orderNumber 
         ? { ...order, note: note }
@@ -1125,6 +1179,24 @@ export default function Admin() {
     );
     setOrders(updatedOrders);
     localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+    // Firebase Firestore에 주문 비고 업데이트
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const orderDocRef = doc(db, 'orders', orderNumber);
+        await updateDoc(orderDocRef, {
+          note: note,
+          updatedBy: auth.currentUser.uid,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('❌ Firestore 주문 비고 업데이트 실패:', error);
+    }
   };
 
   // 주문 관리 함수들
@@ -1199,7 +1271,7 @@ export default function Admin() {
     }
   };
 
-  const handleAddOrder = () => {
+  const handleAddOrder = async () => {
     if (!newOrder.name || !newOrder.phone || !newOrder.address || !newOrder.productName) {
       alert('필수 정보를 모두 입력해주세요.');
       return;
@@ -1227,6 +1299,27 @@ export default function Admin() {
     const updatedOrders = [...orders, orderWithNumber];
     setOrders(updatedOrders);
     localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+    // Firebase Firestore에 주문 저장
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const orderDocRef = doc(db, 'orders', orderWithNumber.orderNumber);
+        const orderData = {
+          ...orderWithNumber,
+          createdBy: auth.currentUser.uid,
+          createdAt: new Date().toISOString()
+        };
+        
+        await setDoc(orderDocRef, orderData);
+        console.log('✅ 주문이 Firestore에 저장되었습니다');
+      }
+    } catch (error) {
+      console.error('❌ Firestore 주문 저장 실패:', error);
+    }
 
     // 완료된 주문 정보 저장 및 요약 표시
     setCompletedOrder(orderWithNumber);
@@ -1318,7 +1411,7 @@ export default function Admin() {
     }
   };
 
-  const handleUpdateOrder = () => {
+  const handleUpdateOrder = async () => {
     if (!editingOrder) return;
 
     const updatedOrders = orders.map(order => 
@@ -1326,14 +1419,48 @@ export default function Admin() {
     );
     setOrders(updatedOrders);
     localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+    // Firebase Firestore에 주문 업데이트
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const orderDocRef = doc(db, 'orders', editingOrder.orderNumber);
+        const orderData = {
+          ...editingOrder,
+          updatedBy: auth.currentUser.uid,
+          updatedAt: new Date().toISOString()
+        };
+        
+        await setDoc(orderDocRef, orderData);
+        console.log('✅ 주문이 Firestore에 업데이트되었습니다');
+      }
+    } catch (error) {
+      console.error('❌ Firestore 주문 업데이트 실패:', error);
+    }
+
     setEditingOrder(null);
   };
 
-  const handleDeleteOrder = (orderNumber: string) => {
+  const handleDeleteOrder = async (orderNumber: string) => {
     if (confirm('정말로 이 주문을 삭제하시겠습니까?')) {
       const updatedOrders = orders.filter(order => order.orderNumber !== orderNumber);
       setOrders(updatedOrders);
       localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+      // Firebase Firestore에서 주문 삭제
+      try {
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const orderDocRef = doc(db, 'orders', orderNumber);
+        await deleteDoc(orderDocRef);
+        console.log('✅ 주문이 Firestore에서 삭제되었습니다');
+      } catch (error) {
+        console.error('❌ Firestore 주문 삭제 실패:', error);
+      }
     }
   };
 
@@ -1452,7 +1579,7 @@ export default function Admin() {
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
               <Link href="/storage" className="nav-link">저장 방법</Link>
               <Link href="/location" className="nav-link">오시는 길</Link>
-              <Link href="/notice" className="nav-link">농장 공지사항</Link>
+              <Link href="/notice" className="nav-link">공지사항</Link>
             </nav>
           </div>
         </header>
@@ -1510,13 +1637,14 @@ export default function Admin() {
             <Link href="/farm-intro" className="nav-link">농장 이야기</Link>
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/location" className="nav-link">오시는 길</Link>
-            <Link href="/notice" className="nav-link">농장 공지사항</Link>
+            <Link href="/notice" className="nav-link">공지사항</Link>
                             <Link href="/admin" className="nav-link nav-link-active">
                   📊 주문 현황
                 </Link>
             <button onClick={() => {
               setIsAdmin(false);
               localStorage.removeItem('adminSession');
+              window.location.href = '/';
             }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
               관리자 로그아웃
             </button>
@@ -2299,7 +2427,7 @@ export default function Admin() {
                           })()}
                         </td>
                         <td style={{padding: '0.6rem 0.4rem', fontSize: '0.7rem', color: '#000000', lineHeight: '1.2', maxWidth: '120px', borderRight: '1px solid var(--chestnut-light)'}}>
-                          {order.address.match(/.{1,10}/g)?.map((line, i) => (
+                          {order.address.match(/.{1,8}/g)?.map((line, i) => (
                             <div key={i}>{line}</div>
                           )) || order.address}
                         </td>

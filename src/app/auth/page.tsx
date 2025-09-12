@@ -267,47 +267,31 @@ export default function Auth() {
             <Link href="/storage" className="nav-link">저장 방법</Link>
             <Link href="/notice" className="nav-link">공지사항</Link>
             <Link href="/admin" className="nav-link">주문 현황</Link>
-            {currentUser && userData ? (
+            {currentUser && userData && localStorage.getItem('adminSession') !== 'true' ? (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
-                  fontSize: '0.85rem', 
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)', 
-                  padding: '0.4rem 0.8rem', 
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                  fontSize: '0.85rem'
                 }}>
                   안녕하세요, {userData.name}님! ✨
                 </div>
-                <Link href="/mypage" className="nav-link" style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                  fontWeight: 'bold',
-                  borderRadius: '20px',
-                  padding: '0.4rem 0.8rem',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  backdropFilter: 'blur(10px)'
-                }}>
+                <Link href="/mypage" className="nav-link" style={{background: 'none'}}>
                   👤 마이페이지
                 </Link>
                 <button
                   onClick={() => setShowLogoutModal(true)}
                   className="nav-link"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'none',
+                    border: 'none',
                     cursor: 'pointer',
-                    color: 'white',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '20px',
-                    backdropFilter: 'blur(10px)'
+                    color: 'white'
                   }}
                 >
                   로그아웃
                 </button>
               </div>
-            ) : (
+            ) : localStorage.getItem('adminSession') !== 'true' ? (
               <Link href="/auth" className="nav-link nav-link-active" style={{
                 background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
                 fontWeight: 'bold',
@@ -318,7 +302,7 @@ export default function Auth() {
               }}>
                 🔐 로그인
               </Link>
-            )}
+            ) : null}
           </nav>
         </div>
       </header>

@@ -19,6 +19,22 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
     
+    // 관리자 메모 규칙 - 인증된 사용자만 접근 가능
+    match /adminNotes/{noteId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 공지사항 규칙 - 모든 사용자가 읽기 가능, 인증된 사용자만 쓰기 가능
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 주문 규칙 - 인증된 사용자만 접근 가능
+    match /orders/{orderId} {
+      allow read, write: if request.auth != null;
+    }
+    
     // 기본적으로 다른 모든 문서는 접근 거부
     match /{document=**} {
       allow read, write: if false;

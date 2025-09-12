@@ -242,7 +242,7 @@ export default function Notice() {
   };
 
   // 새 공지사항 추가
-  const handleAddNotice = () => {
+  const handleAddNotice = async () => {
     if (!newNotice.title.trim() || !newNotice.content.trim()) {
       alert('제목과 내용을 모두 입력해주세요.');
       return;
@@ -260,6 +260,27 @@ export default function Notice() {
     const updatedNotices = [notice, ...notices];
     setNotices(updatedNotices);
     localStorage.setItem('notices', JSON.stringify(updatedNotices));
+
+    // Firebase Firestore에 공지사항 저장
+    try {
+      const { collection, doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const noticeDocRef = doc(db, 'notices', notice.id);
+        const noticeData = {
+          ...notice,
+          createdBy: auth.currentUser.uid,
+          createdAt: new Date().toISOString()
+        };
+        
+        await setDoc(noticeDocRef, noticeData);
+        console.log('✅ 공지사항이 Firestore에 저장되었습니다');
+      }
+    } catch (error) {
+      console.error('❌ Firestore 공지사항 저장 실패:', error);
+    }
     
     setNewNotice({ title: '', content: '' });
     setSelectedFiles([]);
@@ -268,12 +289,24 @@ export default function Notice() {
   };
 
   // 공지사항 삭제
-  const handleDeleteNotice = (id: string) => {
+  const handleDeleteNotice = async (id: string) => {
     if (confirm('정말로 이 공지사항을 삭제하시겠습니까?')) {
       const updatedNotices = notices.filter(notice => notice.id !== id);
       setNotices(updatedNotices);
       localStorage.setItem('notices', JSON.stringify(updatedNotices));
       setSelectedNotice(null);
+
+      // Firebase Firestore에서 공지사항 삭제
+      try {
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const noticeDocRef = doc(db, 'notices', id);
+        await deleteDoc(noticeDocRef);
+        console.log('✅ 공지사항이 Firestore에서 삭제되었습니다');
+      } catch (error) {
+        console.error('❌ Firestore 공지사항 삭제 실패:', error);
+      }
     }
   };
 
@@ -293,7 +326,7 @@ export default function Notice() {
   };
 
   // 공지사항 업데이트
-  const handleUpdateNotice = () => {
+  const handleUpdateNotice = async () => {
     if (!editingNotice?.title.trim() || !editingNotice?.content.trim()) {
       alert('제목과 내용을 모두 입력해주세요.');
       return;
@@ -309,6 +342,27 @@ export default function Notice() {
     );
     setNotices(updatedNotices);
     localStorage.setItem('notices', JSON.stringify(updatedNotices));
+
+    // Firebase Firestore에 공지사항 업데이트
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      const { auth } = await import('@/lib/firebase');
+      
+      if (auth.currentUser) {
+        const noticeDocRef = doc(db, 'notices', updatedNotice.id);
+        const noticeData = {
+          ...updatedNotice,
+          updatedBy: auth.currentUser.uid,
+          updatedAt: new Date().toISOString()
+        };
+        
+        await setDoc(noticeDocRef, noticeData);
+        console.log('✅ 공지사항이 Firestore에 업데이트되었습니다');
+      }
+    } catch (error) {
+      console.error('❌ Firestore 공지사항 업데이트 실패:', error);
+    }
     
     // 현재 선택된 공지사항이 편집된 공지사항이면 상세보기도 업데이트
     if (selectedNotice && selectedNotice.id === editingNotice.id) {
@@ -356,59 +410,48 @@ export default function Notice() {
                 <Link href="/admin" className="nav-link">
                   📊 주문 현황
                 </Link>
-                <button onClick={() => {
+                <button onClick={async () => {
                   setIsAdmin(false);
                   localStorage.removeItem('adminSession');
+                  try {
+                    await logout();
+                  } catch (error) {
+                    console.error('Firebase 로그아웃 오류:', error);
+                  }
                 }} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
                   관리자 로그아웃
                 </button>
               </>
             )}
-            {currentUser && userData ? (
+            {currentUser && userData && localStorage.getItem('adminSession') !== 'true' ? (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
-                  fontSize: '0.85rem', 
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)', 
-                  padding: '0.4rem 0.8rem', 
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                  fontSize: '0.85rem'
                 }}>
                   안녕하세요, {userData.name}님! ✨
                 </div>
-                <Link href="/mypage" className="nav-link" style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%)', 
-                  fontWeight: 'bold',
-                  borderRadius: '20px',
-                  padding: '0.4rem 0.8rem',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  backdropFilter: 'blur(10px)'
-                }}>
+                <Link href="/mypage" className="nav-link" style={{background: 'none'}}>
                   👤 마이페이지
                 </Link>
                 <button
                   onClick={() => setShowLogoutModal(true)}
                   className="nav-link"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'none',
+                    border: 'none',
                     cursor: 'pointer',
-                    color: 'white',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '20px',
-                    backdropFilter: 'blur(10px)'
+                    color: 'white'
                   }}
                 >
                   로그아웃
                 </button>
               </div>
-            ) : (
+            ) : localStorage.getItem('adminSession') !== 'true' ? (
               <Link href="/auth" className="nav-link">
                 🔐 로그인
               </Link>
-            )}
+            ) : null}
           </nav>
         </div>
       </header>
