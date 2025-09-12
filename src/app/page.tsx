@@ -122,30 +122,113 @@ export default function Home() {
     }
   };
 
+  // 관리자 Firebase Auth 로그인
+  const loginAsAdmin = async () => {
+    try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase');
+      
+      // 관리자 전용 Firebase 계정으로 로그인
+      const adminEmail = 'admin@albam.com';
+      const adminPassword = 'admin123456';
+      
+      console.log('관리자 Firebase Auth 로그인 시도...');
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      console.log('✅ 관리자 Firebase Auth 로그인 성공');
+    } catch (error: any) {
+      console.error('❌ 관리자 Firebase Auth 로그인 실패:', error);
+      
+      // 관리자 계정이 없으면 생성 시도
+      if (error.code === 'auth/user-not-found') {
+        try {
+          const { createUserWithEmailAndPassword } = await import('firebase/auth');
+          const { auth } = await import('@/lib/firebase');
+          
+          console.log('관리자 계정 생성 시도...');
+          await createUserWithEmailAndPassword(auth, 'admin@albam.com', 'admin123456');
+          console.log('✅ 관리자 계정 생성 및 로그인 성공');
+        } catch (createError) {
+          console.error('❌ 관리자 계정 생성 실패:', createError);
+        }
+      }
+    }
+  };
+
   // 관리자 세션 및 사용자 로그인 확인
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
     if (adminSession === 'true') {
       setIsAdmin(true);
+      // 관리자 세션이 있으면 Firebase Auth에도 로그인
+      loginAsAdmin();
     }
 
     // Firebase Auth에서 사용자 상태 자동 관리
     
-    // 상품 데이터 로드 (Firestore 우선, 실패 시 localStorage)
-    const loadProducts = async () => {
-      const firestoreLoaded = await loadProductsFromFirestore();
-      
-      if (!firestoreLoaded) {
-        // Firestore 로드 실패 시 localStorage에서 로드
-        const savedProducts = localStorage.getItem('chestnutProducts');
-        if (savedProducts) {
-          console.log('localStorage에서 상품 데이터 로드');
-          setProducts(JSON.parse(savedProducts));
+    // 상품 데이터 로드 (Firestore 우선, 실시간 리스너 설정)
+    const setupProductsListener = async () => {
+      try {
+        const { collection, onSnapshot } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        console.log('Firestore 상품 실시간 리스너 설정...');
+        const productsCollection = collection(db, 'products');
+        
+        // 실시간 리스너 설정
+        const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreProducts: Product[] = snapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: parseInt(doc.id),
+                name: data.name || '',
+                description: data.description || '',
+                price: data.price || '',
+                emoji: data.emoji || '🌰',
+                image: data.image || ''
+              };
+            });
+            
+            // ID 순으로 정렬
+            firestoreProducts.sort((a, b) => a.id - b.id);
+            
+            console.log('✅ Firestore 실시간 상품 데이터 업데이트:', firestoreProducts.length);
+            setProducts(firestoreProducts);
+            localStorage.setItem('chestnutProducts', JSON.stringify(firestoreProducts));
+          } else {
+            console.log('⚠ Firestore에 상품 데이터가 없음 - localStorage에서 로드');
+            const savedProducts = localStorage.getItem('chestnutProducts');
+            if (savedProducts) {
+              setProducts(JSON.parse(savedProducts));
+            }
+          }
+        }, (error) => {
+          console.error('❌ Firestore 실시간 리스너 오류:', error);
+          // 오류 발생 시 localStorage에서 로드
+          const savedProducts = localStorage.getItem('chestnutProducts');
+          if (savedProducts) {
+            console.log('localStorage에서 상품 데이터 로드 (백업)');
+            setProducts(JSON.parse(savedProducts));
+          }
+        });
+        
+        // 컴포넌트 언마운트 시 리스너 해제
+        return unsubscribe;
+      } catch (error) {
+        console.error('❌ Firestore 리스너 설정 실패:', error);
+        // 실패 시 일회성 로드 시도
+        const firestoreLoaded = await loadProductsFromFirestore();
+        if (!firestoreLoaded) {
+          const savedProducts = localStorage.getItem('chestnutProducts');
+          if (savedProducts) {
+            console.log('localStorage에서 상품 데이터 로드');
+            setProducts(JSON.parse(savedProducts));
+          }
         }
       }
     };
     
-    loadProducts();
+    setupProductsListener();
   }, []);
 
   // 로그아웃 처리
@@ -172,6 +255,7 @@ export default function Home() {
         console.log('Firestore 상품 저장 시도:', {
           collection: 'products',
           userId: currentUser.uid,
+          isAdmin: isAdmin,
           productsCount: updatedProducts.length,
           projectId: db.app.options.projectId,
           databaseId: 'albam'

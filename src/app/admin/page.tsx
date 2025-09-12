@@ -781,11 +781,41 @@ export default function Admin() {
   // 주문 편집 개선 상태
   const [editSameAsOrderer, setEditSameAsOrderer] = useState(false);
 
+  // 관리자 Firebase Auth 로그인 함수
+  const loginAsAdmin = async () => {
+    try {
+      const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase');
+      
+      const adminEmail = 'admin@albam.com';
+      const adminPassword = 'admin123456';
+      
+      console.log('관리자 Firebase Auth 로그인 시도...');
+      
+      try {
+        await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+        console.log('✅ 관리자 Firebase Auth 로그인 성공');
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+          console.log('관리자 계정 생성 시도...');
+          await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
+          console.log('✅ 관리자 계정 생성 및 로그인 성공');
+        } else {
+          throw error;
+        }
+      }
+    } catch (error) {
+      console.error('❌ 관리자 Firebase Auth 처리 실패:', error);
+    }
+  };
+
   // 관리자 세션 확인
   useEffect(() => {
     const adminSession = localStorage.getItem('adminSession');
     if (adminSession === 'true') {
       setIsAdmin(true);
+      // 기존 관리자 세션이 있으면 Firebase Auth에도 로그인
+      loginAsAdmin();
     }
     
     // Firestore에서 상품 데이터 로드
@@ -927,11 +957,14 @@ export default function Admin() {
   }, [orders, filterDate, filterProduct, sortBy, sortOrder]);
 
   // 관리자 로그인
-  const handleAdminLogin = () => {
+  const handleAdminLogin = async () => {
     if (adminPassword === 'lky9287') {
       setIsAdmin(true);
       setAdminPassword('');
       localStorage.setItem('adminSession', 'true');
+      
+      // Firebase Auth에도 관리자로 로그인
+      await loginAsAdmin();
     } else {
       alert('비밀번호가 올바르지 않습니다.');
       setAdminPassword('');
