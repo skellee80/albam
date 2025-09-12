@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from "next/link";
 
@@ -26,7 +26,7 @@ interface Product {
 export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { currentUser, userData, logout } = useAuth();
+  const { currentUser, userData, logout, login, register } = useAuth();
   const [products, setProducts] = useState<Product[]>([
     {
       id: 1,
@@ -123,36 +123,46 @@ export default function Home() {
   };
 
   // 관리자 Firebase Auth 로그인
-  const loginAsAdmin = async () => {
+  const loginAsAdmin = useCallback(async () => {
     try {
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const { auth } = await import('@/lib/firebase');
-      
-      // 관리자 전용 Firebase 계정으로 로그인
       const adminEmail = 'admin@albam.com';
       const adminPassword = 'admin123456';
       
-      console.log('관리자 Firebase Auth 로그인 시도...');
-      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-      console.log('✅ 관리자 Firebase Auth 로그인 성공');
-    } catch (error: any) {
-      console.error('❌ 관리자 Firebase Auth 로그인 실패:', error);
+      // 이미 로그인되어 있는지 확인
+      if (currentUser && currentUser.email === adminEmail) {
+        return;
+      }
       
-      // 관리자 계정이 없으면 생성 시도
-      if (error.code === 'auth/user-not-found') {
-        try {
-          const { createUserWithEmailAndPassword } = await import('firebase/auth');
-          const { auth } = await import('@/lib/firebase');
-          
-          console.log('관리자 계정 생성 시도...');
-          await createUserWithEmailAndPassword(auth, 'admin@albam.com', 'admin123456');
-          console.log('✅ 관리자 계정 생성 및 로그인 성공');
-        } catch (createError) {
-          console.error('❌ 관리자 계정 생성 실패:', createError);
+      try {
+        // 먼저 로그인 시도
+        await login(adminEmail, adminPassword);
+        
+        // 로그인 후 상태 업데이트 대기
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+          try {
+            // 계정이 없으면 생성
+            await register(adminEmail, adminPassword, '관리자');
+            
+            // 계정 생성 후 상태 업데이트 대기
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+          } catch (createError: any) {
+            console.error('관리자 계정 생성 실패:', createError);
+            throw createError;
+          }
+        } else {
+          throw error;
         }
       }
+      
+    } catch (error: any) {
+      console.error('관리자 Firebase Auth 처리 실패:', error);
     }
-  };
+  }, [currentUser, login, register]);
+
 
   // 관리자 세션 및 사용자 로그인 확인
   useEffect(() => {
@@ -171,7 +181,6 @@ export default function Home() {
         const { collection, onSnapshot } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
         
-        console.log('Firestore 상품 실시간 리스너 설정...');
         const productsCollection = collection(db, 'products');
         
         // 실시간 리스너 설정
@@ -192,11 +201,9 @@ export default function Home() {
             // ID 순으로 정렬
             firestoreProducts.sort((a, b) => a.id - b.id);
             
-            console.log('✅ Firestore 실시간 상품 데이터 업데이트:', firestoreProducts.length);
             setProducts(firestoreProducts);
             localStorage.setItem('chestnutProducts', JSON.stringify(firestoreProducts));
           } else {
-            console.log('⚠ Firestore에 상품 데이터가 없음 - localStorage에서 로드');
             const savedProducts = localStorage.getItem('chestnutProducts');
             if (savedProducts) {
               setProducts(JSON.parse(savedProducts));
@@ -207,7 +214,6 @@ export default function Home() {
           // 오류 발생 시 localStorage에서 로드
           const savedProducts = localStorage.getItem('chestnutProducts');
           if (savedProducts) {
-            console.log('localStorage에서 상품 데이터 로드 (백업)');
             setProducts(JSON.parse(savedProducts));
           }
         });
@@ -221,7 +227,6 @@ export default function Home() {
         if (!firestoreLoaded) {
           const savedProducts = localStorage.getItem('chestnutProducts');
           if (savedProducts) {
-            console.log('localStorage에서 상품 데이터 로드');
             setProducts(JSON.parse(savedProducts));
           }
         }
@@ -229,7 +234,7 @@ export default function Home() {
     };
     
     setupProductsListener();
-  }, []);
+  }, [loginAsAdmin]);
 
   // 로그아웃 처리
   const handleLogout = async () => {
@@ -252,14 +257,6 @@ export default function Home() {
         const { collection, doc, setDoc } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
         
-        console.log('Firestore 상품 저장 시도:', {
-          collection: 'products',
-          userId: currentUser.uid,
-          isAdmin: isAdmin,
-          productsCount: updatedProducts.length,
-          projectId: db.app.options.projectId,
-          databaseId: 'albam'
-        });
 
         // 각 상품을 개별 문서로 저장
         for (const product of updatedProducts) {
@@ -273,11 +270,6 @@ export default function Home() {
           await setDoc(productDocRef, productData);
         }
         
-        console.log('✅ 상품 데이터가 Firestore에 저장되었습니다!', {
-          collection: 'products',
-          databaseId: 'albam',
-          productsCount: updatedProducts.length
-        });
       } else {
         console.log('⚠ 비로그인 사용자 - Firestore 저장 건너뜀');
       }
@@ -332,6 +324,7 @@ export default function Home() {
     const updatedProducts = products.map(p => 
       p.id === editingProduct.id ? updatedProduct : p
     );
+    
     await saveProducts(updatedProducts);
     setEditingProduct(null);
     setSelectedProductFile(null);

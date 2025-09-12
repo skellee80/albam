@@ -26,7 +26,7 @@ if (getApps().length === 0) {
 
 // Authentication 및 Firestore 인스턴스
 export const auth = getAuth(app);
-export const db = getFirestore(app, 'albam'); // 'albam' 데이터베이스 사용
+export const db = getFirestore(app); // 기본 데이터베이스 사용
 
 // Firebase Auth 설정 최적화
 if (typeof window !== 'undefined') {
@@ -36,7 +36,7 @@ if (typeof window !== 'undefined') {
     auth: !!auth,
     db: !!db,
     projectId: app.options.projectId,
-    databaseId: 'albam', // 사용 중인 데이터베이스 ID
+    databaseId: '(default)', // 사용 중인 데이터베이스 ID
     timestamp: new Date().toISOString()
   });
   
