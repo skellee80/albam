@@ -799,10 +799,14 @@ export default function Admin() {
         const productsSnapshot = await getDocs(productsCollection);
         
         if (!productsSnapshot.empty) {
-          const firestoreProducts = productsSnapshot.docs.map(doc => ({
-            id: parseInt(doc.id),
-            ...doc.data()
-          }));
+          const firestoreProducts = productsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: parseInt(doc.id),
+              name: data.name || '',
+              price: data.price || ''
+            };
+          });
           
           // ID 순으로 정렬
           firestoreProducts.sort((a, b) => a.id - b.id);

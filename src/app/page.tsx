@@ -14,11 +14,20 @@ interface User {
   createdAt: string;
 }
 
+interface Product {
+  id: number;
+  name: string;
+  description: string;
+  price: string;
+  emoji: string;
+  image: string;
+}
+
 export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const { currentUser, userData, logout } = useAuth();
-  const [products, setProducts] = useState([
+  const [products, setProducts] = useState<Product[]>([
     {
       id: 1,
       name: "알밤 1kg",
@@ -68,7 +77,7 @@ export default function Home() {
       image: ""
     }
   ]);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedProductFile, setSelectedProductFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string>('');
@@ -84,10 +93,17 @@ export default function Home() {
       const productsSnapshot = await getDocs(productsCollection);
       
       if (!productsSnapshot.empty) {
-        const firestoreProducts = productsSnapshot.docs.map(doc => ({
-          id: parseInt(doc.id),
-          ...doc.data()
-        }));
+        const firestoreProducts: Product[] = productsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: parseInt(doc.id),
+            name: data.name || '',
+            description: data.description || '',
+            price: data.price || '',
+            emoji: data.emoji || '🌰',
+            image: data.image || ''
+          };
+        });
         
         // ID 순으로 정렬
         firestoreProducts.sort((a, b) => a.id - b.id);
@@ -143,7 +159,7 @@ export default function Home() {
   };
 
   // 상품 저장 (Firebase Firestore + localStorage)
-  const saveProducts = async (updatedProducts: any[]) => {
+  const saveProducts = async (updatedProducts: Product[]) => {
     try {
       setProducts(updatedProducts);
       localStorage.setItem('chestnutProducts', JSON.stringify(updatedProducts));
@@ -193,7 +209,7 @@ export default function Home() {
   };
 
   // 상품 수정
-  const handleEditProduct = (product: any) => {
+  const handleEditProduct = (product: Product) => {
     setEditingProduct({...product});
     setProductImagePreview(product.image || '');
   };
@@ -219,7 +235,7 @@ export default function Home() {
 
     // 상품 업데이트
   const handleUpdateProduct = async () => {
-    if (!editingProduct.name?.trim() || !editingProduct.description?.trim() || !editingProduct.price?.trim()) {
+    if (!editingProduct || !editingProduct.name?.trim() || !editingProduct.description?.trim() || !editingProduct.price?.trim()) {
       alert('이름, 설명, 가격을 모두 입력해주세요.');
       return;
     }
@@ -353,8 +369,8 @@ export default function Home() {
             {isAdmin && (
               <button 
                 onClick={() => {
-                                          setEditingProduct({name: '', description: '', price: '', emoji: ''});
-                        setShowAddForm(true);
+                  setEditingProduct({id: 0, name: '', description: '', price: '', emoji: '🌰', image: ''});
+                  setShowAddForm(true);
                 }}
                 className="btn product-add-btn"
               >
