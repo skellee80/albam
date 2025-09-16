@@ -1,38 +1,53 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 관리자 권한 확인 함수
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    // 관리자 이메일 확인 함수
+    function isAdminEmail() {
+      return request.auth != null && 
+        request.auth.token.email in get(/databases/$(database)/documents/settings/adminEmails).data.emails;
+    }
+    
     // 사용자 문서 규칙 - 인증된 사용자만 자신의 데이터에 접근 가능
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // 주문 문서 규칙 - 인증된 사용자만 자신의 주문에 접근 가능
-    match /orders/{orderId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.userId || 
-         request.auth.uid == request.resource.data.userId);
-    }
-    
-    // 상품 문서 규칙 - 모든 사용자가 읽기 가능, 인증된 사용자만 쓰기 가능
+    // 상품 문서 규칙 - 모든 사용자가 읽기 가능, 관리자만 쓰기 가능
     match /products/{productId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin() || isAdminEmail();
     }
     
-    // 관리자 메모 규칙 - 인증된 사용자만 접근 가능
+    // 관리자 문서 규칙 - 관리자만 접근 가능
+    match /admins/{adminId} {
+      allow read, write: if isAdmin() || isAdminEmail();
+    }
+    
+    // 관리자 설정 규칙 - 관리자만 접근 가능
+    match /settings/{settingId} {
+      allow read, write: if isAdmin() || isAdminEmail();
+    }
+    
+    // 관리자 메모 규칙 - 관리자만 접근 가능
     match /adminNotes/{noteId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAdmin() || isAdminEmail();
     }
     
-    // 공지사항 규칙 - 모든 사용자가 읽기 가능, 인증된 사용자만 쓰기 가능
+    // 공지사항 규칙 - 모든 사용자가 읽기 가능, 관리자만 쓰기 가능
     match /notices/{noticeId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin() || isAdminEmail();
     }
     
-    // 주문 규칙 - 인증된 사용자만 접근 가능
+    // 주문 규칙 - 관리자만 접근 가능
     match /orders/{orderId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAdmin() || isAdminEmail();
     }
     
     // 기본적으로 다른 모든 문서는 접근 거부

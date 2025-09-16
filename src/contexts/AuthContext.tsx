@@ -243,8 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           collection: 'users', 
           docId: user.uid,
           data: userDocData,
-          projectId: db.app.options.projectId,
-          databaseId: 'albam'
+          projectId: db.app.options.projectId
         });
         
         // Firestore 연결 상태 확인
@@ -258,8 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(doc(db, 'users', user.uid), userDocData);
         console.log('✅ Firestore 사용자 데이터 저장 성공!', {
           uid: user.uid,
-          collection: 'users',
-          databaseId: 'albam'
+          collection: 'users'
         });
       } catch (firestoreError: any) {
         console.warn('⚠ Firestore 저장 실패, 로컬에서 계속 진행:', {
@@ -270,7 +268,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 특정 Firestore 오류 처리
         if (firestoreError?.code === 'permission-denied') {
           console.error('Firestore 권한 거부 - 보안 규칙을 확인하세요');
-          console.error('Firebase 콘솔: https://console.firebase.google.com/project/albam-bb07e/firestore/rules');
         } else if (firestoreError?.code === 'unavailable') {
           console.error('Firestore 서비스 사용 불가 - 네트워크 연결을 확인하세요');
         }
@@ -319,7 +316,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           default:
             console.error('알 수 없는 Firebase 오류:', error.code);
             console.error('Firebase 콘솔에서 Authentication이 활성화되어 있는지 확인하세요');
-            console.error('프로젝트 URL: https://console.firebase.google.com/project/albam-bb07e/authentication');
         }
       }
       
@@ -605,3 +601,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   );
 }
+

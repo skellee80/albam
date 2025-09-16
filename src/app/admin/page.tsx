@@ -28,8 +28,10 @@ interface AdminNote {
   id: string;
   title: string;
   content: string;
-  date: string;
-  type: 'note' | 'todo'; // 특이사항 또는 할일
+  date?: string;
+  createdAt?: string;
+  author?: string;
+  type?: 'note' | 'todo'; // 특이사항 또는 할일
   images?: string[];
 }
 
@@ -48,10 +50,33 @@ function AdminBoard() {
 
   // 관리자 노트 로드
   useEffect(() => {
-    const savedNotes = localStorage.getItem('adminNotes');
-    if (savedNotes) {
-      setAdminNotes(JSON.parse(savedNotes));
-    }
+    const loadNotesFromFirestore = async () => {
+      try {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const notesSnapshot = await getDocs(collection(db, 'adminNotes'));
+        const firestoreNotes: AdminNote[] = [];
+        
+        notesSnapshot.forEach((doc) => {
+          const data = doc.data();
+          firestoreNotes.push({
+            id: doc.id,
+            title: data.title,
+            content: data.content,
+            createdAt: data.createdAt,
+            author: data.author,
+            images: data.images || []
+          });
+        });
+
+        setAdminNotes(firestoreNotes);
+      } catch (error) {
+        console.error('Firestore 관리자 노트 로드 실패:', error);
+      }
+    };
+    
+    loadNotesFromFirestore();
   }, []);
 
   // 이미지 파일 처리 (새 메모)
@@ -841,7 +866,7 @@ export default function Admin() {
       const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
       const { auth } = await import('@/lib/firebase');
       
-      const adminEmail = 'admin@albam.com';
+      const adminEmail = 'admin@bamshop.com';
       const adminPassword = 'admin123456';
       
       console.log('관리자 Firebase Auth 로그인 시도...');
@@ -959,18 +984,51 @@ export default function Admin() {
   // 주문 데이터 로드
   useEffect(() => {
     if (isAdmin) {
-      const savedOrders = localStorage.getItem('orders');
-      if (savedOrders) {
-        const orderData = JSON.parse(savedOrders);
-        setOrders(orderData);
-        setFilteredOrders(orderData);
-        // 비고 값들 초기화
-        const notes: {[key: string]: string} = {};
-        orderData.forEach((order: OrderData) => {
-          notes[order.orderNumber] = order.note || '';
-        });
-        setNoteValues(notes);
-      }
+      const loadOrdersFromFirestore = async () => {
+        try {
+          const { collection, getDocs } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase');
+          
+          const ordersSnapshot = await getDocs(collection(db, 'orders'));
+          const firestoreOrders: OrderData[] = [];
+          
+          ordersSnapshot.forEach((doc) => {
+            const data = doc.data();
+            firestoreOrders.push({
+              name: data.name,
+              recipientName: data.recipientName,
+              phone: data.phone,
+              recipientPhone: data.recipientPhone,
+              address: data.address,
+              productId: data.productId,
+              productName: data.productName,
+              quantity: data.quantity,
+              totalPrice: data.totalPrice,
+              orderDate: data.orderDate,
+              orderNumber: data.orderNumber,
+              isShipped: data.isShipped || false,
+              isPaid: data.isPaid || false,
+              isExchanged: data.isExchanged || false,
+              isRefunded: data.isRefunded || false,
+              note: data.note || ''
+            });
+          });
+
+          setOrders(firestoreOrders);
+          setFilteredOrders(firestoreOrders);
+          
+          // 비고 값들 초기화
+          const notes: {[key: string]: string} = {};
+          firestoreOrders.forEach((order: OrderData) => {
+            notes[order.orderNumber] = order.note || '';
+          });
+          setNoteValues(notes);
+        } catch (error) {
+          console.error('Firestore 주문 데이터 로드 실패:', error);
+        }
+      };
+      
+      loadOrdersFromFirestore();
     }
   }, [isAdmin]);
 
@@ -1015,7 +1073,6 @@ export default function Admin() {
     if (adminPassword === 'lky9287') {
       setIsAdmin(true);
       setAdminPassword('');
-      localStorage.setItem('adminSession', 'true');
       
       // Firebase Auth에도 관리자로 로그인
       await loginAsAdmin();

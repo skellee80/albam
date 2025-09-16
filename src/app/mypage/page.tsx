@@ -115,12 +115,8 @@ export default function MyPage() {
       console.warn('Firestore 주문 내역 로드 실패, localStorage 사용:', error);
     }
     
-    // Firestore에서 로드 실패하거나 주문이 없는 경우 localStorage에서 로드
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    const userOrderList = orders.filter((order: OrderData) => 
-      order.name === userData.name || order.phone === userData.phone
-    );
-    setUserOrders(userOrderList);
+    // Firestore에서 로드 실패하거나 주문이 없는 경우 빈 배열 설정
+    setUserOrders([]);
   }, [currentUser]);
 
   // 사용자 데이터 로드 및 폼 초기화
@@ -183,13 +179,6 @@ export default function MyPage() {
 
       // AuthContext의 userData 실시간 업데이트
       updateUserData(updatedData);
-
-      // 임시로 localStorage도 업데이트 (기존 주문 데이터 호환성을 위해)
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const updatedUsers = users.map((user: any) =>
-        user.email === userData.email ? { ...user, ...updatedData } : user
-      );
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
       
       setIsEditing(false);
       setShowSuccessModal(true);
@@ -295,7 +284,7 @@ export default function MyPage() {
             <Link href="/notice" className="nav-link">공지사항</Link>
             <Link href="/admin" className="nav-link">주문 현황</Link>
             <Link href="/mypage" className="nav-link nav-link-active">마이페이지</Link>
-            {currentUser && userData && localStorage.getItem('adminSession') !== 'true' && (
+            {currentUser && userData && (
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <div style={{
                   color: 'white', 
@@ -778,3 +767,4 @@ export default function MyPage() {
     </>
   );
 }
+

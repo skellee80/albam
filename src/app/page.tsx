@@ -110,7 +110,6 @@ export default function Home() {
         
         console.log('✅ Firestore에서 상품 데이터 로드 완료:', firestoreProducts.length);
         setProducts(firestoreProducts);
-        localStorage.setItem('chestnutProducts', JSON.stringify(firestoreProducts));
         return true;
       } else {
         console.log('⚠ Firestore에 상품 데이터가 없음');
@@ -125,7 +124,7 @@ export default function Home() {
   // 관리자 Firebase Auth 로그인
   const loginAsAdmin = useCallback(async () => {
     try {
-      const adminEmail = 'admin@albam.com';
+      const adminEmail = 'admin@bamshop.com';
       const adminPassword = 'admin123456';
       
       // 이미 로그인되어 있는지 확인
@@ -164,18 +163,28 @@ export default function Home() {
   }, [currentUser, login, register]);
 
 
-  // 관리자 세션 및 사용자 로그인 확인
+  // 관리자 권한 확인 (Firebase Auth 기반)
   useEffect(() => {
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession === 'true') {
-      setIsAdmin(true);
-      // 관리자 세션이 있으면 Firebase Auth에도 로그인
-      loginAsAdmin();
-    }
+    const checkAdminStatus = async () => {
+      if (currentUser) {
+        try {
+          const { checkAdminPermission } = await import('@/lib/adminAuth');
+          const hasPermission = await checkAdminPermission(currentUser);
+          setIsAdmin(hasPermission);
+        } catch (error) {
+          console.error('관리자 권한 확인 실패:', error);
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    };
 
-    // Firebase Auth에서 사용자 상태 자동 관리
-    
-    // 상품 데이터 로드 (Firestore 우선, 실시간 리스너 설정)
+    checkAdminStatus();
+  }, [currentUser]);
+
+  // 상품 데이터 로드 (Firestore 우선, 실시간 리스너 설정)
+  useEffect(() => {
     const setupProductsListener = async () => {
       try {
         const { collection, onSnapshot } = await import('firebase/firestore');
@@ -202,20 +211,9 @@ export default function Home() {
             firestoreProducts.sort((a, b) => a.id - b.id);
             
             setProducts(firestoreProducts);
-            localStorage.setItem('chestnutProducts', JSON.stringify(firestoreProducts));
-          } else {
-            const savedProducts = localStorage.getItem('chestnutProducts');
-            if (savedProducts) {
-              setProducts(JSON.parse(savedProducts));
-            }
           }
         }, (error) => {
           console.error('❌ Firestore 실시간 리스너 오류:', error);
-          // 오류 발생 시 localStorage에서 로드
-          const savedProducts = localStorage.getItem('chestnutProducts');
-          if (savedProducts) {
-            setProducts(JSON.parse(savedProducts));
-          }
         });
         
         // 컴포넌트 언마운트 시 리스너 해제
@@ -223,18 +221,12 @@ export default function Home() {
       } catch (error) {
         console.error('❌ Firestore 리스너 설정 실패:', error);
         // 실패 시 일회성 로드 시도
-        const firestoreLoaded = await loadProductsFromFirestore();
-        if (!firestoreLoaded) {
-          const savedProducts = localStorage.getItem('chestnutProducts');
-          if (savedProducts) {
-            setProducts(JSON.parse(savedProducts));
-          }
-        }
+        await loadProductsFromFirestore();
       }
     };
     
     setupProductsListener();
-  }, [loginAsAdmin]);
+  }, []);
 
   // 로그아웃 처리
   const handleLogout = async () => {
@@ -246,11 +238,10 @@ export default function Home() {
     }
   };
 
-  // 상품 저장 (Firebase Firestore + localStorage)
+  // 상품 저장 (Firebase Firestore)
   const saveProducts = async (updatedProducts: Product[]) => {
     try {
       setProducts(updatedProducts);
-      localStorage.setItem('chestnutProducts', JSON.stringify(updatedProducts));
 
       // Firebase Firestore에 상품 데이터 저장
       if (currentUser) {

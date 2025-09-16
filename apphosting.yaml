@@ -15,37 +15,37 @@ env:
   # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
   
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyC_UBILTyP5hLYszfcwBws_GuHTUWaY3hI
+    value: AIzaSyB875pSZMX_SprhkbB24W7E8WZUuk_NJME
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: albam-bb07e.firebaseapp.com
+    value: bamshop-ce59b.firebaseapp.com
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: albam-bb07e
+    value: bamshop-ce59b
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: albam-bb07e.firebasestorage.app
+    value: bamshop-ce59b.firebasestorage.app
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "214464229053"
+    value: "785228145441"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:214464229053:web:b2cd7266cdcce7aa8851d4
+    value: 1:785228145441:web:e8ac6a0c36061f87851460
     availability:
       - BUILD
       - RUNTIME

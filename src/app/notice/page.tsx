@@ -48,7 +48,7 @@ export default function Notice() {
       const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
       const { auth } = await import('@/lib/firebase');
       
-      const adminEmail = 'admin@albam.com';
+      const adminEmail = 'admin@bamshop.com';
       const adminPassword = 'admin123456';
       
       console.log('관리자 Firebase Auth 로그인 시도...');
@@ -70,15 +70,25 @@ export default function Notice() {
     }
   };
 
-  // 관리자 세션 확인
+  // 관리자 권한 확인 (Firebase Auth 기반)
   useEffect(() => {
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession === 'true') {
-      setIsAdmin(true);
-      // 기존 관리자 세션이 있으면 Firebase Auth에도 로그인
-      loginAsAdmin();
-    }
-  }, []);
+    const checkAdminStatus = async () => {
+      if (currentUser) {
+        try {
+          const { checkAdminPermission } = await import('@/lib/adminAuth');
+          const hasPermission = await checkAdminPermission(currentUser);
+          setIsAdmin(hasPermission);
+        } catch (error) {
+          console.error('관리자 권한 확인 실패:', error);
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [currentUser]);
 
   // 로그아웃 처리
   const handleLogout = async () => {

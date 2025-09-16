@@ -5,7 +5,7 @@
   },
   "apphosting": [
     {
-      "backendId": "albam",
+      "backendId": "bamshop",
       "rootDir": "/",
       "ignore": [
         "node_modules",

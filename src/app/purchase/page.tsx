@@ -43,13 +43,25 @@ export default function Purchase() {
     quantity: 1
   });
 
-  // 관리자 세션 확인
+  // 관리자 권한 확인 (Firebase Auth 기반)
   useEffect(() => {
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession === 'true') {
-      setIsAdmin(true);
-    }
-  }, []);
+    const checkAdminStatus = async () => {
+      if (currentUser) {
+        try {
+          const { checkAdminPermission } = await import('@/lib/adminAuth');
+          const hasPermission = await checkAdminPermission(currentUser);
+          setIsAdmin(hasPermission);
+        } catch (error) {
+          console.error('관리자 권한 확인 실패:', error);
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [currentUser]);
 
   // 로그인한 사용자 정보로 폼 자동 채우기
   useEffect(() => {
@@ -425,14 +437,14 @@ export default function Purchase() {
             userId: currentUser.uid,
             orderNumber: orderData.orderNumber,
             projectId: db.app.options.projectId,
-            databaseId: 'albam'
+            databaseId: '(default)'
           });
           
           const docRef = await addDoc(collection(db, 'orders'), firestoreOrderData);
           console.log('✅ 주문 데이터가 Firestore에 저장되었습니다!', {
             docId: docRef.id,
             collection: 'orders',
-            databaseId: 'albam'
+            databaseId: '(default)'
           });
         } catch (firestoreError: any) {
           console.error('❌ Firestore 주문 저장 실패:', {
