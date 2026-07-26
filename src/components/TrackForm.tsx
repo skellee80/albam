@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
 import { findOrders, type TrackedOrder } from '@/app/(shop)/track/actions';
-import { formatDate, formatKRW } from '@/lib/format';
+import { formatDate, formatDateTime, formatKRW } from '@/lib/format';
+import { paymentDueAt } from '@/lib/types';
 
 import { OrderStatusTrail, SpecialStatusBadge } from './OrderStatusTrail';
 import { TrackingNumber } from './TrackingNumber';
@@ -123,9 +124,15 @@ function TrackedOrderCard({ order }: { order: TrackedOrder }) {
       <SpecialStatusBadge status={order.status} />
 
       {order.status === '입금대기' && (
-        <p className="mt-3 rounded-xl bg-shell-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-shell">
-          아직 입금이 확인되지 않았습니다.
-        </p>
+        <div className="mt-3 rounded-xl bg-shell-tint px-3.5 py-2.5">
+          <p className="text-[0.85rem] font-semibold text-shell">
+            아직 입금이 확인되지 않았습니다.
+          </p>
+          <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-soft">
+            {formatDateTime(paymentDueAt(order.createdAt))}까지 입금되지 않으면 주문이 자동으로
+            취소됩니다.
+          </p>
+        </div>
       )}
 
       <ul className="mt-4 space-y-1.5 border-t border-line pt-3.5 text-[0.9rem]">

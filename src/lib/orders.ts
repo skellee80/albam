@@ -3,6 +3,8 @@ import 'server-only';
 import { COL, db, toMillis, toMillisOr } from './firebase-admin';
 import { kstDateKey, normalizeName, normalizePhone } from './format';
 import {
+  PAYMENT_DEADLINE_HOURS,
+  PAYMENT_DEADLINE_MS,
   STOCK_RELEASING_STATUSES,
   type CartLine,
   type Order,
@@ -90,7 +92,15 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderResult =
-  | { ok: true; orderId: string; orderNo: string; totalAmount: number; items: OrderItem[] }
+  | {
+      ok: true;
+      orderId: string;
+      orderNo: string;
+      totalAmount: number;
+      items: OrderItem[];
+      /** 이 시각까지 입금해야 한다. 지나면 자동 취소된다. */
+      paymentDueAt: number;
+    }
   | { ok: false; error: string };
 
 /**
@@ -199,7 +209,14 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       shippedAt: null,
     });
 
-    return { ok: true, orderId: orderRef.id, orderNo, totalAmount, items };
+    return {
+      ok: true,
+      orderId: orderRef.id,
+      orderNo,
+      totalAmount,
+      items,
+      paymentDueAt: now + PAYMENT_DEADLINE_MS,
+    };
   });
 }
 
@@ -380,4 +397,64 @@ export async function lookupOrders(depositorName: string, phone: string): Promis
 /** 입금 매칭 후보: 아직 입금 확인이 안 된 주문 */
 export async function listPendingPaymentOrders(limit = 200): Promise<Order[]> {
   return listOrders({ status: '입금대기', limit });
+}
+
+/* ────────────────────────────────────────────────────────────
+ * 입금 기한이 지난 주문 자동 취소
+ * ──────────────────────────────────────────────────────────── */
+
+/**
+ * 인스턴스별 마지막 정리 시각.
+ *
+ * 이 정리는 화면을 그릴 때 곁다리로 돌기 때문에, 요청마다 조회를 날리면 낭비다.
+ * 인스턴스가 여러 개여도 각자 1분에 한 번씩만 도는 정도라 문제되지 않는다
+ * (같은 주문을 두 번 취소해도 재고는 상태에서 유도하므로 어긋나지 않는다).
+ */
+const globalForSweep = globalThis as unknown as { __albamLastSweep?: number };
+const SWEEP_INTERVAL_MS = 60_000;
+
+/**
+ * 입금 기한(24시간)이 지난 입금대기 주문을 취소한다.
+ *
+ * 취소 처리는 updateOrder를 그대로 쓴다. 재고 복원이 상태에서 유도되므로
+ * 여기서 재고를 따로 건드리지 않아도 정확히 한 번만 돌아간다.
+ *
+ * 별도의 스케줄러 없이 서버가 화면을 그릴 때 함께 돈다. 손님이 상품 목록을 보거나
+ * 아버지가 관리자 화면을 열 때마다 정리되므로, 실제로는 계속 도는 셈이다.
+ *
+ * @param force 스로틀을 무시하고 즉시 실행 (점검·수동 실행용)
+ */
+export async function expireStaleOrders({ force = false } = {}): Promise<number> {
+  const now = Date.now();
+  const last = globalForSweep.__albamLastSweep ?? 0;
+  if (!force && now - last < SWEEP_INTERVAL_MS) return 0;
+  globalForSweep.__albamLastSweep = now;
+
+  const snap = await db
+    .collection(COL.orders)
+    .where('status', '==', '입금대기')
+    .where('createdAt', '<', now - PAYMENT_DEADLINE_MS)
+    .limit(50) // 한 번에 너무 많이 붙들지 않는다. 남으면 다음 정리에서 처리된다.
+    .get();
+
+  let cancelled = 0;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data.deleted) continue;
+    try {
+      await updateOrder(doc.id, {
+        status: '취소',
+        // 아버지가 나중에 "왜 취소됐지?" 할 때 볼 단서. 직접 쓴 메모는 덮지 않는다.
+        memo: String(data.memo ?? '').trim()
+          ? data.memo
+          : `입금 기한 ${PAYMENT_DEADLINE_HOURS}시간이 지나 자동으로 취소되었습니다.`,
+      });
+      cancelled += 1;
+    } catch (err) {
+      // 한 건이 실패해도 나머지는 계속 정리한다
+      console.error('[expireStaleOrders]', doc.id, err);
+    }
+  }
+
+  return cancelled;
 }

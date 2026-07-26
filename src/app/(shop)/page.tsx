@@ -1,8 +1,9 @@
 import { CartBar } from '@/components/CartBar';
 import { ProductRow, type ShopProduct } from '@/components/ProductRow';
 import { SiteHeader } from '@/components/SiteHeader';
+import { expireStaleOrders } from '@/lib/orders';
 import { listProducts } from '@/lib/products';
-import type { Product } from '@/lib/types';
+import { PAYMENT_DEADLINE_HOURS, type Product } from '@/lib/types';
 
 // 재고와 가격이 바로 반영되어야 하므로 캐시하지 않는다.
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,11 @@ function groupByVariety(products: Product[]) {
 }
 
 export default async function ShopPage() {
+  // 기한 지난 입금대기 주문을 먼저 정리한다.
+  // 손님이 목록을 보는 이 순간이 "재고가 정확해야 하는" 순간이라 여기서 돌린다.
+  // (스로틀이 걸려 있어 실제 조회는 인스턴스당 1분에 한 번을 넘지 않는다)
+  await expireStaleOrders();
+
   const products = await listProducts();
   const groups = groupByVariety(products);
 
@@ -100,8 +106,9 @@ export default async function ShopPage() {
               <b className="text-ink">1.</b> 밤을 담고 받는 분 정보를 남깁니다.
             </li>
             <li>
-              <b className="text-ink">2.</b> 안내된 계좌로 입금합니다. 입금자명을 주문할 때 적은
-              이름과 똑같이 해주세요.
+              <b className="text-ink">2.</b> 안내된 계좌로 <b className="text-ink">{PAYMENT_DEADLINE_HOURS}시간 안에</b>{' '}
+              입금합니다. 입금자명을 주문할 때 적은 이름과 똑같이 해주세요. 기한이 지나면 주문이
+              자동으로 취소됩니다.
             </li>
             <li>
               <b className="text-ink">3.</b> 입금이 확인되면 발송 준비에 들어갑니다.

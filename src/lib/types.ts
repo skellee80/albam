@@ -33,18 +33,37 @@ export interface Product {
   updatedAt: number;
 }
 
-/** 주문 상태. 화면 표기와 DB 값이 같아 아버지가 콘솔에서 봐도 읽힌다. */
+/**
+ * 주문 상태. 화면 표기와 DB 값이 같아 아버지가 콘솔에서 봐도 읽힌다.
+ *
+ * "환불요청"·"교환요청"은 두지 않는다. 고객이 사이트에서 신청하는 경로가 없고
+ * 전화로 받아 아버지가 직접 처리하므로, 중간 상태를 만들면 아무도 안 쓰는 칸만 늘어난다.
+ * 실제로 송금하거나 새로 보낸 뒤 완료 상태로 한 번에 바꾼다.
+ */
 export const ORDER_STATUSES = [
   '입금대기',
   '발송대기',
   '발송완료',
   '취소',
-  '환불요청',
   '환불완료',
-  '교환요청',
   '교환완료',
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/**
+ * 입금 기한. 이 시간이 지난 입금대기 주문은 자동으로 취소되고 재고가 돌아간다.
+ *
+ * 무통장이라 주문 시점에 재고를 선점하는데, 입금하지 않은 주문이 재고를 계속
+ * 붙들고 있으면 정작 살 사람이 못 산다.
+ */
+export const PAYMENT_DEADLINE_HOURS = 24;
+
+export const PAYMENT_DEADLINE_MS = PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000;
+
+/** 이 주문의 입금 마감 시각 */
+export function paymentDueAt(createdAt: number): number {
+  return createdAt + PAYMENT_DEADLINE_MS;
+}
 
 /**
  * 재고를 "놓아주는" 상태.

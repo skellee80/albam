@@ -40,6 +40,15 @@
       ]
     },
     {
+      "__comment__": "입금 기한 지난 주문 자동 취소: 입금대기 + createdAt 범위",
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "__comment__": "관리자 미해결 입금 목록 (확인필요/미매칭)",
       "collectionGroup": "deposits",
       "queryScope": "COLLECTION",

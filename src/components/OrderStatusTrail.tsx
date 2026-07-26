@@ -61,11 +61,12 @@ export function OrderStatusTrail({
   );
 }
 
-/** 환불·교환처럼 3단계로 표현되지 않는 상태는 별도 배지로 분명히 알린다. */
+/**
+ * 환불·교환처럼 3단계로 표현되지 않는 상태는 별도 배지로 분명히 알린다.
+ * 요청 단계는 두지 않는다 — 고객이 사이트에서 신청하지 않고 전화로 받아 처리한다.
+ */
 const SPECIAL_STATUS: Partial<Record<OrderStatus, { text: string; tone: 'berry' | 'amber' }>> = {
-  환불요청: { text: '환불 요청을 접수했습니다', tone: 'amber' },
   환불완료: { text: '환불이 완료되었습니다', tone: 'berry' },
-  교환요청: { text: '교환 요청을 접수했습니다', tone: 'amber' },
   교환완료: { text: '교환이 완료되었습니다', tone: 'berry' },
 };
 

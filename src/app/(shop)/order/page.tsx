@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { OrderForm, type OrderProduct } from '@/components/OrderForm';
 import { SiteHeader } from '@/components/SiteHeader';
+import { expireStaleOrders } from '@/lib/orders';
 import { listProducts } from '@/lib/products';
 import { getSettings } from '@/lib/settings';
 
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
 };
 
 export default async function OrderPage() {
+  // 기한 지난 주문을 먼저 정리해야 재고 확인이 정확하다
+  await expireStaleOrders();
+
   // 장바구니는 브라우저에 있지만, 가격과 재고는 지금 이 순간의 서버 값으로 다시 확인한다.
   const [products, settings] = await Promise.all([
     listProducts({ includeHidden: true }),

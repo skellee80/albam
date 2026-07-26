@@ -359,7 +359,82 @@ async function main() {
   }
 
   /* ────────────────────────────────────────────── */
-  section('14. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
+  section('15. 입금 기한 24시간이 지나면 자동 취소 + 재고 복원');
+
+  const { expireStaleOrders } = await import('../src/lib/orders');
+  const { PAYMENT_DEADLINE_MS } = await import('../src/lib/types');
+
+  const stockBeforeExpire = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+
+  const stale = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 2 }],
+    depositorName: '기한지남',
+    sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
+    recipient: { name: '기한지남', phone: '010-4444-5555', address: '강릉시 어딘가' },
+  });
+  const fresh = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '방금주문',
+    sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
+    recipient: { name: '방금주문', phone: '010-6666-7777', address: '속초시 어딘가' },
+  });
+  check('점검용 주문 2건이 만들어진다', stale.ok && fresh.ok);
+  if (!stale.ok || !fresh.ok) throw new Error('이후 검증 불가');
+
+  const stockAfterOrders = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+  check('주문으로 재고 3개가 빠진다', stockAfterOrders === stockBeforeExpire - 3, `${stockAfterOrders}`);
+
+  check(
+    '입금 마감 시각을 알려준다 (주문 + 24시간)',
+    Math.abs(stale.paymentDueAt - (Date.now() + PAYMENT_DEADLINE_MS)) < 60_000,
+  );
+
+  // 한 건만 24시간하고도 1분 전에 들어온 것처럼 되돌린다
+  await db
+    .collection(COL.orders)
+    .doc(stale.orderId)
+    .update({ createdAt: Date.now() - PAYMENT_DEADLINE_MS - 60_000 });
+
+  const cancelledCount = await expireStaleOrders({ force: true });
+  check('기한 지난 주문만 취소된다', cancelledCount === 1, `${cancelledCount}건 취소`);
+
+  const staleAfter = await getOrder(stale.orderId);
+  const freshAfter = await getOrder(fresh.orderId);
+  check('기한 지난 주문이 취소 상태가 된다', staleAfter?.status === '취소', staleAfter?.status);
+  check('방금 들어온 주문은 그대로 입금대기다', freshAfter?.status === '입금대기', freshAfter?.status);
+  check(
+    '자동 취소 사유가 메모에 남는다',
+    (staleAfter?.memo ?? '').includes('자동으로 취소'),
+    staleAfter?.memo,
+  );
+
+  const stockAfterExpire = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+  check(
+    '취소된 수량 2개가 재고로 돌아온다',
+    stockAfterExpire === stockBeforeExpire - 1,
+    `${stockAfterOrders} → ${stockAfterExpire}`,
+  );
+
+  const secondSweep = await expireStaleOrders({ force: true });
+  const stockAfterSecond = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+  check('다시 돌려도 또 취소하지 않는다', secondSweep === 0, `${secondSweep}건`);
+  check('재고가 더 늘지 않는다', stockAfterSecond === stockAfterExpire, `${stockAfterSecond}`);
+
+  const autoCancelled = await lookupOrders('기한지남', '010-4444-5555');
+  check('자동 취소된 주문은 배송조회에서 사라진다', autoCancelled.length === 0);
+
+  section('16. 환불요청·교환요청 상태는 없다');
+
+  const { ORDER_STATUSES: statuses } = await import('../src/lib/types');
+  check('환불요청이 상태 목록에 없다', !(statuses as readonly string[]).includes('환불요청'));
+  check('교환요청이 상태 목록에 없다', !(statuses as readonly string[]).includes('교환요청'));
+  check('환불완료는 남아 있다', (statuses as readonly string[]).includes('환불완료'));
+  check('교환완료는 남아 있다', (statuses as readonly string[]).includes('교환완료'));
+
+  /* ────────────────────────────────────────────── */
+  section('17. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
 
   // 서버(Node)와 브라우저의 ICU 데이터가 달라 ko-KR 오전/오후가 "PM"으로 나오는 바람에
   // 하이드레이션이 깨진 적이 있다. 고정 시각으로 결과를 못 박아 재발을 잡는다.

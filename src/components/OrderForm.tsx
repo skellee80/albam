@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 
 import { placeOrder, type PlaceOrderResult } from '@/app/(shop)/order/actions';
-import { formatKRW } from '@/lib/format';
-import type { OrderItem, Settings } from '@/lib/types';
+import { formatDateTime, formatKRW } from '@/lib/format';
+import { PAYMENT_DEADLINE_HOURS, type OrderItem, type Settings } from '@/lib/types';
 
 import { useCart } from './CartProvider';
 
@@ -23,6 +23,7 @@ type Completed = {
   totalAmount: number;
   items: OrderItem[];
   depositorName: string;
+  paymentDueAt: number;
 };
 
 export function OrderForm({
@@ -101,6 +102,7 @@ export function OrderForm({
         totalAmount: result.totalAmount,
         items: result.items,
         depositorName: depositorName.trim(),
+        paymentDueAt: result.paymentDueAt,
       });
       clear();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -308,6 +310,17 @@ export function OrderForm({
         </p>
       )}
 
+      {/* 주문을 누르기 전에 알려야 할 것 — 누른 뒤에 알면 늦다 */}
+      <div className="rounded-xl bg-shell-tint px-4 py-3.5">
+        <p className="text-[0.88rem] font-semibold text-shell">
+          주문 후 {PAYMENT_DEADLINE_HOURS}시간 안에 입금해 주세요
+        </p>
+        <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-soft">
+          기한이 지나면 주문이 자동으로 취소되고, 담아 둔 밤은 다른 분이 주문할 수 있게 됩니다.
+          다시 주문하시면 됩니다.
+        </p>
+      </div>
+
       <button type="submit" disabled={pending || blocked} className="btn btn-primary w-full text-[1.05rem]">
         {pending ? '주문 접수 중…' : `${formatKRW(total)} 주문하기`}
       </button>
@@ -372,6 +385,15 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
             <dd className="font-semibold">{completed.depositorName}</dd>
           </div>
         </dl>
+
+        <div className="mt-4 rounded-xl bg-surface px-4 py-3.5">
+          <p className="text-[0.85rem] font-bold text-berry">
+            {formatDateTime(completed.paymentDueAt)}까지
+          </p>
+          <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-soft">
+            이 시각까지 입금되지 않으면 주문이 자동으로 취소됩니다.
+          </p>
+        </div>
 
         <p className="mt-4 text-[0.83rem] leading-relaxed text-shell">
           입금자명이 <b>{completed.depositorName}</b> 과(와) 다르면 입금 확인이 늦어집니다.

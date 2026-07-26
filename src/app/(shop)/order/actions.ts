@@ -4,7 +4,13 @@ import { createOrder } from '@/lib/orders';
 import type { OrderItem } from '@/lib/types';
 
 export type PlaceOrderResult =
-  | { ok: true; orderNo: string; totalAmount: number; items: OrderItem[] }
+  | {
+      ok: true;
+      orderNo: string;
+      totalAmount: number;
+      items: OrderItem[];
+      paymentDueAt: number;
+    }
   | { ok: false; error: string };
 
 /**
@@ -37,6 +43,7 @@ export async function placeOrder(payload: {
       orderNo: result.orderNo,
       totalAmount: result.totalAmount,
       items: result.items,
+      paymentDueAt: result.paymentDueAt,
     };
   } catch (err) {
     console.error('[placeOrder]', err);

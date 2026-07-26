@@ -25,9 +25,7 @@ const STATUS_TONE: Record<string, string> = {
   발송대기: 'bg-burr-tint text-burr-deep',
   발송완료: 'bg-line text-ink-soft',
   취소: 'bg-berry-tint text-berry',
-  환불요청: 'bg-amber-tint text-amber',
   환불완료: 'bg-berry-tint text-berry',
-  교환요청: 'bg-amber-tint text-amber',
   교환완료: 'bg-line text-ink-soft',
 };
 

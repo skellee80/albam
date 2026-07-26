@@ -9,7 +9,7 @@ import { DailySalesChart, ProductSalesBars } from '@/components/admin/SalesChart
 import { ShipQueue, type ShipItem } from '@/components/admin/ShipQueue';
 import { listUnresolvedDeposits } from '@/lib/deposits';
 import { formatKRW, summarizeItems } from '@/lib/format';
-import { getOrders, listOrders } from '@/lib/orders';
+import { expireStaleOrders, getOrders, listOrders } from '@/lib/orders';
 import { isSoldOut, listProducts } from '@/lib/products';
 import { dailySales, productSales, statusCounts, totals } from '@/lib/stats';
 import type { Order } from '@/lib/types';
@@ -28,6 +28,9 @@ function toCandidate(order: Order): CandidateOrder {
 }
 
 export default async function AdminDashboardPage() {
+  // 아버지가 이 화면을 여는 순간의 목록이 정확해야 하므로 먼저 정리한다
+  await expireStaleOrders();
+
   const [deposits, orders, products] = await Promise.all([
     listUnresolvedDeposits(),
     listOrders({ limit: 1000 }),
