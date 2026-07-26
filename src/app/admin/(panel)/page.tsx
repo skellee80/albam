@@ -7,10 +7,11 @@ import {
 } from '@/components/admin/DepositAlerts';
 import { DailySalesChart, ProductSalesBars } from '@/components/admin/SalesCharts';
 import { ShipQueue, type ShipItem } from '@/components/admin/ShipQueue';
-import { listUnresolvedDeposits } from '@/lib/deposits';
+import { banksMatch, listUnresolvedDeposits } from '@/lib/deposits';
 import { formatKRW, summarizeItems } from '@/lib/format';
 import { expireStaleOrders, getOrders, listOrders } from '@/lib/orders';
 import { isSoldOut, listProducts } from '@/lib/products';
+import { getSettings } from '@/lib/settings';
 import { dailySales, productSales, statusCounts, totals } from '@/lib/stats';
 import type { Order } from '@/lib/types';
 
@@ -20,6 +21,7 @@ function toCandidate(order: Order): CandidateOrder {
   return {
     id: order.id,
     orderNo: order.orderNo,
+    depositorName: order.depositorName,
     recipientName: order.recipient.name,
     phone: order.recipient.phone,
     itemsSummary: summarizeItems(order.items),
@@ -31,10 +33,11 @@ export default async function AdminDashboardPage() {
   // 아버지가 이 화면을 여는 순간의 목록이 정확해야 하므로 먼저 정리한다
   await expireStaleOrders();
 
-  const [deposits, orders, products] = await Promise.all([
+  const [deposits, orders, products, settings] = await Promise.all([
     listUnresolvedDeposits(),
     listOrders({ limit: 1000 }),
     listProducts({ includeHidden: true }),
+    getSettings(),
   ]);
 
   // 확인필요 입금의 후보 주문을 한 번에 읽어 온다
@@ -53,6 +56,7 @@ export default async function AdminDashboardPage() {
       .map((id) => candidateById.get(id))
       .filter((o): o is Order => Boolean(o) && !o!.deleted)
       .map(toCandidate),
+    otherBank: !banksMatch(d.bankName, settings.bankName),
   }));
 
   const pendingOrders = orders.filter((o) => o.status === '입금대기').map(toCandidate);
@@ -78,7 +82,11 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       {/* 1. 가장 급한 것 — 돈은 들어왔는데 주문이 안 움직이는 건 */}
-      <DepositAlerts deposits={alertDeposits} pendingOrders={pendingOrders} />
+      <DepositAlerts
+        deposits={alertDeposits}
+        pendingOrders={pendingOrders}
+        accountBank={settings.bankName}
+      />
 
       {/* 2. 매진 — 손님이 지금 주문할 수 없는 상품 */}
       {soldOut.length > 0 && (

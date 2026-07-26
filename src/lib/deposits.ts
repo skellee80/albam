@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 
 import { COL, db, toMillis, toMillisOr } from './firebase-admin';
 import { formatKRW, normalizeName, summarizeItems } from './format';
+import { getSettings } from './settings';
 import {
   UNRESOLVED_DEPOSIT_STATUSES,
   type Deposit,
@@ -81,6 +82,40 @@ export type DepositResult = {
   duplicate: boolean;
 };
 
+/* ────────────────────────────────────────────────────────────
+ * 은행 대조
+ * ──────────────────────────────────────────────────────────── */
+
+/**
+ * 은행명 정규화. "NH농협은행", "농협 은행", "농협" 을 모두 같게 본다.
+ * 문자에 찍히는 표기가 은행·기기마다 달라서 글자 그대로 비교하면 거의 안 맞는다.
+ */
+function normalizeBank(value: string): string {
+  return value
+    .normalize('NFC')
+    .replace(/\s+/g, '')
+    .replace(/은행$/, '')
+    .toLowerCase();
+}
+
+/**
+ * 입금 문자의 은행이 **설정에 적어 둔 입금 계좌의 은행과 같은지** 본다.
+ *
+ * 주문에는 은행 정보가 없다(손님이 어느 은행에서 보낼지 미리 알 수 없다).
+ * 대조할 수 있는 건 "이 입금이 우리 판매 계좌로 들어온 게 맞는가" 하나뿐이고,
+ * 그게 실제로 걸러야 하는 것이기도 하다 — 다른 계좌 입금 문자가 섞여 들어오면
+ * 엉뚱한 주문이 발송대기로 올라간다.
+ *
+ * 한쪽이 비어 있으면 판단하지 않고 통과시킨다. 설정을 아직 안 했다고 해서
+ * 멀쩡한 입금을 막으면 안 된다.
+ */
+export function banksMatch(depositBank: string, accountBank: string): boolean {
+  const a = normalizeBank(depositBank ?? '');
+  const b = normalizeBank(accountBank ?? '');
+  if (!a || !b) return true;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
 /** 후보 주문에서 판정에 필요한 것만 추린 모양 */
 type Candidate = { id: string; itemsSummary: string };
 
@@ -124,6 +159,21 @@ function decide(candidates: Candidate[], depositorName: string, amount: number):
     message: `❓ 미매칭: ${depositorName} ${formatKRW(amount)}. 관리자에서 확인하세요.`,
     matchedOrderId: null,
     candidateOrderIds,
+  };
+}
+
+/** 우리 계좌가 아닌 은행에서 온 입금 — 주문을 찾아보지도 않는다 */
+function otherBankDecision(
+  depositorName: string,
+  amount: number,
+  depositBank: string,
+  accountBank: string,
+): Decision {
+  return {
+    status: '미매칭',
+    message: `❓ 미매칭: ${depositorName} ${formatKRW(amount)} — ${depositBank} 입금입니다. 판매 계좌는 ${accountBank}입니다.`,
+    matchedOrderId: null,
+    candidateOrderIds: [],
   };
 }
 
@@ -171,6 +221,10 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
   const now = Date.now();
   const keys = dedupeKeysToCheck(amount, nameNorm, bankNorm, now);
 
+  // 트랜잭션 밖에서 미리 읽는다. 계좌 설정은 거의 바뀌지 않아 경합할 일이 없다.
+  const accountBank = (await getSettings()).bankName;
+  const sameBank = banksMatch(bankName, accountBank);
+
   return db.runTransaction<DepositResult>(async (t) => {
     // ── 읽기 ──
     const depositRefs = keys.map((k) => db.collection(COL.deposits).doc(k));
@@ -189,12 +243,15 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
       };
     }
 
-    const candidateSnap = await t.get(matchQuery(nameNorm, amount));
-    // 삭제된 주문은 메모리에서 걸러낸다 (인덱스를 늘리지 않으려고)
-    const matched = candidateSnap.docs.filter((d) => !d.data().deleted);
+    // 은행이 다르면 우리 계좌 입금이 아니므로 주문을 찾아보지 않는다
+    const matched = sameBank
+      ? (await t.get(matchQuery(nameNorm, amount))).docs.filter((d) => !d.data().deleted)
+      : [];
 
     // ── 판정 ──
-    const decision = decide(matched.map(toCandidate), depositorName, amount);
+    const decision = sameBank
+      ? decide(matched.map(toCandidate), depositorName, amount)
+      : otherBankDecision(depositorName, amount, bankName, accountBank);
 
     // ── 쓰기 ──
     if (decision.matchedOrderId) {
@@ -267,9 +324,10 @@ export async function previewDeposit(input: DepositInput): Promise<DepositPrevie
   }
 
   const keys = dedupeKeysToCheck(amount, nameNorm, bankNorm, Date.now());
-  const [dedupeSnaps, candidateSnap] = await Promise.all([
+  const [dedupeSnaps, candidateSnap, settings] = await Promise.all([
     db.getAll(...keys.map((k) => db.collection(COL.deposits).doc(k))),
     matchQuery(nameNorm, amount).get(),
+    getSettings(),
   ]);
 
   const alreadySeen = dedupeSnaps.find((s) => s.exists);
@@ -284,8 +342,11 @@ export async function previewDeposit(input: DepositInput): Promise<DepositPrevie
     };
   }
 
-  const matched = candidateSnap.docs.filter((d) => !d.data().deleted);
-  const decision = decide(matched.map(toCandidate), depositorName, amount);
+  const sameBank = banksMatch(bankName, settings.bankName);
+  const matched = sameBank ? candidateSnap.docs.filter((d) => !d.data().deleted) : [];
+  const decision = sameBank
+    ? decide(matched.map(toCandidate), depositorName, amount)
+    : otherBankDecision(depositorName, amount, bankName, settings.bankName);
 
   return {
     ok: true,

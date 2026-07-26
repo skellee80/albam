@@ -23,10 +23,17 @@ type Outcome =
   | { kind: 'sent'; status: string | null; message: string; duplicate: boolean }
   | { kind: 'error'; error: string };
 
-export function DepositTester({ pendingOrders }: { pendingOrders: PendingOrder[] }) {
+export function DepositTester({
+  pendingOrders,
+  accountBank,
+}: {
+  pendingOrders: PendingOrder[];
+  accountBank: string;
+}) {
   const [depositorName, setDepositorName] = useState('');
   const [amount, setAmount] = useState('');
-  const [bankName, setBankName] = useState('농협');
+  // 판매 계좌의 은행을 기본값으로 둔다. 다른 은행을 넣으면 일부러 어긋나게 해볼 수 있다.
+  const [bankName, setBankName] = useState(accountBank);
   const [phoneFilter, setPhoneFilter] = useState('');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [pending, startTransition] = useTransition();
@@ -119,8 +126,12 @@ export function DepositTester({ pendingOrders }: { pendingOrders: PendingOrder[]
               className="field"
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
-              placeholder="농협"
+              placeholder={accountBank}
             />
+            <p className="mt-1.5 text-[0.8rem] leading-snug text-ink-soft">
+              판매 계좌는 <b>{accountBank}</b> 입니다. 다른 은행에서 온 입금은 우리 계좌 입금이
+              아니므로 매칭하지 않습니다.
+            </p>
           </div>
         </div>
 

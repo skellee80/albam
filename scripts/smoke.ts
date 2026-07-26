@@ -190,7 +190,7 @@ async function main() {
   const ambiguous = await recordDeposit({
     amount: daeboMid.price,
     depositorName: '김철수',
-    bankName: '국민',
+    bankName: '농협',
   });
   check('후보가 여러 건이면 확인필요가 된다', ambiguous.status === '확인필요', ambiguous.message);
   check('후보 건수가 문구에 들어간다', ambiguous.message.includes('2건'), ambiguous.message);
@@ -201,7 +201,7 @@ async function main() {
   const wrongAmount = await recordDeposit({
     amount: 12345,
     depositorName: '박영희',
-    bankName: '신한',
+    bankName: '농협',
   });
   check('맞는 주문이 없으면 미매칭이 된다', wrongAmount.status === '미매칭', wrongAmount.message);
 
@@ -283,7 +283,7 @@ async function main() {
   const matchDeleted = await recordDeposit({
     amount: okgwangLarge.price,
     depositorName: '삭제대상',
-    bankName: '카카오뱅크',
+    bankName: '농협',
   });
   check('삭제된 주문에는 입금이 붙지 않는다', matchDeleted.status === '미매칭', matchDeleted.message);
 
@@ -448,7 +448,45 @@ async function main() {
   const autoCancelled = await lookupOrders('기한지남', '010-4444-5555');
   check('자동 취소된 주문은 배송조회에서 사라진다', autoCancelled.length === 0);
 
-  section('16. 입금 미리보기 — 판정은 같고 아무것도 바꾸지 않는다');
+  section('16. 은행 대조 — 판매 계좌가 아닌 은행 입금은 매칭하지 않는다');
+
+  const { banksMatch } = await import('../src/lib/deposits');
+  const { getSettings } = await import('../src/lib/settings');
+  const accountBank = (await getSettings()).bankName;
+
+  check('표기가 달라도 같은 은행으로 본다', banksMatch('NH농협은행', '농협'));
+  check('"농협 은행"도 같게 본다', banksMatch('농협 은행', '농협'));
+  check('다른 은행은 구분한다', !banksMatch('국민', '농협'));
+  check('설정이 비어 있으면 막지 않는다', banksMatch('국민', ''));
+
+  const bankOrder = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '은행대조',
+    sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
+    recipient: { name: '은행대조', phone: '010-3131-4141', address: '청주시 어딘가' },
+  });
+  if (!bankOrder.ok) throw new Error('점검용 주문 생성 실패');
+
+  const wrongBank = await recordDeposit({
+    amount: bankOrder.totalAmount,
+    depositorName: '은행대조',
+    bankName: '없는은행',
+  });
+  check('다른 은행 입금은 확정되지 않는다', wrongBank.status === '미매칭', wrongBank.message);
+  check('문구가 은행 때문임을 알려준다', wrongBank.message.includes('없는은행'), wrongBank.message);
+
+  const stillWaiting = await getOrder(bankOrder.orderId);
+  check('주문은 입금대기로 남는다', stillWaiting?.status === '입금대기', stillWaiting?.status);
+
+  const rightBank = await recordDeposit({
+    amount: bankOrder.totalAmount,
+    depositorName: '은행대조',
+    bankName: accountBank,
+  });
+  check('같은 은행 입금은 확정된다', rightBank.status === '확정', rightBank.message);
+
+  section('17. 입금 미리보기 — 판정은 같고 아무것도 바꾸지 않는다');
 
   const { previewDeposit } = await import('../src/lib/deposits');
 
@@ -489,7 +527,7 @@ async function main() {
   const nowShipping = await getOrder(previewTarget.orderId);
   check('실제 처리는 주문 상태를 바꾼다', nowShipping?.status === '발송대기', nowShipping?.status);
 
-  section('17. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
+  section('18. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
 
   const { stockNotice, LOW_STOCK_NOTICE_THRESHOLD } = await import('../src/lib/types');
 
@@ -500,7 +538,7 @@ async function main() {
   check('1개 남아도 주문할 수 있다', stockNotice(1) === '1개 남았습니다', stockNotice(1));
   check('0개면 품절 안내', stockNotice(0) === '지금은 준비된 물량이 없습니다', stockNotice(0));
 
-  section('18. 환불요청·교환요청 상태는 없다');
+  section('19. 환불요청·교환요청 상태는 없다');
 
   const { ORDER_STATUSES: statuses } = await import('../src/lib/types');
   check('환불요청이 상태 목록에 없다', !(statuses as readonly string[]).includes('환불요청'));
@@ -509,7 +547,7 @@ async function main() {
   check('교환완료는 남아 있다', (statuses as readonly string[]).includes('교환완료'));
 
   /* ────────────────────────────────────────────── */
-  section('19. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
+  section('20. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
 
   // 서버(Node)와 브라우저의 ICU 데이터가 달라 ko-KR 오전/오후가 "PM"으로 나오는 바람에
   // 하이드레이션이 깨진 적이 있다. 고정 시각으로 결과를 못 박아 재발을 잡는다.

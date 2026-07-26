@@ -3,11 +3,12 @@ import Link from 'next/link';
 import { DepositTester, type PendingOrder } from '@/components/admin/DepositTester';
 import { summarizeItems } from '@/lib/format';
 import { listPendingPaymentOrders } from '@/lib/orders';
+import { getSettings } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDepositTestPage() {
-  const orders = await listPendingPaymentOrders();
+  const [orders, settings] = await Promise.all([listPendingPaymentOrders(), getSettings()]);
 
   const pendingOrders: PendingOrder[] = orders.map((o) => ({
     id: o.id,
@@ -31,7 +32,7 @@ export default async function AdminDepositTestPage() {
         은행 문자를 기다리지 않고, 입금이 들어왔을 때 어떻게 처리되는지 확인합니다.
       </p>
 
-      <DepositTester pendingOrders={pendingOrders} />
+      <DepositTester pendingOrders={pendingOrders} accountBank={settings.bankName} />
     </div>
   );
 }
