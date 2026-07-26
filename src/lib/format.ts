@@ -10,7 +10,7 @@
  * 서버는 UTC로 돌기 때문에(Cloud Run) 시간은 반드시 한국 시간으로 옮겨서 쓴다.
  * 이걸 빼먹으면 오전 9시 이전 주문이 하루 전 날짜로 찍힌다.
  */
-import { SIZES } from './types';
+import { SIZES, SIZE_ALIASES } from './types';
 
 /**
  * 한국 표준시는 UTC+9 고정이고 서머타임이 없다(1988년 이후).
@@ -132,14 +132,20 @@ export function parseProductName(name: string): {
   }
 
   let size = '';
-  if (parts.length >= 2 && (SIZES as readonly string[]).includes(parts[parts.length - 1])) {
-    size = parts.pop()!;
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1];
+    // 예전 표기("특대")로 이름 붙인 상품도 현재 표기("특")로 맞춰 준다
+    const matched = (SIZES as readonly string[]).includes(last) ? last : SIZE_ALIASES[last];
+    if (matched) {
+      size = matched;
+      parts.pop();
+    }
   }
 
   return { variety: parts.join(' ') || cleaned, size, weight };
 }
 
-/** "대보 중 2 · 옥광 특대 1" 형태의 주문 요약 */
+/** "대보 중 2 · 옥광 특 1" 형태의 주문 요약 */
 export function summarizeItems(items: { name: string; qty: number }[]): string {
   return items.map((i) => `${i.name} ${i.qty}`).join(' · ');
 }

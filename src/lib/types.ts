@@ -9,8 +9,14 @@
 export const VARIETIES = ['대보', '포르단', '옥광'] as const;
 export type Variety = (typeof VARIETIES)[number];
 
-export const SIZES = ['중', '대', '특대'] as const;
+export const SIZES = ['중', '대', '특'] as const;
 export type Size = (typeof SIZES)[number];
+
+/**
+ * 예전에 쓰던 표기 → 지금 표기.
+ * "특대"로 이름 붙여 둔 상품이 남아 있어도 묶음에서 빠지지 않게 한다.
+ */
+export const SIZE_ALIASES: Record<string, Size> = { 특대: '특' };
 
 /** 판매 단위 무게. 상품 이름 끝에 붙여서 쓴다 ("대보 중 4kg"). */
 export const WEIGHTS = ['4kg', '10kg'] as const;
@@ -31,7 +37,7 @@ export const SIZE_GUIDE: {
 }[] = [
   { size: '중', tag: '온가족 행복', note: '온 가족 부담없이 즐기는 실속용', tone: 'burr' },
   { size: '대', tag: '품격있는 추천', note: '품질과 가격 만족도 높은 선물용', tone: 'shell' },
-  { size: '특대', tag: '최상급 프리미엄', note: '격식 있는 최상급 선물용', tone: 'amber' },
+  { size: '특', tag: '최상급 프리미엄', note: '격식 있는 최상급 선물용', tone: 'amber' },
 ];
 
 export interface Product {

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { logoutAction } from '@/app/admin/actions';
+import { BRAND } from '@/lib/brand';
 
 const TABS = [
   { href: '/admin', label: '오늘 할 일' },
@@ -21,7 +22,7 @@ export function AdminNav() {
     <header className="sticky top-0 z-30 bg-shell text-white shadow-sm">
       <div className="mx-auto flex w-full max-w-[46rem] items-center justify-between px-4 py-3">
         <Link href="/admin" className="font-display text-[1.3rem] leading-none">
-          알밤 관리
+          {BRAND.short} 관리
         </Link>
         <button
           type="button"

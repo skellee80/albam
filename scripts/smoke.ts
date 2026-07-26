@@ -24,7 +24,7 @@ const SEED_STOCK = 50;
 
 /** 점검에 쓰는 기준 상품 (시드가 넣는 이름) */
 const DAEBO_MID_NAME = '대보 중 4kg';
-const OKGWANG_LARGE_NAME = '옥광 특대 4kg';
+const OKGWANG_LARGE_NAME = '옥광 특 4kg';
 
 let passed = 0;
 let failed = 0;
@@ -318,11 +318,15 @@ async function main() {
     return p.variety === '꿀밤 선물세트' && p.size === '' && p.weight === '';
   })());
   check('대문자 KG도 알아본다', parseProductName('대보 대 10KG').weight === '10kg');
+  check('예전 표기 "특대"도 "특"으로 알아본다', (() => {
+    const p = parseProductName('대보 특대 4kg');
+    return p.variety === '대보' && p.size === '특' && p.weight === '4kg';
+  })());
 
-  await updateProduct(daeboMid.id, { name: '햇대보 특대 10kg' });
+  await updateProduct(daeboMid.id, { name: '햇대보 특 10kg' });
   const renamed = (await listProducts()).find((p) => p.id === daeboMid.id)!;
   check('이름을 바꾸면 품종이 따라 바뀐다', renamed.variety === '햇대보', renamed.variety);
-  check('이름을 바꾸면 크기도 따라 바뀐다', renamed.size === '특대', renamed.size);
+  check('이름을 바꾸면 크기도 따라 바뀐다', renamed.size === '특', renamed.size);
   check('이름을 바꾸면 무게도 따라 바뀐다', renamed.weight === '10kg', renamed.weight);
 
   await updateProduct(daeboMid.id, { name: DAEBO_MID_NAME }); // 원복

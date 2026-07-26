@@ -1,7 +1,7 @@
 {
-  "name": "알밤 주문 관리",
-  "short_name": "알밤",
-  "description": "햇밤 주문과 발송을 관리합니다.",
+  "name": "칠갑산 석촌 유기농 햇 밤",
+  "short_name": "칠갑산 햇밤",
+  "description": "칠갑산 석촌 유기농 햇 밤 주문과 발송을 관리합니다.",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",

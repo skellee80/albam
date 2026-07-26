@@ -17,11 +17,7 @@ runConfig:
   memoryMiB: 512
 
 env:
-  - variable: NEXT_PUBLIC_SITE_NAME
-    value: 알밤 주문
-    availability:
-      - BUILD
-      - RUNTIME
+  # 가게 이름은 src/lib/brand.ts 에 있다. 환경변수로 두면 코드와 두 곳에서 어긋난다.
 
   # 관리자 공유 비밀번호 (아버지가 쓰는 그 비밀번호)
   - variable: ADMIN_PASSWORD

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Gowun_Dodum, IBM_Plex_Sans_KR } from 'next/font/google';
 
+import { BRAND } from '@/lib/brand';
+
 import './globals.css';
 
 /**
@@ -27,19 +29,18 @@ const bodyFace = IBM_Plex_Sans_KR({
   display: 'swap',
 });
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || '알밤 주문';
-
 export const metadata: Metadata = {
   title: {
-    default: `${siteName} · 햇밤 직거래`,
-    template: `%s · ${siteName}`,
+    default: BRAND.full,
+    template: `%s · ${BRAND.short}`,
   },
-  description: '대보·포르단·옥광 햇밤을 무통장 입금으로 주문하세요.',
+  description: '칠갑산 석촌에서 키운 유기농 햇 밤을 무통장 입금으로 주문하세요.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: siteName,
+    // 홈화면 아이콘 밑에 붙는 글자라 길면 잘린다
+    title: BRAND.short,
   },
   // 파비콘/애플 아이콘은 src/app/icon.svg, src/app/apple-icon.png 파일 규칙으로 자동 연결된다.
   // 주문 페이지가 검색에 뜰 이유가 없다. 상품 목록만 노출한다.

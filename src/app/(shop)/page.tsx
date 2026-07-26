@@ -24,7 +24,7 @@ const SIZE_TONE = {
  *   대보
  *     중    4kg / 10kg
  *     대    4kg / 10kg
- *     특대  4kg / 10kg
+ *     특    4kg / 10kg
  *
  * 무게를 바깥 묶음으로 올리면 "대보 4kg", "대보 10kg" 처럼 같은 품종이 두 번 나온다.
  * 손님은 품종을 먼저 고르고 그다음 크기와 양을 정하므로, 고르는 순서대로 겹쳐 둔다.
@@ -80,7 +80,7 @@ export default async function ShopPage() {
 
         {/*
           크기 안내는 여기서 한 번만 한다.
-          중·대·특대가 모든 묶음에서 똑같이 반복되므로, 상품마다 붙이면 같은 문장을
+          중·대·특이 모든 묶음에서 똑같이 반복되므로, 상품마다 붙이면 같은 문장을
           열여덟 번 읽게 된다.
         */}
         <section className="mt-5 rounded-card border border-line bg-surface px-4 py-4">
