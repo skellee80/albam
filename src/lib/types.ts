@@ -66,6 +66,19 @@ export function paymentDueAt(createdAt: number): number {
 }
 
 /**
+ * 재고가 이 수 이하로 남으면 손님에게 남은 수량을 알린다.
+ * 평소에는 숫자를 감춘다 — 넉넉할 때 "47개 남음"은 알려줄 것이 없는 소음이다.
+ */
+export const LOW_STOCK_NOTICE_THRESHOLD = 10;
+
+/** 상품 목록에서 재고 상태를 한 줄로 알린다. */
+export function stockNotice(stock: number): string {
+  if (stock <= 0) return '지금은 준비된 물량이 없습니다';
+  if (stock <= LOW_STOCK_NOTICE_THRESHOLD) return `${stock}개 남았습니다`;
+  return '주문 가능';
+}
+
+/**
  * 재고를 "놓아주는" 상태.
  *
  * 재고는 주문 생성 시점에 선점(차감)한다. 무통장이라 입금까지 시간이 걸리는데

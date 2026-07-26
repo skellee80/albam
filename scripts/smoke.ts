@@ -425,7 +425,18 @@ async function main() {
   const autoCancelled = await lookupOrders('기한지남', '010-4444-5555');
   check('자동 취소된 주문은 배송조회에서 사라진다', autoCancelled.length === 0);
 
-  section('16. 환불요청·교환요청 상태는 없다');
+  section('16. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
+
+  const { stockNotice, LOW_STOCK_NOTICE_THRESHOLD } = await import('../src/lib/types');
+
+  check('기준값은 10개', LOW_STOCK_NOTICE_THRESHOLD === 10, `${LOW_STOCK_NOTICE_THRESHOLD}`);
+  check('재고가 넉넉하면 숫자를 감춘다', stockNotice(11) === '주문 가능', stockNotice(11));
+  check('딱 10개면 숫자를 보여준다', stockNotice(10) === '10개 남았습니다', stockNotice(10));
+  check('3개 남으면 숫자를 보여준다', stockNotice(3) === '3개 남았습니다', stockNotice(3));
+  check('1개 남아도 주문할 수 있다', stockNotice(1) === '1개 남았습니다', stockNotice(1));
+  check('0개면 품절 안내', stockNotice(0) === '지금은 준비된 물량이 없습니다', stockNotice(0));
+
+  section('17. 환불요청·교환요청 상태는 없다');
 
   const { ORDER_STATUSES: statuses } = await import('../src/lib/types');
   check('환불요청이 상태 목록에 없다', !(statuses as readonly string[]).includes('환불요청'));
@@ -434,7 +445,7 @@ async function main() {
   check('교환완료는 남아 있다', (statuses as readonly string[]).includes('교환완료'));
 
   /* ────────────────────────────────────────────── */
-  section('17. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
+  section('18. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
 
   // 서버(Node)와 브라우저의 ICU 데이터가 달라 ko-KR 오전/오후가 "PM"으로 나오는 바람에
   // 하이드레이션이 깨진 적이 있다. 고정 시각으로 결과를 못 박아 재발을 잡는다.

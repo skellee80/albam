@@ -9,13 +9,14 @@ import { PAYMENT_DEADLINE_HOURS, type Product } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 /**
- * 품종 소개 문구 — 아버지가 관리자 화면 대신 이 파일에서 고치면 된다.
- * 여기 없는 품종은 문구 없이 이름만 나온다.
+ * 크기별 안내 — 손님이 "어느 걸 사야 하나"를 고르는 기준이다.
+ * 품종은 취향이지만 크기는 용도라, 용도를 말해 주는 쪽이 고르는 데 도움이 된다.
+ * 여기 없는 크기는 문구 없이 이름만 나온다.
  */
-const VARIETY_NOTE: Record<string, string> = {
-  대보: '알이 굵어 구워 먹기 좋습니다.',
-  포르단: '껍질이 잘 벗겨져 손질이 편합니다.',
-  옥광: '단맛이 좋아 쪄서 그대로 먹기 좋습니다.',
+const SIZE_NOTE: Record<string, string> = {
+  중: '온 가족이 편하게 나눠 먹기 좋은 크기',
+  대: '선물로 건네기 좋은 넉넉한 크기',
+  특대: '귀한 분께 드리는 가장 굵은 알',
 };
 
 /**
@@ -79,14 +80,7 @@ export default async function ShopPage() {
                       loading="lazy"
                     />
                   ) : null}
-                  <div>
-                    <h2 className="font-display text-[1.4rem] leading-tight">{group.variety}</h2>
-                    {VARIETY_NOTE[group.variety] ? (
-                      <p className="mt-0.5 text-[0.85rem] leading-snug text-ink-soft">
-                        {VARIETY_NOTE[group.variety]}
-                      </p>
-                    ) : null}
-                  </div>
+                  <h2 className="font-display text-[1.4rem] leading-tight">{group.variety}</h2>
                 </div>
 
                 <div className="card mt-3 divide-y divide-line overflow-hidden">
@@ -128,6 +122,7 @@ function toShopProduct(p: Product): ShopProduct {
     name: p.name,
     // 이름이 "대보 중" 꼴이 아니면 크기가 비어 있다. 그때는 이름을 그대로 줄 이름표로 쓴다.
     label: p.size || p.name,
+    note: SIZE_NOTE[p.size] ?? '',
     price: p.price,
     stock: p.stock,
   };
