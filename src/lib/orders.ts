@@ -51,6 +51,7 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
     trackingNo: data.trackingNo ?? '',
     memo: data.memo ?? '',
     refundAmount: Number(data.refundAmount ?? 0),
+    paymentGroupId: data.paymentGroupId ?? null,
     deleted: Boolean(data.deleted),
     createdAt: toMillisOr(data.createdAt, now),
     updatedAt: toMillisOr(data.updatedAt, now),
@@ -98,12 +99,20 @@ export type CreateOrderResult =
       ok: true;
       orderId: string;
       orderNo: string;
-      totalAmount: number;
+      /** 이 주문 한 건의 금액 */
+      orderTotal: number;
+      /**
+       * 손님이 실제로 보내야 할 금액.
+       * 다른 주문과 입금을 묶었으면 묶음 합계다 — 화면에 띄울 값은 항상 이쪽.
+       */
+      amountToPay: number;
       items: OrderItem[];
       /** 이 시각까지 입금해야 한다. 지나면 자동 취소된다. */
       paymentDueAt: number;
-      /** 기존 입금대기 주문에 합쳤는지 */
+      /** 기존 입금대기 주문과 합치거나 묶었는지 */
       merged: boolean;
+      /** 주소가 달라 주문은 따로 두고 입금만 묶은 경우 */
+      groupedByPayment?: boolean;
     }
   | { ok: false; error: string };
 
@@ -206,6 +215,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       trackingNo: '',
       memo: '',
       refundAmount: 0,
+      paymentGroupId: null,
       deleted: false,
       createdAt: now,
       updatedAt: now,
@@ -218,7 +228,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       ok: true,
       orderId: orderRef.id,
       orderNo,
-      totalAmount,
+      orderTotal: totalAmount,
+      amountToPay: totalAmount,
       items,
       paymentDueAt: now + PAYMENT_DEADLINE_MS,
       merged: false,
@@ -281,18 +292,36 @@ export async function findMergeableOrders(
     }));
 }
 
+/** 주소를 비교할 때는 띄어쓰기 차이를 무시한다 */
+function sameAddress(a: string, b: string): boolean {
+  return a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
+}
+
 /**
- * 기존 입금대기 주문에 상품을 더한다.
+ * 기존 입금대기 주문과 입금을 묶는다.
  *
- * 새 주문을 만들 때와 똑같이 서버 가격으로 다시 계산하고 재고를 확인·차감한다.
- * 입금 기한은 지금부터 다시 센다 — 어제 주문에 오늘 더했는데 곧 취소되면 안 된다.
+ * 받는 주소가 **같으면** 기존 주문에 상품을 더한다(한 상자로 나간다).
+ * 받는 주소가 **다르면** 주문은 따로 만들고 결제 그룹만 같이 준다.
+ *   → 배송은 주소별로 따로, 입금은 합계 한 번으로.
+ * 주문 하나에 주소가 하나뿐이라 이렇게 나눠야 두 곳으로 보낼 수 있다.
+ *
+ * 어느 쪽이든 서버 가격으로 다시 계산하고 재고를 확인·차감한다.
+ * 입금 기한은 묶음 전체가 지금부터 다시 센다 — 어제 주문이 곧 취소되면 안 된다.
  */
-export async function mergeIntoOrder(
-  orderId: string,
-  lines: CartLine[],
+export async function mergeWithExistingOrder(
+  existingOrderId: string,
+  input: CreateOrderInput,
 ): Promise<CreateOrderResult> {
+  const depositorName = input.depositorName.trim();
+  const depositorPhone = input.depositorPhone.trim();
+  const recipient: Recipient = {
+    name: input.recipient.name.trim(),
+    phone: input.recipient.phone.trim(),
+    address: input.recipient.address.trim(),
+  };
+
   const merged = new Map<string, number>();
-  for (const line of lines) {
+  for (const line of input.lines) {
     const qty = Math.floor(Number(line.qty));
     if (!line.productId || !Number.isFinite(qty) || qty <= 0) continue;
     merged.set(line.productId, (merged.get(line.productId) ?? 0) + qty);
@@ -303,17 +332,34 @@ export async function mergeIntoOrder(
 
   return db.runTransaction<CreateOrderResult>(async (t) => {
     // ── 읽기 ──
-    const orderRef = db.collection(COL.orders).doc(orderId);
-    const orderSnap = await t.get(orderRef);
-    if (!orderSnap.exists) return { ok: false, error: '합칠 주문을 찾을 수 없습니다.' };
+    const existingRef = db.collection(COL.orders).doc(existingOrderId);
+    const existingSnap = await t.get(existingRef);
+    if (!existingSnap.exists) return { ok: false, error: '합칠 주문을 찾을 수 없습니다.' };
 
-    const existing = mapOrder(orderSnap.id, orderSnap.data()!);
+    const existing = mapOrder(existingSnap.id, existingSnap.data()!);
     if (existing.deleted || existing.status !== '입금대기') {
       return { ok: false, error: '이미 처리된 주문이라 합칠 수 없습니다. 새로 주문해 주세요.' };
     }
 
+    const keepSeparate = !sameAddress(existing.recipient.address, recipient.address);
+
     const productRefs = entries.map(([productId]) => db.collection(COL.products).doc(productId));
     const productSnaps = await t.getAll(...productRefs);
+
+    // 주소가 다르면 새 주문을 만들어야 하니 주문번호를 받아 둔다
+    const counterRef = db.collection(COL.counters).doc(ORDER_NO_COUNTER);
+    const counterSnap = keepSeparate ? await t.get(counterRef) : null;
+
+    // 같은 결제 그룹의 다른 주문들도 기한을 함께 늘려야 한다
+    const groupId = existing.paymentGroupId;
+    const siblingSnap = groupId
+      ? await t.get(
+          db
+            .collection(COL.orders)
+            .where('paymentGroupId', '==', groupId)
+            .where('status', '==', '입금대기'),
+        )
+      : null;
 
     // ── 검증 및 계산 ──
     const addedItems: OrderItem[] = [];
@@ -336,39 +382,113 @@ export async function mergeIntoOrder(
       stockWrites.push({ ref: productRefs[i], stock: stock - qty });
     }
 
-    // 같은 상품은 기존 줄에 수량을 더한다
-    const combined: OrderItem[] = existing.items.map((item) => ({ ...item }));
-    for (const added of addedItems) {
-      const found = combined.find((i) => i.productId === added.productId);
-      if (found) {
-        found.qty += added.qty;
-        found.price = added.price; // 지금 가격으로 맞춘다
-        found.subtotal = found.price * found.qty;
-      } else {
-        combined.push(added);
-      }
-    }
-
-    const totalAmount = recalcTotal(combined);
     const now = Date.now();
+    const dueAt = now + PAYMENT_DEADLINE_MS;
 
     // ── 쓰기 ──
     for (const w of stockWrites) t.update(w.ref, { stock: w.stock, updatedAt: now });
-    t.update(orderRef, {
-      items: combined,
-      totalAmount,
+
+    if (!keepSeparate) {
+      // 같은 주소 → 한 주문으로 합친다
+      const combined: OrderItem[] = existing.items.map((item) => ({ ...item }));
+      for (const added of addedItems) {
+        const found = combined.find((i) => i.productId === added.productId);
+        if (found) {
+          found.qty += added.qty;
+          found.price = added.price; // 지금 가격으로 맞춘다
+          found.subtotal = found.price * found.qty;
+        } else {
+          combined.push(added);
+        }
+      }
+
+      const orderTotal = recalcTotal(combined);
+      t.update(existingRef, {
+        items: combined,
+        totalAmount: orderTotal,
+        updatedAt: now,
+        paymentDueAt: dueAt,
+      });
+
+      // 이미 묶여 있던 주문들도 기한을 같이 늘린다
+      let groupTotal = orderTotal;
+      for (const doc of siblingSnap?.docs ?? []) {
+        if (doc.id === existingOrderId) continue;
+        t.update(doc.ref, { paymentDueAt: dueAt, updatedAt: now });
+        groupTotal += Number(doc.data().totalAmount ?? 0);
+      }
+
+      return {
+        ok: true,
+        orderId: existingOrderId,
+        orderNo: existing.orderNo,
+        orderTotal,
+        amountToPay: groupTotal,
+        items: combined,
+        paymentDueAt: dueAt,
+        merged: true,
+        groupedByPayment: Boolean(groupId),
+      };
+    }
+
+    // 주소가 다르다 → 주문은 따로, 입금만 묶는다
+    const paymentGroupId = groupId ?? existingOrderId;
+
+    const dateKey = kstDateKey();
+    const counter = counterSnap?.exists ? counterSnap.data()! : {};
+    const seq = counter.dateKey === dateKey ? Number(counter.seq ?? 0) + 1 : 1;
+    const orderNo = `${dateKey}-${String(seq).padStart(4, '0')}`;
+    t.set(counterRef, { dateKey, seq });
+
+    const orderTotal = recalcTotal(addedItems);
+    const newRef = db.collection(COL.orders).doc();
+    t.set(newRef, {
+      orderNo,
+      recipient,
+      phoneNorm: normalizePhone(recipient.phone),
+      depositorName,
+      depositorNameNorm: normalizeName(depositorName),
+      depositorPhone,
+      depositorPhoneNorm: normalizePhone(depositorPhone),
+      sameAsDepositor: Boolean(input.sameAsDepositor),
+      items: addedItems,
+      totalAmount: orderTotal,
+      status: '입금대기' satisfies OrderStatus,
+      trackingNo: '',
+      memo: '',
+      refundAmount: 0,
+      paymentGroupId,
+      deleted: false,
+      createdAt: now,
       updatedAt: now,
-      paymentDueAt: now + PAYMENT_DEADLINE_MS,
+      paymentDueAt: dueAt,
+      paidAt: null,
+      shippedAt: null,
     });
+
+    // 기존 주문(및 이미 묶인 주문들)에 그룹을 달고 기한을 늘린다
+    let groupTotal = orderTotal;
+    const alreadyGrouped = siblingSnap?.docs ?? [];
+    if (alreadyGrouped.length > 0) {
+      for (const doc of alreadyGrouped) {
+        t.update(doc.ref, { paymentGroupId, paymentDueAt: dueAt, updatedAt: now });
+        groupTotal += Number(doc.data().totalAmount ?? 0);
+      }
+    } else {
+      t.update(existingRef, { paymentGroupId, paymentDueAt: dueAt, updatedAt: now });
+      groupTotal += existing.totalAmount;
+    }
 
     return {
       ok: true,
-      orderId,
-      orderNo: existing.orderNo,
-      totalAmount,
-      items: combined,
-      paymentDueAt: now + PAYMENT_DEADLINE_MS,
+      orderId: newRef.id,
+      orderNo,
+      orderTotal,
+      amountToPay: groupTotal,
+      items: addedItems,
+      paymentDueAt: dueAt,
       merged: true,
+      groupedByPayment: true,
     };
   });
 }

@@ -25,11 +25,16 @@ export type OrderProduct = {
 
 type Completed = {
   orderNo: string;
-  totalAmount: number;
+  /** 실제로 보내야 할 금액 (입금을 묶었으면 합계) */
+  amountToPay: number;
+  /** 이 주문 한 건의 금액 */
+  orderTotal: number;
   items: OrderItem[];
   depositorName: string;
   paymentDueAt: number;
   merged: boolean;
+  /** 주소가 달라 주문은 따로 두고 입금만 묶은 경우 */
+  groupedByPayment: boolean;
 };
 
 export function OrderForm({
@@ -128,11 +133,13 @@ export function OrderForm({
 
     setCompleted({
       orderNo: result.orderNo,
-      totalAmount: result.totalAmount,
+      amountToPay: result.amountToPay,
+      orderTotal: result.orderTotal,
       items: result.items,
       depositorName: depositorName.trim(),
       paymentDueAt: result.paymentDueAt,
       merged: result.merged,
+      groupedByPayment: result.groupedByPayment,
     });
     clear();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -453,7 +460,8 @@ function MergeChoice({
         <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-soft">
           입금을 <b className="text-ink">한 번에 하실 건가요, 따로 하실 건가요?</b>
           <br />
-          합쳐서 보내실 거라면 주문도 합쳐야 입금 확인이 자동으로 됩니다.
+          합쳐서 보내실 거라면 주문도 묶어야 입금 확인이 자동으로 됩니다.
+          {!sameAddress && ' 주소가 달라도 묶을 수 있습니다 — 배송만 따로 나갑니다.'}
         </p>
       </div>
 
@@ -475,40 +483,25 @@ function MergeChoice({
         />
       </div>
 
-      {!sameAddress && (
-        <div className="rounded-card border-2 border-berry/35 bg-berry-tint px-4 py-3.5">
-          <p className="text-[0.9rem] font-bold text-berry">받는 주소가 서로 다릅니다</p>
-          <p className="mt-1 text-[0.84rem] leading-relaxed text-ink-soft">
-            합치면 <b>한 주소로만</b> 보내집니다. 두 곳으로 나눠 받으시려면{' '}
-            <b>따로 입금</b>을 골라 주세요.
-          </p>
-        </div>
-      )}
-
       <button
         type="button"
         onClick={() => onMerge(target.id)}
         disabled={pending}
-        className={`w-full rounded-card border-2 px-5 py-4 text-left ${
-          sameAddress ? 'border-burr bg-burr-tint' : 'border-line bg-surface'
-        }`}
+        className="w-full rounded-card border-2 border-burr bg-burr-tint px-5 py-4 text-left"
       >
-        <span
-          className={`block text-[1.02rem] font-bold ${sameAddress ? 'text-burr-deep' : 'text-ink'}`}
-        >
+        <span className="block text-[1.02rem] font-bold text-burr-deep">
           합쳐서 한 번에 입금할게요
         </span>
         <span className="tnum mt-1 block text-[1.15rem] font-bold text-shell">
           {formatKRW(mergedTotal)}
         </span>
         <span className="mt-1 block text-[0.83rem] leading-snug text-ink-soft">
-          두 주문이 하나로 합쳐집니다. 이 금액을 한 번에 보내주세요.
-          {!sameAddress && (
+          {sameAddress ? (
+            <>받는 주소가 같아 한 상자로 나갑니다. 이 금액을 한 번에 보내주세요.</>
+          ) : (
             <>
-              {' '}
-              <b className="text-berry">
-                모두 {target.recipientName}님 주소로 보내집니다.
-              </b>
+              받는 주소가 달라 <b className="text-ink">배송은 주소별로 따로</b> 나가고,{' '}
+              <b className="text-ink">입금만 한 번</b>으로 묶습니다. 이 합계를 보내주세요.
             </>
           )}
         </span>
@@ -576,7 +569,14 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
         <p className="tnum mt-1.5 text-[0.9rem] text-ink-soft">주문번호 {completed.orderNo}</p>
         {completed.merged && (
           <p className="mt-2.5 rounded-xl bg-burr-tint px-3.5 py-2.5 text-[0.85rem] leading-snug text-burr-deep">
-            먼저 하신 주문과 합쳤습니다. 아래 금액을 <b>한 번에</b> 보내주세요.
+            {completed.groupedByPayment ? (
+              <>
+                받는 주소가 달라 <b>배송은 따로</b> 나가고, <b>입금만 한 번</b>으로 묶었습니다.
+                아래 합계를 한 번에 보내주세요.
+              </>
+            ) : (
+              <>먼저 하신 주문과 합쳤습니다. 아래 금액을 <b>한 번에</b> 보내주세요.</>
+            )}
           </p>
         )}
       </div>
@@ -601,7 +601,7 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
           <div className="flex justify-between">
             <dt className="text-ink-soft">입금할 금액</dt>
             <dd className="tnum text-[1.15rem] font-bold text-shell">
-              {formatKRW(completed.totalAmount)}
+              {formatKRW(completed.amountToPay)}
             </dd>
           </div>
           <div className="flex justify-between">

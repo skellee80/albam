@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 
 import { deleteProductAction, restockProductAction, saveProductAction } from '@/app/admin/actions';
 import { formatKRW, parseProductName } from '@/lib/format';
+import { LOW_STOCK_NOTICE_THRESHOLD } from '@/lib/types';
 
 export type ManagedProduct = {
   id: string;
@@ -75,6 +76,9 @@ function ProductCard({ product }: { product: ManagedProduct }) {
   const [restock, setRestock] = useState('');
   const [pending, startTransition] = useTransition();
   const soldOut = product.stock <= 0;
+  // 손님 화면에서 "N개 남았습니다"가 뜨기 시작하는 지점과 같은 기준을 쓴다.
+  // 관리자와 손님이 서로 다른 기준으로 "얼마 안 남음"을 보면 대화가 어긋난다.
+  const lowStock = !soldOut && product.stock <= LOW_STOCK_NOTICE_THRESHOLD;
 
   function applyRestock() {
     const value = Number(restock.replace(/[^\d]/g, ''));
@@ -89,7 +93,7 @@ function ProductCard({ product }: { product: ManagedProduct }) {
   return (
     <article
       className={`card px-4 py-4 ${product.hidden ? 'opacity-60' : ''} ${
-        soldOut ? 'border-2 border-berry/35' : ''
+        soldOut ? 'border-2 border-berry/35' : lowStock ? 'border-2 border-amber/40' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -108,6 +112,10 @@ function ProductCard({ product }: { product: ManagedProduct }) {
         {soldOut ? (
           <span className="shrink-0 rounded-full bg-berry-tint px-2.5 py-1 text-[0.76rem] font-bold text-berry">
             매진
+          </span>
+        ) : lowStock ? (
+          <span className="tnum shrink-0 rounded-full bg-amber-tint px-2.5 py-1 text-[0.76rem] font-bold text-amber">
+            {product.stock}개 남음
           </span>
         ) : (
           <span className="tnum shrink-0 rounded-full bg-burr-tint px-2.5 py-1 text-[0.76rem] font-bold text-burr-deep">

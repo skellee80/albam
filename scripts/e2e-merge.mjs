@@ -27,7 +27,7 @@ const { initializeApp } = await import('firebase-admin/app');
 const { getFirestore } = await import('firebase-admin/firestore');
 const db = getFirestore(initializeApp({ projectId: 'albam-416fd' }));
 
-const { createOrder, findMergeableOrders, mergeIntoOrder, getOrder } = await import(
+const { createOrder, findMergeableOrders, mergeWithExistingOrder, getOrder } = await import(
   '../src/lib/orders.ts'
 );
 
@@ -60,7 +60,7 @@ const second = await createOrder({
 });
 check('따로 주문도 들어간다', second.ok);
 
-const combined = first.totalAmount + second.totalAmount;
+const combined = first.amountToPay + second.amountToPay;
 const missed = await fetch(`${BASE}/api/deposit`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
@@ -71,9 +71,15 @@ check('합산 금액으로 보내면 미매칭이 된다 (합치기가 필요한
 
 console.log('\n합치면 — 합산 입금이 한 번에 확정된다');
 
-const merged = await mergeIntoOrder(first.orderId, [{ productId: daebo.id, qty: 2 }]);
+const merged = await mergeWithExistingOrder(first.orderId, {
+  lines: [{ productId: daebo.id, qty: 2 }],
+  depositorName: '합산테스트',
+  depositorPhone: '010-7777-7777',
+  sameAsDepositor: true,
+  recipient: { name: '합산테스트', phone: '010-7777-7777', address: '서울시 어딘가' },
+});
 check('합치기가 성공한다', merged.ok, JSON.stringify(merged));
-check('금액이 합산된다', merged.ok && merged.totalAmount === price * 3, `${merged.totalAmount}`);
+check('금액이 합산된다', merged.ok && merged.amountToPay === price * 3, `${merged.amountToPay}`);
 
 // 은행 표기를 바꿔 보낸다. 위에서 같은 (금액·이름·은행)으로 이미 한 번 보냈기 때문에
 // 그대로 다시 보내면 중복 방지에 걸려 앞선 미매칭 문구가 그대로 돌아온다.
@@ -83,7 +89,7 @@ const okRes = await fetch(`${BASE}/api/deposit`, {
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({
     token: TOKEN,
-    amount: String(merged.totalAmount),
+    amount: String(merged.amountToPay),
     name: '합산테스트',
     bank: 'NH농협',
   }),

@@ -51,6 +51,17 @@ export function AdminNav() {
               </Link>
             );
           })}
+
+          {/*
+            손님 화면으로 건너가는 문. 로그아웃과는 다르다 —
+            세션은 그대로 두고 상품 목록만 보러 간다(주문이 어떻게 보이는지 확인할 때 쓴다).
+          */}
+          <Link
+            href="/"
+            className="shrink-0 rounded-full border border-white/30 px-4 py-2 text-[0.88rem] font-semibold text-white/90"
+          >
+            나가기 ↗
+          </Link>
         </div>
       </nav>
     </header>

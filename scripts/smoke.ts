@@ -93,8 +93,8 @@ async function main() {
   const expectedTotal = daeboMid.price * 2 + okgwangLarge.price;
   check(
     `총액이 서버 가격으로 계산된다 (${expectedTotal.toLocaleString('ko-KR')}원)`,
-    created.totalAmount === expectedTotal,
-    `실제 ${created.totalAmount}`,
+    created.amountToPay === expectedTotal,
+    `실제 ${created.amountToPay}`,
   );
   check('주문번호가 YYYYMMDD-0001 형식이다', /^\d{8}-0001$/.test(created.orderNo), created.orderNo);
 
@@ -496,7 +496,7 @@ async function main() {
 
   section('17. 주문 합치기 — 같은 사람이 입금 전에 또 주문할 때');
 
-  const { findMergeableOrders, mergeIntoOrder } = await import('../src/lib/orders');
+  const { findMergeableOrders, mergeWithExistingOrder } = await import('../src/lib/orders');
 
   const first = await createOrder({
     lines: [{ productId: daeboMid.id, qty: 1 }],
@@ -514,18 +514,25 @@ async function main() {
   check('연락처가 다르면 남의 주문으로 본다', otherPerson.length === 0, `${otherPerson.length}건`);
 
   const stockBeforeMerge = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
-  const mergedResult = await mergeIntoOrder(first.orderId, [
-    { productId: daeboMid.id, qty: 2 },
-    { productId: okgwangLarge.id, qty: 1 },
-  ]);
+  const mergedResult = await mergeWithExistingOrder(first.orderId, {
+    lines: [
+      { productId: daeboMid.id, qty: 2 },
+      { productId: okgwangLarge.id, qty: 1 },
+    ],
+    depositorName: '합치기',
+    depositorPhone: '010-1212-1212',
+    sameAsDepositor: true,
+    // 같은 주소 → 한 주문으로 합쳐진다
+    recipient: { name: '합치기', phone: '010-1212-1212', address: '김포시 어딘가' },
+  });
   check('합치기가 성공한다', mergedResult.ok, JSON.stringify(mergedResult));
   if (!mergedResult.ok) throw new Error('이후 검증 불가');
 
   check('합쳤다고 알려준다', mergedResult.merged);
   check(
     '금액이 합산된다',
-    mergedResult.totalAmount === daeboMid.price * 3 + okgwangLarge.price,
-    `${mergedResult.totalAmount}`,
+    mergedResult.amountToPay === daeboMid.price * 3 + okgwangLarge.price,
+    `${mergedResult.amountToPay}`,
   );
   check(
     '같은 상품은 한 줄로 합쳐진다',
@@ -545,14 +552,78 @@ async function main() {
 
   // 합친 금액 한 번으로 매칭되어야 한다 — 이게 합치기를 만든 이유다
   const mergedDeposit = await recordDeposit({
-    amount: mergedResult.totalAmount,
+    amount: mergedResult.amountToPay,
     depositorName: '합치기',
     bankName: accountBank,
   });
   check('합친 금액 한 번으로 입금이 확정된다', mergedDeposit.status === '확정', mergedDeposit.message);
 
-  const alreadyPaid = await mergeIntoOrder(first.orderId, [{ productId: daeboMid.id, qty: 1 }]);
+  const alreadyPaid = await mergeWithExistingOrder(first.orderId, {
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '합치기',
+    depositorPhone: '010-1212-1212',
+    sameAsDepositor: true,
+    recipient: { name: '합치기', phone: '010-1212-1212', address: '김포시 어딘가' },
+  });
   check('이미 입금된 주문에는 합칠 수 없다', !alreadyPaid.ok, JSON.stringify(alreadyPaid));
+
+  section('17-2. 주소가 다르면 배송은 따로, 입금만 묶는다');
+
+  const giftA = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '선물보내기',
+    sameAsDepositor: false,
+    depositorPhone: '010-8282-8282',
+    recipient: { name: '큰집', phone: '010-1111-0001', address: '충남 청양군 대치면 1-1' },
+  });
+  if (!giftA.ok) throw new Error('점검용 주문 생성 실패');
+
+  const giftB = await mergeWithExistingOrder(giftA.orderId, {
+    lines: [{ productId: okgwangLarge.id, qty: 1 }],
+    depositorName: '선물보내기',
+    depositorPhone: '010-8282-8282',
+    sameAsDepositor: false,
+    // 주소가 다르다 → 주문이 따로 만들어져야 한다
+    recipient: { name: '작은집', phone: '010-2222-0002', address: '서울시 강남구 2-2' },
+  });
+  check('주소가 달라도 묶을 수 있다', giftB.ok, JSON.stringify(giftB));
+  if (!giftB.ok) throw new Error('이후 검증 불가');
+
+  check('주문은 따로 만들어진다', giftB.orderId !== giftA.orderId);
+  check('입금만 묶였다고 알려준다', giftB.groupedByPayment === true);
+  check(
+    '보낼 금액은 두 주문의 합계다',
+    giftB.amountToPay === daeboMid.price + okgwangLarge.price,
+    `${giftB.amountToPay}`,
+  );
+  check('이 주문 자체 금액은 따로 표시된다', giftB.orderTotal === okgwangLarge.price);
+
+  const orderA = await getOrder(giftA.orderId);
+  const orderB = await getOrder(giftB.orderId);
+  check('두 주문이 같은 결제 그룹이 된다', !!orderA?.paymentGroupId && orderA.paymentGroupId === orderB?.paymentGroupId);
+  check('받는 주소는 각각 그대로다', orderA?.recipient.address !== orderB?.recipient.address);
+  check('받는 사람도 각각 그대로다', orderA?.recipient.name === '큰집' && orderB?.recipient.name === '작은집');
+
+  // 합계 한 번으로 두 건이 함께 확정되어야 한다
+  const groupDeposit = await recordDeposit({
+    amount: giftB.amountToPay,
+    depositorName: '선물보내기',
+    bankName: accountBank,
+  });
+  check('합계 한 번으로 확정된다', groupDeposit.status === '확정', groupDeposit.message);
+  check('묶인 건수를 문구에 알려준다', groupDeposit.message.includes('주문 2건'), groupDeposit.message);
+
+  const afterA = await getOrder(giftA.orderId);
+  const afterB = await getOrder(giftB.orderId);
+  check('묶인 주문이 모두 발송대기로 올라간다', afterA?.status === '발송대기' && afterB?.status === '발송대기', `${afterA?.status} / ${afterB?.status}`);
+
+  // 한 건만 보내면 맞지 않아야 한다 (묶었으므로 합계로만 맞는다)
+  const partial = await recordDeposit({
+    amount: daeboMid.price,
+    depositorName: '부분입금',
+    bankName: accountBank,
+  });
+  check('묶음 합계가 아니면 확정되지 않는다', partial.status === '미매칭', partial.message);
 
   section('17-1. 손님이 스스로 주문 취소 — 남의 주문은 못 건드린다');
 
@@ -620,7 +691,7 @@ async function main() {
   if (!bankOrder.ok) throw new Error('점검용 주문 생성 실패');
 
   const wrongBank = await recordDeposit({
-    amount: bankOrder.totalAmount,
+    amount: bankOrder.amountToPay,
     depositorName: '은행대조',
     bankName: '없는은행',
   });
@@ -631,7 +702,7 @@ async function main() {
   check('주문은 입금대기로 남는다', stillWaiting?.status === '입금대기', stillWaiting?.status);
 
   const rightBank = await recordDeposit({
-    amount: bankOrder.totalAmount,
+    amount: bankOrder.amountToPay,
     depositorName: '은행대조',
     bankName: accountBank,
   });
@@ -652,7 +723,7 @@ async function main() {
 
   const depositCountBefore = (await db.collection(COL.deposits).get()).size;
   const pv = await previewDeposit({
-    amount: previewTarget.totalAmount,
+    amount: previewTarget.amountToPay,
     depositorName: '미리보기',
     bankName: '농협',
   });
@@ -669,7 +740,7 @@ async function main() {
 
   // 미리보기와 실제 처리의 문구가 같아야 테스트가 의미를 갖는다
   const real = await recordDeposit({
-    amount: previewTarget.totalAmount,
+    amount: previewTarget.amountToPay,
     depositorName: '미리보기',
     bankName: '농협',
   });

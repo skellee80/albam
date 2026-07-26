@@ -1,16 +1,26 @@
 'use server';
 
-import { createOrder, findMergeableOrders, mergeIntoOrder, type MergeableOrder } from '@/lib/orders';
+import {
+  createOrder,
+  findMergeableOrders,
+  mergeWithExistingOrder,
+  type MergeableOrder,
+} from '@/lib/orders';
 import type { OrderItem } from '@/lib/types';
 
 export type PlaceOrderResult =
   | {
       ok: true;
       orderNo: string;
-      totalAmount: number;
+      /** 손님이 실제로 보내야 할 금액 (입금을 묶었으면 합계) */
+      amountToPay: number;
+      /** 이 주문 한 건의 금액 */
+      orderTotal: number;
       items: OrderItem[];
       paymentDueAt: number;
       merged: boolean;
+      /** 주소가 달라 주문은 따로 두고 입금만 묶었는지 */
+      groupedByPayment: boolean;
     }
   | { ok: false; error: string };
 
@@ -49,25 +59,29 @@ export async function placeOrder(payload: {
   mergeIntoOrderId?: string | null;
 }): Promise<PlaceOrderResult> {
   try {
+    const input = {
+      lines: payload.lines,
+      depositorName: payload.depositorName,
+      depositorPhone: payload.depositorPhone,
+      sameAsDepositor: payload.sameAsDepositor,
+      recipient: payload.recipient,
+    };
+
     const result = payload.mergeIntoOrderId
-      ? await mergeIntoOrder(payload.mergeIntoOrderId, payload.lines)
-      : await createOrder({
-          lines: payload.lines,
-          depositorName: payload.depositorName,
-          depositorPhone: payload.depositorPhone,
-          sameAsDepositor: payload.sameAsDepositor,
-          recipient: payload.recipient,
-        });
+      ? await mergeWithExistingOrder(payload.mergeIntoOrderId, input)
+      : await createOrder(input);
 
     if (!result.ok) return { ok: false, error: result.error };
 
     return {
       ok: true,
       orderNo: result.orderNo,
-      totalAmount: result.totalAmount,
+      amountToPay: result.amountToPay,
+      orderTotal: result.orderTotal,
       items: result.items,
       paymentDueAt: result.paymentDueAt,
       merged: result.merged,
+      groupedByPayment: Boolean(result.groupedByPayment),
     };
   } catch (err) {
     console.error('[placeOrder]', err);

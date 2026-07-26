@@ -116,13 +116,20 @@ export function banksMatch(depositBank: string, accountBank: string): boolean {
   return a === b || a.includes(b) || b.includes(a);
 }
 
-/** 후보 주문에서 판정에 필요한 것만 추린 모양 */
-type Candidate = { id: string; itemsSummary: string };
+/**
+ * 판정 후보 한 건.
+ *
+ * 입금을 묶은 주문들은 **묶음 전체가 후보 하나**다. 손님이 합계를 한 번에 보내기로
+ * 했으므로 그 합계로 맞춰야 하고, 확정되면 묶인 주문이 모두 발송대기로 올라간다.
+ */
+type Candidate = { id: string; orderIds: string[]; totalAmount: number; itemsSummary: string };
 
 type Decision = {
   status: DepositStatus;
   message: string;
   matchedOrderId: string | null;
+  /** 확정 시 발송대기로 올릴 주문 전부 (묶음이면 여러 건) */
+  confirmedOrderIds: string[];
   candidateOrderIds: string[];
 };
 
@@ -137,10 +144,13 @@ function decide(candidates: Candidate[], depositorName: string, amount: number):
 
   if (candidates.length === 1) {
     const only = candidates[0];
+    // 묶음이면 몇 건이 함께 확정되는지 알려준다 — 주소가 여러 곳이라는 뜻이다
+    const groupNote = only.orderIds.length > 1 ? ` · 주문 ${only.orderIds.length}건` : '';
     return {
       status: '확정',
-      message: `✅ 확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${only.itemsSummary ? ` (${only.itemsSummary})` : ''}`,
+      message: `✅ 확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${only.itemsSummary ? ` (${only.itemsSummary})` : ''}${groupNote}`,
       matchedOrderId: only.id,
+      confirmedOrderIds: only.orderIds,
       candidateOrderIds,
     };
   }
@@ -150,6 +160,7 @@ function decide(candidates: Candidate[], depositorName: string, amount: number):
       status: '확인필요',
       message: `⚠️ 확인필요: ${depositorName} ${formatKRW(amount)}, 후보 ${candidates.length}건. 관리자에서 선택하세요.`,
       matchedOrderId: null,
+      confirmedOrderIds: [],
       candidateOrderIds,
     };
   }
@@ -158,6 +169,7 @@ function decide(candidates: Candidate[], depositorName: string, amount: number):
     status: '미매칭',
     message: `❓ 미매칭: ${depositorName} ${formatKRW(amount)}. 관리자에서 확인하세요.`,
     matchedOrderId: null,
+    confirmedOrderIds: [],
     candidateOrderIds,
   };
 }
@@ -173,25 +185,49 @@ function otherBankDecision(
     status: '미매칭',
     message: `❓ 미매칭: ${depositorName} ${formatKRW(amount)} — ${depositBank} 입금입니다. 판매 계좌는 ${accountBank}입니다.`,
     matchedOrderId: null,
+    confirmedOrderIds: [],
     candidateOrderIds: [],
   };
 }
 
-/** 입금대기 주문 중 이름·금액이 정확히 일치하는 건 (삭제된 주문 제외) */
-function matchQuery(nameNorm: string, amount: number) {
+/**
+ * 이 입금자 이름으로 아직 입금 안 된 주문 전부.
+ *
+ * 금액으로 거르지 않는 이유: 입금을 묶은 주문은 **합계**로 맞춰야 해서
+ * 개별 금액으로 미리 거르면 묶음을 못 찾는다. 한 사람의 미입금 주문은 몇 건뿐이라
+ * 다 읽어와서 메모리에서 묶는 편이 단순하고 정확하다.
+ */
+function matchQuery(nameNorm: string) {
   return db
     .collection(COL.orders)
     .where('status', '==', '입금대기')
-    .where('depositorNameNorm', '==', nameNorm)
-    .where('totalAmount', '==', amount);
+    .where('depositorNameNorm', '==', nameNorm);
 }
 
-function toCandidate(doc: FirebaseFirestore.QueryDocumentSnapshot): Candidate {
-  const data = doc.data();
-  return {
-    id: doc.id,
-    itemsSummary: summarizeItems(Array.isArray(data.items) ? data.items : []),
-  };
+/**
+ * 주문들을 결제 그룹 단위로 묶어 후보를 만든다.
+ * 묶이지 않은 주문은 자기 혼자가 그룹이다.
+ */
+function buildCandidates(docs: FirebaseFirestore.QueryDocumentSnapshot[]): Candidate[] {
+  const groups = new Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>();
+
+  for (const doc of docs) {
+    // 묶이지 않은 주문은 자기 id를 그룹 키로 써서 혼자 한 묶음이 된다
+    const key = (doc.data().paymentGroupId as string | null) ?? `single:${doc.id}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(doc);
+    else groups.set(key, [doc]);
+  }
+
+  return [...groups.values()].map((bucket) => {
+    const items = bucket.flatMap((d) => (Array.isArray(d.data().items) ? d.data().items : []));
+    return {
+      id: bucket[0].id,
+      orderIds: bucket.map((d) => d.id),
+      totalAmount: bucket.reduce((sum, d) => sum + Number(d.data().totalAmount ?? 0), 0),
+      itemsSummary: summarizeItems(items),
+    };
+  });
 }
 
 /**
@@ -245,24 +281,28 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
 
     // 은행이 다르면 우리 계좌 입금이 아니므로 주문을 찾아보지 않는다
     const matched = sameBank
-      ? (await t.get(matchQuery(nameNorm, amount))).docs.filter((d) => !d.data().deleted)
+      ? (await t.get(matchQuery(nameNorm))).docs.filter((d) => !d.data().deleted)
       : [];
+    const candidates = buildCandidates(matched).filter((c) => c.totalAmount === amount);
 
     // ── 판정 ──
     const decision = sameBank
-      ? decide(matched.map(toCandidate), depositorName, amount)
+      ? decide(candidates, depositorName, amount)
       : otherBankDecision(depositorName, amount, bankName, accountBank);
 
     // ── 쓰기 ──
-    if (decision.matchedOrderId) {
-      const orderDoc = matched.find((d) => d.id === decision.matchedOrderId)!;
+    if (decision.confirmedOrderIds.length > 0) {
       // 입금대기 → 발송대기는 둘 다 재고를 잡고 있는 상태라 재고 변동이 없다.
       // 이미 트랜잭션 안이므로 여기서 직접 갱신한다.
-      t.update(orderDoc.ref, {
-        status: '발송대기' satisfies OrderStatus,
-        paidAt: now,
-        updatedAt: now,
-      });
+      for (const orderId of decision.confirmedOrderIds) {
+        const doc = matched.find((d) => d.id === orderId);
+        if (!doc) continue;
+        t.update(doc.ref, {
+          status: '발송대기' satisfies OrderStatus,
+          paidAt: now,
+          updatedAt: now,
+        });
+      }
     }
 
     t.set(depositRefs[0], {
@@ -326,7 +366,7 @@ export async function previewDeposit(input: DepositInput): Promise<DepositPrevie
   const keys = dedupeKeysToCheck(amount, nameNorm, bankNorm, Date.now());
   const [dedupeSnaps, candidateSnap, settings] = await Promise.all([
     db.getAll(...keys.map((k) => db.collection(COL.deposits).doc(k))),
-    matchQuery(nameNorm, amount).get(),
+    matchQuery(nameNorm).get(),
     getSettings(),
   ]);
 
@@ -344,8 +384,9 @@ export async function previewDeposit(input: DepositInput): Promise<DepositPrevie
 
   const sameBank = banksMatch(bankName, settings.bankName);
   const matched = sameBank ? candidateSnap.docs.filter((d) => !d.data().deleted) : [];
+  const candidates = buildCandidates(matched).filter((c) => c.totalAmount === amount);
   const decision = sameBank
-    ? decide(matched.map(toCandidate), depositorName, amount)
+    ? decide(candidates, depositorName, amount)
     : otherBankDecision(depositorName, amount, bankName, settings.bankName);
 
   return {
@@ -353,15 +394,17 @@ export async function previewDeposit(input: DepositInput): Promise<DepositPrevie
     status: decision.status,
     message: decision.message,
     duplicate: false,
-    candidates: matched.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        orderNo: data.orderNo ?? d.id,
-        recipientName: data.recipient?.name ?? '',
-        phone: data.recipient?.phone ?? '',
-      };
-    }),
+    candidates: candidates.flatMap((c) =>
+      c.orderIds.map((orderId) => {
+        const data = matched.find((d) => d.id === orderId)!.data();
+        return {
+          id: orderId,
+          orderNo: data.orderNo ?? orderId,
+          recipientName: data.recipient?.name ?? '',
+          phone: data.recipient?.phone ?? '',
+        };
+      }),
+    ),
   };
 }
 
@@ -382,12 +425,34 @@ export async function resolveDeposit(depositId: string, orderId: string): Promis
     if (!depositSnap.exists) throw new Error('입금 내역을 찾을 수 없습니다.');
     if (!orderSnap.exists) throw new Error('주문을 찾을 수 없습니다.');
 
-    const now = Date.now();
     const order = orderSnap.data()!;
+    const groupId = (order.paymentGroupId as string | null) ?? null;
+
+    // 입금을 묶은 주문이면 묶인 것 전부를 함께 올린다.
+    // 손님은 합계를 한 번에 보냈으므로 한 건만 올리면 나머지가 미입금으로 남아
+    // 기한이 지나 자동 취소된다.
+    const siblings = groupId
+      ? await t.get(
+          db
+            .collection(COL.orders)
+            .where('paymentGroupId', '==', groupId)
+            .where('status', '==', '입금대기'),
+        )
+      : null;
+
+    const now = Date.now();
 
     // 입금대기 → 발송대기 (재고를 잡고 있는 상태끼리의 이동이라 재고 변동 없음)
-    if (order.status === '입금대기') {
-      t.update(orderRef, { status: '발송대기' satisfies OrderStatus, paidAt: now, updatedAt: now });
+    const confirm = (ref: FirebaseFirestore.DocumentReference) =>
+      t.update(ref, { status: '발송대기' satisfies OrderStatus, paidAt: now, updatedAt: now });
+
+    if (siblings && siblings.docs.length > 0) {
+      for (const doc of siblings.docs) confirm(doc.ref);
+      if (order.status === '입금대기' && !siblings.docs.some((d) => d.id === orderId)) {
+        confirm(orderRef);
+      }
+    } else if (order.status === '입금대기') {
+      confirm(orderRef);
     }
 
     t.update(depositRef, {
