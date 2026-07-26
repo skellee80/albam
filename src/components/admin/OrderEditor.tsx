@@ -103,7 +103,7 @@ export function OrderEditor({
   }
 
   function remove() {
-    if (!window.confirm('이 주문을 삭제할까요?\n고객 배송조회에서 사라지고, 재고는 되돌아갑니다.')) return;
+    if (!window.confirm('이 주문을 삭제할까요?\n고객 주문 조회에서 사라지고, 재고는 되돌아갑니다.')) return;
     startTransition(async () => {
       const result = await deleteOrderAction(order.id);
       if (result.ok) router.push('/admin/orders');

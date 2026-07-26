@@ -554,6 +554,55 @@ async function main() {
   const alreadyPaid = await mergeIntoOrder(first.orderId, [{ productId: daeboMid.id, qty: 1 }]);
   check('이미 입금된 주문에는 합칠 수 없다', !alreadyPaid.ok, JSON.stringify(alreadyPaid));
 
+  section('17-1. 손님이 스스로 주문 취소 — 남의 주문은 못 건드린다');
+
+  const { cancelOwnOrder } = await import('../src/app/(shop)/track/actions');
+
+  const mine = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '내주문',
+    sameAsDepositor: true,
+    depositorPhone: '010-3434-3434',
+    recipient: { name: '내주문', phone: '010-3434-3434', address: '평택시 어딘가' },
+  });
+  if (!mine.ok) throw new Error('점검용 주문 생성 실패');
+
+  const stockBeforeSelfCancel = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+
+  const wrongOwner = await cancelOwnOrder(mine.orderId, '내주문', '010-0000-0000');
+  check('연락처가 다르면 취소할 수 없다', !wrongOwner.ok, JSON.stringify(wrongOwner));
+  const wrongName = await cancelOwnOrder(mine.orderId, '남의이름', '010-3434-3434');
+  check('이름이 다르면 취소할 수 없다', !wrongName.ok, JSON.stringify(wrongName));
+
+  const stillThere = await getOrder(mine.orderId);
+  check('막힌 요청은 주문을 건드리지 않는다', stillThere?.status === '입금대기', stillThere?.status);
+
+  const selfCancel = await cancelOwnOrder(mine.orderId, '내주문', '010-3434-3434');
+  check('본인이면 취소된다', selfCancel.ok, JSON.stringify(selfCancel));
+  const cancelled = await getOrder(mine.orderId);
+  check('상태가 취소가 된다', cancelled?.status === '취소', cancelled?.status);
+
+  const stockAfterSelfCancel = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+  check(
+    '취소한 수량이 재고로 돌아온다',
+    stockAfterSelfCancel === stockBeforeSelfCancel + 1,
+    `${stockBeforeSelfCancel} → ${stockAfterSelfCancel}`,
+  );
+
+  // 입금이 끝난 주문은 환불이 얽히므로 손님이 스스로 못 지운다
+  const paidOne = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '입금끝',
+    sameAsDepositor: true,
+    depositorPhone: '010-5656-5656',
+    recipient: { name: '입금끝', phone: '010-5656-5656', address: '이천시 어딘가' },
+  });
+  if (!paidOne.ok) throw new Error('점검용 주문 생성 실패');
+  await updateOrder(paidOne.orderId, { status: '발송대기' });
+
+  const afterPaid = await cancelOwnOrder(paidOne.orderId, '입금끝', '010-5656-5656');
+  check('입금 확인된 주문은 스스로 취소할 수 없다', !afterPaid.ok, JSON.stringify(afterPaid));
+
   section('18. 은행 대조 — 판매 계좌가 아닌 은행 입금은 매칭하지 않는다');
 
   check('표기가 달라도 같은 은행으로 본다', banksMatch('NH농협은행', '농협'));

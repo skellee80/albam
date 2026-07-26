@@ -8,7 +8,7 @@ import {
   placeOrder,
   type PlaceOrderResult,
 } from '@/app/(shop)/order/actions';
-import { formatDateTime, formatKRW, summarizeItems } from '@/lib/format';
+import { formatDateTime, formatKRW } from '@/lib/format';
 import type { MergeableOrder } from '@/lib/orders';
 import { PAYMENT_DEADLINE_HOURS, type OrderItem, type Settings } from '@/lib/types';
 
@@ -146,7 +146,9 @@ export function OrderForm({
     return (
       <MergeChoice
         existing={mergeChoice}
+        newItems={lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price }))}
         newItemsTotal={total}
+        newRecipient={{ name: recipientName, address }}
         pending={pending}
         onMerge={(orderId) => submit(orderId)}
         onSeparate={() => submit(null)}
@@ -378,16 +380,57 @@ export function OrderForm({
  * 합칠지 따로 할지 고르는 화면
  * ──────────────────────────────────────────────────────────── */
 
+/** 한 주소로 가는 밤 한 묶음 */
+function ShipmentBlock({
+  label,
+  recipientName,
+  address,
+  items,
+  total,
+}: {
+  label: string;
+  recipientName: string;
+  address: string;
+  items: { name: string; qty: number; price: number }[];
+  total: number;
+}) {
+  return (
+    <div className="px-4 py-3.5">
+      <p className="text-[0.78rem] font-semibold text-ink-faint">{label}</p>
+
+      <p className="mt-1 text-[0.9rem] font-bold">{recipientName}</p>
+      <p className="mt-0.5 text-[0.82rem] leading-snug text-ink-soft">{address}</p>
+
+      <ul className="mt-2 space-y-1 border-t border-line pt-2 text-[0.87rem]">
+        {items.map((item, i) => (
+          <li key={`${item.name}-${i}`} className="flex justify-between gap-2 text-ink-soft">
+            <span>
+              {item.name} <span className="tnum">×{item.qty}</span>
+            </span>
+            <span className="tnum">{formatKRW(item.price * item.qty)}</span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="tnum mt-1.5 text-right text-[1rem] font-bold">{formatKRW(total)}</p>
+    </div>
+  );
+}
+
 function MergeChoice({
   existing,
+  newItems,
   newItemsTotal,
+  newRecipient,
   pending,
   onMerge,
   onSeparate,
   onCancel,
 }: {
   existing: MergeableOrder[];
+  newItems: { name: string; qty: number; price: number }[];
   newItemsTotal: number;
+  newRecipient: { name: string; address: string };
   pending: boolean;
   onMerge: (orderId: string) => void;
   onSeparate: () => void;
@@ -396,6 +439,10 @@ function MergeChoice({
   // 가장 최근 입금대기 주문에 합친다. 여러 건이면 나머지는 아래에 알려만 준다.
   const target = existing[0];
   const mergedTotal = target.totalAmount + newItemsTotal;
+
+  // 받는 주소가 다르면 합칠 때 한쪽 주소로만 나간다. 반드시 짚어 줘야 한다.
+  const sameAddress =
+    target.recipientAddress.replace(/\s+/g, '') === newRecipient.address.replace(/\s+/g, '');
 
   return (
     <div className="mt-6 space-y-5">
@@ -410,24 +457,45 @@ function MergeChoice({
         </p>
       </div>
 
-      <div className="card px-4 py-4">
-        <p className="text-[0.8rem] font-semibold text-ink-faint">먼저 하신 주문</p>
-        <p className="mt-1.5 text-[0.92rem]">{summarizeItems(target.items)}</p>
-        <p className="tnum mt-1 text-[1.05rem] font-bold">{formatKRW(target.totalAmount)}</p>
-
-        <div className="mt-3 border-t border-line pt-3">
-          <p className="text-[0.8rem] font-semibold text-ink-faint">지금 담으신 밤</p>
-          <p className="tnum mt-1.5 text-[1.05rem] font-bold">{formatKRW(newItemsTotal)}</p>
-        </div>
+      {/* 어느 주소로 가는 밤인지 나눠서 보여준다 */}
+      <div className="card divide-y divide-line overflow-hidden">
+        <ShipmentBlock
+          label="먼저 하신 주문"
+          recipientName={target.recipientName}
+          address={target.recipientAddress}
+          items={target.items}
+          total={target.totalAmount}
+        />
+        <ShipmentBlock
+          label="지금 담으신 밤"
+          recipientName={newRecipient.name}
+          address={newRecipient.address}
+          items={newItems}
+          total={newItemsTotal}
+        />
       </div>
+
+      {!sameAddress && (
+        <div className="rounded-card border-2 border-berry/35 bg-berry-tint px-4 py-3.5">
+          <p className="text-[0.9rem] font-bold text-berry">받는 주소가 서로 다릅니다</p>
+          <p className="mt-1 text-[0.84rem] leading-relaxed text-ink-soft">
+            합치면 <b>한 주소로만</b> 보내집니다. 두 곳으로 나눠 받으시려면{' '}
+            <b>따로 입금</b>을 골라 주세요.
+          </p>
+        </div>
+      )}
 
       <button
         type="button"
         onClick={() => onMerge(target.id)}
         disabled={pending}
-        className="w-full rounded-card border-2 border-burr bg-burr-tint px-5 py-4 text-left"
+        className={`w-full rounded-card border-2 px-5 py-4 text-left ${
+          sameAddress ? 'border-burr bg-burr-tint' : 'border-line bg-surface'
+        }`}
       >
-        <span className="block text-[1.02rem] font-bold text-burr-deep">
+        <span
+          className={`block text-[1.02rem] font-bold ${sameAddress ? 'text-burr-deep' : 'text-ink'}`}
+        >
           합쳐서 한 번에 입금할게요
         </span>
         <span className="tnum mt-1 block text-[1.15rem] font-bold text-shell">
@@ -435,6 +503,14 @@ function MergeChoice({
         </span>
         <span className="mt-1 block text-[0.83rem] leading-snug text-ink-soft">
           두 주문이 하나로 합쳐집니다. 이 금액을 한 번에 보내주세요.
+          {!sameAddress && (
+            <>
+              {' '}
+              <b className="text-berry">
+                모두 {target.recipientName}님 주소로 보내집니다.
+              </b>
+            </>
+          )}
         </span>
       </button>
 
@@ -457,7 +533,7 @@ function MergeChoice({
       {existing.length > 1 && (
         <p className="rounded-xl bg-amber-tint px-4 py-3 text-[0.83rem] leading-relaxed text-amber">
           입금하지 않은 주문이 {existing.length}건 있습니다. 합치기는 가장 최근 주문에만
-          적용됩니다. 나머지는 배송 조회에서 확인해 주세요.
+          적용됩니다. 나머지는 주문 조회에서 확인해 주세요.
         </p>
       )}
 
@@ -570,7 +646,7 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
           입금 완료가 처리되지 않는 다면 연락주세요.
         </p>
         <p className="mt-2 text-[0.85rem] leading-relaxed text-ink-soft">
-          진행 상태는 <b>배송 조회</b>에서 입금자명과 연락처로 확인하실 수 있습니다.
+          진행 상태는 <b>주문 조회</b>에서 입금자명과 연락처로 확인하실 수 있습니다.
           <br />
           문의 <b className="tnum text-ink">{settings.contactPhone}</b>
         </p>
@@ -578,7 +654,7 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
 
       <div className="flex gap-2 pb-6">
         <Link href="/track" className="btn btn-primary flex-1">
-          배송 조회
+          주문 조회
         </Link>
         <Link href="/" className="btn btn-outline flex-1">
           더 주문하기

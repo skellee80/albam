@@ -12,6 +12,7 @@ export type CandidateOrder = {
   id: string;
   orderNo: string;
   depositorName: string;
+  depositorPhone: string;
   recipientName: string;
   phone: string;
   itemsSummary: string;
@@ -301,8 +302,9 @@ function ResolveSummary({
       <dl className="overflow-hidden rounded-xl border border-line">
         <Row label="들어온 입금" value={`${deposit.depositorName} · ${formatKRW(deposit.amount)}`} />
         <Row label="입금자" value={order.depositorName} warn={!nameMatches} />
+        <Row label="입금자 연락처" value={order.depositorPhone || '—'} mono />
         <Row label="받는 분" value={order.recipientName} />
-        <Row label="연락처" value={order.phone} mono />
+        <Row label="받는 분 연락처" value={order.phone} mono />
         <Row label="주문 상품" value={order.itemsSummary} />
         <Row label="주문 금액" value={formatKRW(order.totalAmount)} warn={!amountMatches} mono />
       </dl>
@@ -334,8 +336,13 @@ function ResolveSummary({
       <div className="rounded-xl border-2 border-berry/35 bg-berry-tint px-3.5 py-3">
         <p className="text-[0.88rem] font-bold text-berry">📞 전화로 먼저 확인하세요</p>
         <p className="mt-1 text-[0.83rem] leading-relaxed text-ink-soft">
-          <b className="tnum text-ink">{order.phone}</b> 로 연락해서 <b>입금자·받는 분·입금액</b>이
-          맞는지 확인한 뒤 눌러 주세요. 잘못 연결하면 <b>돈을 받지 않고 물건을 보내게 됩니다.</b>
+          <b className="tnum text-ink">{order.depositorPhone || order.phone}</b> 로 연락해서{' '}
+          <b>입금자·받는 분·입금액</b>이 맞는지 확인한 뒤 눌러 주세요. 잘못 연결하면{' '}
+          <b>돈을 받지 않고 물건을 보내게 됩니다.</b>
+        </p>
+        <p className="mt-2 border-t border-berry/25 pt-2 text-[0.83rem] leading-relaxed text-ink-soft">
+          이 주문이 맞다면, <b>주문 화면에서 내용을 실제와 맞게 고쳐 두세요.</b> 입금자명이나
+          금액이 다른 채로 두면 다음에 또 같은 확인을 하게 됩니다.
         </p>
       </div>
     </div>

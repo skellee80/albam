@@ -42,7 +42,10 @@ export const metadata: Metadata = {
     // 홈화면 아이콘 밑에 붙는 글자라 길면 잘린다
     title: BRAND.short,
   },
-  // 파비콘/애플 아이콘은 src/app/icon.svg, src/app/apple-icon.png 파일 규칙으로 자동 연결된다.
+  // 파비콘은 public/icon.svg 를 가리킨다.
+  // src/app/icon.svg 로도 두면 Next가 같은 /icon.svg 경로를 두 번 만들어 500이 난다
+  // (conflicting public file and page file). 애플 아이콘만 파일 규칙(src/app/apple-icon.png)을 쓴다.
+  icons: { icon: '/icon.svg' },
   // 주문 페이지가 검색에 뜰 이유가 없다. 상품 목록만 노출한다.
   robots: { index: true, follow: true },
 };

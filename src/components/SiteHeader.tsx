@@ -25,7 +25,7 @@ export function SiteHeader({ active }: { active: 'shop' | 'track' | null }) {
 
         <nav className="mt-4 flex justify-center gap-2" aria-label="주요 메뉴">
           <NavLink href="/" label="밤 고르기" isActive={active === 'shop'} />
-          <NavLink href="/track" label="배송 조회" isActive={active === 'track'} />
+          <NavLink href="/track" label="주문 조회" isActive={active === 'track'} />
         </nav>
       </div>
     </header>

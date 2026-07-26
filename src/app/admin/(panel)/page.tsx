@@ -22,6 +22,7 @@ function toCandidate(order: Order): CandidateOrder {
     id: order.id,
     orderNo: order.orderNo,
     depositorName: order.depositorName,
+    depositorPhone: order.depositorPhone,
     recipientName: order.recipient.name,
     phone: order.recipient.phone,
     itemsSummary: summarizeItems(order.items),

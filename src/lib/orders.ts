@@ -240,6 +240,9 @@ export type MergeableOrder = {
   items: OrderItem[];
   totalAmount: number;
   createdAt: number;
+  /** 합치기 화면에서 "어디로 가는 밤인지" 보여줘야 해서 함께 넘긴다 */
+  recipientName: string;
+  recipientAddress: string;
 };
 
 /**
@@ -273,6 +276,8 @@ export async function findMergeableOrders(
       items: o.items,
       totalAmount: o.totalAmount,
       createdAt: o.createdAt,
+      recipientName: o.recipient.name,
+      recipientAddress: o.recipient.address,
     }));
 }
 

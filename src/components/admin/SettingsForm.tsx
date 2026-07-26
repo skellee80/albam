@@ -85,7 +85,7 @@ export function SettingsForm({ settings }: { settings: Settings }) {
       <section className="card px-4 py-4">
         <h2 className="font-display text-[1.1rem]">문의 전화번호</h2>
         <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
-          배송 조회에서 주문을 못 찾은 손님에게 안내되는 번호입니다.
+          주문 조회에서 주문을 못 찾은 손님에게 안내되는 번호입니다.
         </p>
 
         <div className="mt-3.5">
