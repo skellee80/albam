@@ -173,6 +173,13 @@ function TrackedOrderCard({
           <p className="mt-2 text-[0.8rem] leading-relaxed text-ink-soft">
             {formatDateTime(order.paymentDueAt)}까지 입금되지 않으면 주문이 자동으로 취소됩니다.
           </p>
+
+          {/* 합산 입금이 자동 확인이 안 되는 가장 흔한 이유다 */}
+          <p className="mt-2 border-t border-shell/20 pt-2 text-[0.82rem] leading-relaxed text-berry">
+            이 주문은 <b className="tnum">{formatKRW(order.totalAmount)}</b> 을 그대로 보내주셔야
+            확인됩니다. 다른 주문과 <b>더해서 한 번에 보내시면 확인되지 않습니다.</b> 이미 합쳐
+            보내셨다면 아래에서 <b>주문을 취소하고 다시 주문</b>한 뒤 각 금액으로 보내주세요.
+          </p>
         </div>
       )}
 

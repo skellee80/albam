@@ -153,14 +153,6 @@ export interface Order {
   trackingNo: string; // 우체국 송장번호 (조회 연동은 추후)
   memo: string; // 관리자 메모 (환불/교환 사유 등)
   refundAmount: number;
-  /**
-   * 한 번에 입금하기로 묶인 주문들의 공통 키. 안 묶였으면 null.
-   *
-   * 주문 하나에는 받는 주소가 하나뿐이라, 주소가 다르면 주문을 합칠 수 없다.
-   * 대신 **주문은 따로 두고 입금만 묶는다** — 배송은 주소별로 따로 나가고,
-   * 입금 매칭은 묶음 합계로 한다. 아버지 입장에서 포장·송장은 그대로 한 건씩이다.
-   */
-  paymentGroupId: string | null;
   deleted: boolean;
   createdAt: number;
   updatedAt: number;

@@ -49,15 +49,6 @@
       ]
     },
     {
-      "__comment__": "입금을 묶은 주문 찾기: 결제 그룹 + 입금대기",
-      "collectionGroup": "orders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "paymentGroupId", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" }
-      ]
-    },
-    {
       "__comment__": "관리자 미해결 입금 목록 (확인필요/미매칭)",
       "collectionGroup": "deposits",
       "queryScope": "COLLECTION",
