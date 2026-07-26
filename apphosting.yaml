@@ -1,0 +1,42 @@
+# Firebase App Hosting 백엔드 설정
+# 배포 주소: https://albam--albam-416fd.us-central1.hosted.app
+#
+# 아래 secret 3개는 소스에 값을 두지 않는다. 배포 전에 한 번만 등록:
+#   firebase apphosting:secrets:set albam-admin-password
+#   firebase apphosting:secrets:set albam-session-secret
+#   firebase apphosting:secrets:set albam-macrodroid-token
+# 자세한 절차는 README.md 참고.
+
+runConfig:
+  # 주문이 몰리는 시즌 상품이라 0 → 스케일업을 허용하되 상한을 낮게 둔다.
+  # (Blaze 요금제에서 예상치 못한 과금이 나지 않도록)
+  minInstances: 0
+  maxInstances: 5
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  - variable: NEXT_PUBLIC_SITE_NAME
+    value: 알밤 주문
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # 관리자 공유 비밀번호 (아버지가 쓰는 그 비밀번호)
+  - variable: ADMIN_PASSWORD
+    secret: albam-admin-password
+    availability:
+      - RUNTIME
+
+  # 관리자 세션 쿠키 서명 키
+  - variable: SESSION_SECRET
+    secret: albam-session-secret
+    availability:
+      - RUNTIME
+
+  # MacroDroid가 입금 정보를 보낼 때 사용하는 토큰
+  - variable: MACRODROID_TOKEN
+    secret: albam-macrodroid-token
+    availability:
+      - RUNTIME

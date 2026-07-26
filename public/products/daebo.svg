@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300" role="img" aria-label="대보 밤">
+  <defs>
+    <linearGradient id="daeboShell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B27A46"/>
+      <stop offset="1" stop-color="#7B4A26"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="#FFF3DC"/>
+  <circle cx="200" cy="158" r="108" fill="#FFE2A8" opacity="0.8"/>
+  <ellipse cx="200" cy="234" rx="92" ry="12" fill="#E8C68A" opacity="0.45"/>
+  <path d="M201 50 q12 16 3 32 q-13 -8 -3 -32z" fill="#6B3F20"/>
+  <path d="M200 78 c46 0 92 52 92 100 c0 26-41 40-92 40 s-92-14-92-40 c0-48 46-100 92-100z" fill="url(#daeboShell)"/>
+  <path d="M109 172 c26 14 56 21 91 21 s65-7 91-21 c1 4 1 8 1 12 c0 26-41 40-92 40 s-92-14-92-40 c0-4 0-8 1-12z" fill="#F7E7D0"/>
+  <ellipse cx="163" cy="120" rx="24" ry="14" fill="#D8A874" opacity="0.5" transform="rotate(-32 163 120)"/>
+  <ellipse cx="163" cy="156" rx="15" ry="9" fill="#E79AA2" opacity="0.45"/>
+  <ellipse cx="237" cy="156" rx="15" ry="9" fill="#E79AA2" opacity="0.45"/>
+  <g fill="none" stroke="#FBEFDD" stroke-width="6" stroke-linecap="round">
+    <path d="M172 146 q9 -11 18 0"/>
+    <path d="M210 146 q9 -11 18 0"/>
+    <path d="M191 163 q9 9 18 0"/>
+  </g>
+</svg>

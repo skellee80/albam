@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// 이 앱은 브라우저에서 Firestore에 직접 접근하지 않는다.
+// 모든 읽기/쓰기는 App Hosting 위에서 도는 Next.js 서버가 firebase-admin SDK로 수행하며,
+// Admin SDK는 보안 규칙을 우회한다.
+//
+// 따라서 클라이언트 접근을 전부 막는 것이 올바른 설정이다.
+// 주문·연락처·주소가 규칙 실수로 새어나갈 경로 자체를 없앤다.
+//
+// 만약 나중에 클라이언트 SDK를 쓰게 되면 그때 필요한 컬렉션만 열어야 한다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

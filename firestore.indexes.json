@@ -1,0 +1,43 @@
+{
+  "indexes": [
+    {
+      "__comment__": "입금 자동 매칭: 입금대기 + 입금자명 + 금액 정확 일치",
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "depositorNameNorm", "order": "ASCENDING" },
+        { "fieldPath": "totalAmount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "__comment__": "/track 배송조회: 입금자명 + 전화번호 정확 일치",
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "depositorNameNorm", "order": "ASCENDING" },
+        { "fieldPath": "phoneNorm", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "__comment__": "관리자 상태별 주문 목록 (발송대기 등)",
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "__comment__": "관리자 미해결 입금 목록 (확인필요/미매칭)",
+      "collectionGroup": "deposits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "receivedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

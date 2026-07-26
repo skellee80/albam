@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="알밤">
+  <defs>
+    <linearGradient id="iconShell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B27A46"/>
+      <stop offset="1" stop-color="#7B4A26"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#6F9A57"/>
+  <circle cx="256" cy="268" r="150" fill="#E9F2E1" opacity="0.95"/>
+  <path d="M258 116 q18 24 5 48 q-20 -12 -5 -48z" fill="#4A6B36"/>
+  <path d="M256 158 c62 0 124 70 124 135 c0 35-55 54-124 54 s-124-19-124-54 c0-65 62-135 124-135z" fill="url(#iconShell)"/>
+  <path d="M133 285 c35 19 76 28 123 28 s88-9 123-28 c1 5 1 10 1 16 c0 35-55 54-124 54 s-124-19-124-54 c0-6 0-11 1-16z" fill="#F7E7D0"/>
+  <g fill="none" stroke="#FBEFDD" stroke-width="15" stroke-linecap="round">
+    <path d="M212 250 q13 -16 26 0"/>
+    <path d="M274 250 q13 -16 26 0"/>
+    <path d="M243 275 q13 13 26 0"/>
+  </g>
+</svg>
