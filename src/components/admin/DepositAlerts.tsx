@@ -6,6 +6,8 @@ import { ignoreDepositAction, resolveDepositAction } from '@/app/admin/actions';
 import { formatKRW, formatShortDateTime, normalizeName, normalizePhone } from '@/lib/format';
 import type { DepositStatus } from '@/lib/types';
 
+import { ConfirmDialog } from './ConfirmDialog';
+
 export type CandidateOrder = {
   id: string;
   orderNo: string;
@@ -83,6 +85,8 @@ function DepositCard({
   // 다른 은행 입금도 접어 둔다 — 연결하면 안 되는 건이라 먼저 권하지 않는다.
   const [browsing, setBrowsing] = useState(deposit.status === '미매칭' && !deposit.otherBank);
   const [query, setQuery] = useState('');
+  /** 확인 창에 올라와 있는 주문. 누르자마자 처리하지 않고 한 번 물어본다. */
+  const [confirming, setConfirming] = useState<CandidateOrder | null>(null);
 
   /**
    * 입금대기 주문 전체 목록.
@@ -114,6 +118,7 @@ function DepositCard({
   function connect(orderId: string) {
     if (!orderId) return;
     setError(null);
+    setConfirming(null);
     startTransition(async () => {
       const result = await resolveDepositAction(deposit.id, orderId);
       if (!result.ok) setError(result.error);
@@ -176,7 +181,7 @@ function DepositCard({
                 order={order}
                 depositAmount={deposit.amount}
                 disabled={pending}
-                onPick={() => connect(order.id)}
+                onPick={() => setConfirming(order)}
               />
             </li>
           ))}
@@ -231,7 +236,7 @@ function DepositCard({
                         order={order}
                         depositAmount={deposit.amount}
                         disabled={pending}
-                        onPick={() => connect(order.id)}
+                        onPick={() => setConfirming(order)}
                       />
                     </li>
                   ))}
@@ -255,7 +260,110 @@ function DepositCard({
       >
         내 입금이 아님 · 목록에서 치우기
       </button>
+
+      <ConfirmDialog
+        open={confirming !== null}
+        title="이 주문을 입금 완료로 처리할까요?"
+        confirmLabel="예, 입금 완료"
+        cancelLabel="아니요"
+        pending={pending}
+        onConfirm={() => connect(confirming!.id)}
+        onCancel={() => setConfirming(null)}
+      >
+        {confirming && (
+          <ResolveSummary deposit={deposit} order={confirming} otherBank={deposit.otherBank} />
+        )}
+      </ConfirmDialog>
     </article>
+  );
+}
+
+/**
+ * 확인 창 본문: 들어온 입금과 고른 주문을 나란히 놓는다.
+ *
+ * 자동으로 못 맞춘 건이라 사람이 판단해야 하는데, 그 판단에 필요한 값
+ * (입금자·수신자·금액)이 한 화면에 없으면 결국 감으로 누르게 된다.
+ */
+function ResolveSummary({
+  deposit,
+  order,
+  otherBank,
+}: {
+  deposit: AlertDeposit;
+  order: CandidateOrder;
+  otherBank: boolean;
+}) {
+  const amountMatches = deposit.amount === order.totalAmount;
+  const nameMatches = normalizeName(deposit.depositorName) === normalizeName(order.depositorName);
+
+  return (
+    <div className="space-y-3">
+      <dl className="overflow-hidden rounded-xl border border-line">
+        <Row label="들어온 입금" value={`${deposit.depositorName} · ${formatKRW(deposit.amount)}`} />
+        <Row label="입금자" value={order.depositorName} warn={!nameMatches} />
+        <Row label="받는 분" value={order.recipientName} />
+        <Row label="연락처" value={order.phone} mono />
+        <Row label="주문 상품" value={order.itemsSummary} />
+        <Row label="주문 금액" value={formatKRW(order.totalAmount)} warn={!amountMatches} mono />
+      </dl>
+
+      {/* 자동 매칭이 실패한 이유를 짚어 준다 */}
+      {(!amountMatches || !nameMatches) && (
+        <ul className="space-y-1 rounded-xl bg-amber-tint px-3.5 py-3 text-[0.83rem] leading-snug text-amber">
+          {!nameMatches && (
+            <li>
+              입금자명이 다릅니다 — 입금 <b>{deposit.depositorName}</b> / 주문{' '}
+              <b>{order.depositorName}</b>
+            </li>
+          )}
+          {!amountMatches && (
+            <li>
+              금액이 다릅니다 — 입금 <b>{formatKRW(deposit.amount)}</b> / 주문{' '}
+              <b>{formatKRW(order.totalAmount)}</b>
+            </li>
+          )}
+        </ul>
+      )}
+
+      {otherBank && (
+        <p className="rounded-xl bg-berry-tint px-3.5 py-3 text-[0.83rem] leading-snug font-semibold text-berry">
+          판매 계좌가 아닌 은행에서 온 입금입니다. 통장에 실제로 들어왔는지 먼저 확인하세요.
+        </p>
+      )}
+
+      <div className="rounded-xl border-2 border-berry/35 bg-berry-tint px-3.5 py-3">
+        <p className="text-[0.88rem] font-bold text-berry">📞 전화로 먼저 확인하세요</p>
+        <p className="mt-1 text-[0.83rem] leading-relaxed text-ink-soft">
+          <b className="tnum text-ink">{order.phone}</b> 로 연락해서 <b>입금자·받는 분·입금액</b>이
+          맞는지 확인한 뒤 눌러 주세요. 잘못 연결하면 <b>돈을 받지 않고 물건을 보내게 됩니다.</b>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  warn,
+  mono,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex gap-3 border-b border-line px-3.5 py-2 last:border-b-0">
+      <dt className="w-[4.5rem] shrink-0 text-[0.8rem] text-ink-faint">{label}</dt>
+      <dd
+        className={`min-w-0 flex-1 text-[0.88rem] ${mono ? 'tnum' : ''} ${
+          warn ? 'font-bold text-amber' : ''
+        }`}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
 
@@ -288,15 +396,17 @@ function OrderPickButton({
       }`}
     >
       <span className="flex items-baseline justify-between gap-2">
-        <b>
-          {order.depositorName}
-          {order.recipientName !== order.depositorName && (
-            <span className="ml-1.5 text-[0.8rem] font-normal text-ink-soft">
-              → {order.recipientName}
-            </span>
-          )}
-        </b>
+        <span className="min-w-0">
+          <span className="text-[0.72rem] text-ink-faint">입금자 </span>
+          <b>{order.depositorName}</b>
+        </span>
         <span className="tnum shrink-0 text-[0.85rem] text-ink-soft">{order.phone}</span>
+      </span>
+
+      {/* 받는 분은 입금자와 같더라도 늘 보여준다 — 전화로 확인할 때 필요한 값이다 */}
+      <span className="mt-0.5 block text-[0.85rem]">
+        <span className="text-[0.72rem] text-ink-faint">받는 분 </span>
+        <b>{order.recipientName}</b>
       </span>
 
       <span className="mt-1 flex items-baseline justify-between gap-2 text-[0.82rem] text-ink-soft">

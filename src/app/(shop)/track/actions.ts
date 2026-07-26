@@ -15,6 +15,7 @@ export type TrackedOrder = {
   memo: string;
   refundAmount: number;
   createdAt: number;
+  paymentDueAt: number;
   paidAt: number | null;
   shippedAt: number | null;
 };
@@ -49,6 +50,7 @@ export async function findOrders(depositorName: string, phone: string): Promise<
         memo: o.memo,
         refundAmount: o.refundAmount,
         createdAt: o.createdAt,
+        paymentDueAt: o.paymentDueAt,
         paidAt: o.paidAt,
         shippedAt: o.shippedAt,
       })),

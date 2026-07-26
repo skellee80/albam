@@ -414,11 +414,14 @@ async function main() {
     Math.abs(stale.paymentDueAt - (Date.now() + PAYMENT_DEADLINE_MS)) < 60_000,
   );
 
-  // 한 건만 24시간하고도 1분 전에 들어온 것처럼 되돌린다
+  // 한 건만 입금 기한이 1분 전에 지난 것처럼 되돌린다
   await db
     .collection(COL.orders)
     .doc(stale.orderId)
-    .update({ createdAt: Date.now() - PAYMENT_DEADLINE_MS - 60_000 });
+    .update({
+      createdAt: Date.now() - PAYMENT_DEADLINE_MS - 60_000,
+      paymentDueAt: Date.now() - 60_000,
+    });
 
   const cancelledCount = await expireStaleOrders({ force: true });
   check('기한 지난 주문만 취소된다', cancelledCount === 1, `${cancelledCount}건 취소`);
@@ -448,11 +451,110 @@ async function main() {
   const autoCancelled = await lookupOrders('기한지남', '010-4444-5555');
   check('자동 취소된 주문은 배송조회에서 사라진다', autoCancelled.length === 0);
 
-  section('16. 은행 대조 — 판매 계좌가 아닌 은행 입금은 매칭하지 않는다');
-
+  // 판매 계좌 은행 — 아래 여러 절에서 입금을 만들 때 쓴다
   const { banksMatch } = await import('../src/lib/deposits');
   const { getSettings } = await import('../src/lib/settings');
   const accountBank = (await getSettings()).bankName;
+
+  section('16. 상태를 되돌리면 진행 시각도 함께 지워진다');
+
+  const revertOrder = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '되돌리기',
+    sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
+    recipient: { name: '되돌리기', phone: '010-9090-8080', address: '전주시 어딘가' },
+  });
+  if (!revertOrder.ok) throw new Error('점검용 주문 생성 실패');
+
+  await updateOrder(revertOrder.orderId, { status: '발송완료', trackingNo: '123456789' });
+  const shipped = await getOrder(revertOrder.orderId);
+  check('발송완료로 올리면 입금·발송 시각이 찍힌다', !!shipped?.paidAt && !!shipped?.shippedAt);
+
+  await updateOrder(revertOrder.orderId, { status: '발송대기' });
+  const backToReady = await getOrder(revertOrder.orderId);
+  check('발송대기로 되돌리면 발송 시각이 지워진다', backToReady?.shippedAt === null, `${backToReady?.shippedAt}`);
+  check('입금 시각은 남는다', !!backToReady?.paidAt);
+
+  await updateOrder(revertOrder.orderId, { status: '입금대기' });
+  const backToPending = await getOrder(revertOrder.orderId);
+  check(
+    '입금대기로 되돌리면 입금 시각이 지워진다',
+    backToPending?.paidAt === null,
+    `${backToPending?.paidAt}`,
+  );
+  check('발송 시각도 지워진 채로 남는다', backToPending?.shippedAt === null);
+
+  // 배송조회 화면은 이 시각들로 진행 단계를 그린다.
+  // paidAt이 남아 있으면 되돌렸는데도 손님 화면에 "입금 확인"으로 보인다.
+  const trackedAfterRevert = await lookupOrders('되돌리기', '010-9090-8080');
+  check(
+    '배송조회에도 입금 확인이 사라진다',
+    trackedAfterRevert[0]?.paidAt === null,
+    `${trackedAfterRevert[0]?.paidAt}`,
+  );
+
+  section('17. 주문 합치기 — 같은 사람이 입금 전에 또 주문할 때');
+
+  const { findMergeableOrders, mergeIntoOrder } = await import('../src/lib/orders');
+
+  const first = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '합치기',
+    sameAsDepositor: true,
+    depositorPhone: '010-1212-1212',
+    recipient: { name: '합치기', phone: '010-1212-1212', address: '김포시 어딘가' },
+  });
+  if (!first.ok) throw new Error('점검용 주문 생성 실패');
+
+  const mergeable = await findMergeableOrders('합치기', '010-1212-1212');
+  check('입금 전 주문을 찾아낸다', mergeable.length === 1, `${mergeable.length}건`);
+
+  const otherPerson = await findMergeableOrders('합치기', '010-0000-0000');
+  check('연락처가 다르면 남의 주문으로 본다', otherPerson.length === 0, `${otherPerson.length}건`);
+
+  const stockBeforeMerge = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+  const mergedResult = await mergeIntoOrder(first.orderId, [
+    { productId: daeboMid.id, qty: 2 },
+    { productId: okgwangLarge.id, qty: 1 },
+  ]);
+  check('합치기가 성공한다', mergedResult.ok, JSON.stringify(mergedResult));
+  if (!mergedResult.ok) throw new Error('이후 검증 불가');
+
+  check('합쳤다고 알려준다', mergedResult.merged);
+  check(
+    '금액이 합산된다',
+    mergedResult.totalAmount === daeboMid.price * 3 + okgwangLarge.price,
+    `${mergedResult.totalAmount}`,
+  );
+  check(
+    '같은 상품은 한 줄로 합쳐진다',
+    mergedResult.items.filter((i) => i.productId === daeboMid.id).length === 1,
+  );
+  check(
+    '같은 상품의 수량이 더해진다',
+    mergedResult.items.find((i) => i.productId === daeboMid.id)?.qty === 3,
+  );
+
+  const stockAfterMerge = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
+  check('더한 만큼 재고가 빠진다', stockAfterMerge === stockBeforeMerge - 2, `${stockBeforeMerge} → ${stockAfterMerge}`);
+
+  const mergedOrderDoc = await getOrder(first.orderId);
+  check('주문번호는 그대로다', mergedOrderDoc?.orderNo === first.orderNo);
+  check('입금 기한이 다시 시작된다', (mergedOrderDoc?.paymentDueAt ?? 0) > first.paymentDueAt);
+
+  // 합친 금액 한 번으로 매칭되어야 한다 — 이게 합치기를 만든 이유다
+  const mergedDeposit = await recordDeposit({
+    amount: mergedResult.totalAmount,
+    depositorName: '합치기',
+    bankName: accountBank,
+  });
+  check('합친 금액 한 번으로 입금이 확정된다', mergedDeposit.status === '확정', mergedDeposit.message);
+
+  const alreadyPaid = await mergeIntoOrder(first.orderId, [{ productId: daeboMid.id, qty: 1 }]);
+  check('이미 입금된 주문에는 합칠 수 없다', !alreadyPaid.ok, JSON.stringify(alreadyPaid));
+
+  section('18. 은행 대조 — 판매 계좌가 아닌 은행 입금은 매칭하지 않는다');
 
   check('표기가 달라도 같은 은행으로 본다', banksMatch('NH농협은행', '농협'));
   check('"농협 은행"도 같게 본다', banksMatch('농협 은행', '농협'));
@@ -486,7 +588,7 @@ async function main() {
   });
   check('같은 은행 입금은 확정된다', rightBank.status === '확정', rightBank.message);
 
-  section('17. 입금 미리보기 — 판정은 같고 아무것도 바꾸지 않는다');
+  section('19. 입금 미리보기 — 판정은 같고 아무것도 바꾸지 않는다');
 
   const { previewDeposit } = await import('../src/lib/deposits');
 
@@ -527,7 +629,7 @@ async function main() {
   const nowShipping = await getOrder(previewTarget.orderId);
   check('실제 처리는 주문 상태를 바꾼다', nowShipping?.status === '발송대기', nowShipping?.status);
 
-  section('18. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
+  section('20. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
 
   const { stockNotice, LOW_STOCK_NOTICE_THRESHOLD } = await import('../src/lib/types');
 
@@ -538,7 +640,7 @@ async function main() {
   check('1개 남아도 주문할 수 있다', stockNotice(1) === '1개 남았습니다', stockNotice(1));
   check('0개면 품절 안내', stockNotice(0) === '지금은 준비된 물량이 없습니다', stockNotice(0));
 
-  section('19. 환불요청·교환요청 상태는 없다');
+  section('21. 환불요청·교환요청 상태는 없다');
 
   const { ORDER_STATUSES: statuses } = await import('../src/lib/types');
   check('환불요청이 상태 목록에 없다', !(statuses as readonly string[]).includes('환불요청'));
@@ -547,7 +649,7 @@ async function main() {
   check('교환완료는 남아 있다', (statuses as readonly string[]).includes('교환완료'));
 
   /* ────────────────────────────────────────────── */
-  section('20. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
+  section('22. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
 
   // 서버(Node)와 브라우저의 ICU 데이터가 달라 ko-KR 오전/오후가 "PM"으로 나오는 바람에
   // 하이드레이션이 깨진 적이 있다. 고정 시각으로 결과를 못 박아 재발을 잡는다.

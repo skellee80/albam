@@ -156,6 +156,13 @@ export interface Order {
   deleted: boolean;
   createdAt: number;
   updatedAt: number;
+  /**
+   * 이 시각까지 입금해야 한다. 지나면 자동 취소된다.
+   *
+   * createdAt에서 계산하지 않고 따로 두는 이유: 주문을 합치면 기한이 다시 시작해야 한다.
+   * 어제 담아 둔 주문에 오늘 상품을 더했는데 몇 시간 뒤 취소되면 손님이 납득할 수 없다.
+   */
+  paymentDueAt: number;
   paidAt: number | null; // 입금 매칭 확정 시각
   shippedAt: number | null;
 }

@@ -40,12 +40,12 @@
       ]
     },
     {
-      "__comment__": "입금 기한 지난 주문 자동 취소: 입금대기 + createdAt 범위",
+      "__comment__": "입금 기한 지난 주문 자동 취소: 입금대기 + paymentDueAt 범위",
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "ASCENDING" }
+        { "fieldPath": "paymentDueAt", "order": "ASCENDING" }
       ]
     },
     {

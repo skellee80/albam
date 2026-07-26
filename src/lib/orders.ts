@@ -54,6 +54,8 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
     deleted: Boolean(data.deleted),
     createdAt: toMillisOr(data.createdAt, now),
     updatedAt: toMillisOr(data.updatedAt, now),
+    // 예전 문서에는 이 필드가 없다. 그때 규칙대로 주문 시각 + 24시간으로 본다.
+    paymentDueAt: toMillisOr(data.paymentDueAt, toMillisOr(data.createdAt, now) + PAYMENT_DEADLINE_MS),
     paidAt: toMillis(data.paidAt),
     shippedAt: toMillis(data.shippedAt),
   };
@@ -100,6 +102,8 @@ export type CreateOrderResult =
       items: OrderItem[];
       /** 이 시각까지 입금해야 한다. 지나면 자동 취소된다. */
       paymentDueAt: number;
+      /** 기존 입금대기 주문에 합쳤는지 */
+      merged: boolean;
     }
   | { ok: false; error: string };
 
@@ -205,6 +209,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       deleted: false,
       createdAt: now,
       updatedAt: now,
+      paymentDueAt: now + PAYMENT_DEADLINE_MS,
       paidAt: null,
       shippedAt: null,
     });
@@ -216,6 +221,149 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       totalAmount,
       items,
       paymentDueAt: now + PAYMENT_DEADLINE_MS,
+      merged: false,
+    };
+  });
+}
+
+/* ────────────────────────────────────────────────────────────
+ * 기존 입금대기 주문에 합치기
+ *
+ * 같은 사람이 입금 전에 또 주문하면, 두 건을 **한 번에 합쳐서 송금하는 일이 흔하다.**
+ * 그러면 입금액이 어느 주문과도 맞지 않아 자동 매칭이 실패한다(미매칭).
+ * 주문받는 시점에 합칠지 따로 할지 물어보고, 합치면 금액이 하나로 모여 매칭이 된다.
+ * ──────────────────────────────────────────────────────────── */
+
+export type MergeableOrder = {
+  id: string;
+  orderNo: string;
+  items: OrderItem[];
+  totalAmount: number;
+  createdAt: number;
+};
+
+/**
+ * 이 입금자 이름·연락처로 아직 입금 안 된 주문을 찾는다.
+ *
+ * 이름만으로 찾으면 동명이인의 주문에 남의 상품을 얹게 된다.
+ * 연락처까지 같아야 같은 사람으로 본다.
+ */
+export async function findMergeableOrders(
+  depositorName: string,
+  depositorPhone: string,
+): Promise<MergeableOrder[]> {
+  const nameNorm = normalizeName(depositorName ?? '');
+  const phoneNorm = normalizePhone(depositorPhone ?? '');
+  if (!nameNorm || !phoneNorm) return [];
+
+  const snap = await db
+    .collection(COL.orders)
+    .where('status', '==', '입금대기')
+    .where('depositorNameNorm', '==', nameNorm)
+    .limit(20)
+    .get();
+
+  return snap.docs
+    .map((d) => mapOrder(d.id, d.data()))
+    .filter((o) => !o.deleted && o.depositorPhoneNorm === phoneNorm)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((o) => ({
+      id: o.id,
+      orderNo: o.orderNo,
+      items: o.items,
+      totalAmount: o.totalAmount,
+      createdAt: o.createdAt,
+    }));
+}
+
+/**
+ * 기존 입금대기 주문에 상품을 더한다.
+ *
+ * 새 주문을 만들 때와 똑같이 서버 가격으로 다시 계산하고 재고를 확인·차감한다.
+ * 입금 기한은 지금부터 다시 센다 — 어제 주문에 오늘 더했는데 곧 취소되면 안 된다.
+ */
+export async function mergeIntoOrder(
+  orderId: string,
+  lines: CartLine[],
+): Promise<CreateOrderResult> {
+  const merged = new Map<string, number>();
+  for (const line of lines) {
+    const qty = Math.floor(Number(line.qty));
+    if (!line.productId || !Number.isFinite(qty) || qty <= 0) continue;
+    merged.set(line.productId, (merged.get(line.productId) ?? 0) + qty);
+  }
+  if (merged.size === 0) return { ok: false, error: '주문할 상품이 없습니다.' };
+
+  const entries = [...merged.entries()];
+
+  return db.runTransaction<CreateOrderResult>(async (t) => {
+    // ── 읽기 ──
+    const orderRef = db.collection(COL.orders).doc(orderId);
+    const orderSnap = await t.get(orderRef);
+    if (!orderSnap.exists) return { ok: false, error: '합칠 주문을 찾을 수 없습니다.' };
+
+    const existing = mapOrder(orderSnap.id, orderSnap.data()!);
+    if (existing.deleted || existing.status !== '입금대기') {
+      return { ok: false, error: '이미 처리된 주문이라 합칠 수 없습니다. 새로 주문해 주세요.' };
+    }
+
+    const productRefs = entries.map(([productId]) => db.collection(COL.products).doc(productId));
+    const productSnaps = await t.getAll(...productRefs);
+
+    // ── 검증 및 계산 ──
+    const addedItems: OrderItem[] = [];
+    const stockWrites: { ref: FirebaseFirestore.DocumentReference; stock: number }[] = [];
+
+    for (let i = 0; i < entries.length; i++) {
+      const [productId, qty] = entries[i];
+      const snap = productSnaps[i];
+      if (!snap.exists) return { ok: false, error: '판매하지 않는 상품이 포함되어 있습니다.' };
+
+      const data = snap.data()!;
+      if (data.hidden) return { ok: false, error: `${data.name}은(는) 현재 판매하지 않습니다.` };
+
+      const stock = Number(data.stock ?? 0);
+      if (stock <= 0) return { ok: false, error: `${data.name}이(가) 품절되었습니다.` };
+      if (stock < qty) return { ok: false, error: `${data.name}의 재고가 ${stock}개 남았습니다.` };
+
+      const price = Number(data.price ?? 0); // ← 서버 가격만 사용
+      addedItems.push({ productId, name: data.name ?? '', price, qty, subtotal: price * qty });
+      stockWrites.push({ ref: productRefs[i], stock: stock - qty });
+    }
+
+    // 같은 상품은 기존 줄에 수량을 더한다
+    const combined: OrderItem[] = existing.items.map((item) => ({ ...item }));
+    for (const added of addedItems) {
+      const found = combined.find((i) => i.productId === added.productId);
+      if (found) {
+        found.qty += added.qty;
+        found.price = added.price; // 지금 가격으로 맞춘다
+        found.subtotal = found.price * found.qty;
+      } else {
+        combined.push(added);
+      }
+    }
+
+    const totalAmount = recalcTotal(combined);
+    const now = Date.now();
+
+    // ── 쓰기 ──
+    for (const w of stockWrites) t.update(w.ref, { stock: w.stock, updatedAt: now });
+    t.update(orderRef, {
+      items: combined,
+      totalAmount,
+      updatedAt: now,
+      paymentDueAt: now + PAYMENT_DEADLINE_MS,
+    });
+
+    return {
+      ok: true,
+      orderId,
+      orderNo: existing.orderNo,
+      totalAmount,
+      items: combined,
+      paymentDueAt: now + PAYMENT_DEADLINE_MS,
+      merged: true,
     };
   });
 }
@@ -238,6 +386,35 @@ export type OrderPatch = Partial<
     | 'deleted'
   >
 >;
+
+/**
+ * 상태에 맞게 진행 시각을 맞춘다.
+ *
+ * 앞으로만 채우면 안 되고 **되돌릴 때 지워야** 한다.
+ * 배송조회 화면의 진행 단계는 이 시각들로 그리기 때문에, 관리자가 발송대기를
+ * 입금대기로 되돌려도 paidAt이 남아 있으면 손님 화면에는 계속 "입금 확인"으로 보인다.
+ */
+function syncTimestamps(order: Order, status: OrderStatus, now: number): void {
+  switch (status) {
+    case '입금대기':
+      // 아직 입금 전으로 되돌린 것이므로 이후 기록을 모두 지운다
+      order.paidAt = null;
+      order.shippedAt = null;
+      break;
+    case '발송대기':
+      if (!order.paidAt) order.paidAt = now;
+      order.shippedAt = null; // 발송을 취소하고 되돌린 경우
+      break;
+    case '발송완료':
+      if (!order.paidAt) order.paidAt = now;
+      if (!order.shippedAt) order.shippedAt = now;
+      break;
+    default:
+      // 취소·환불완료·교환완료는 진행 시각을 건드리지 않는다.
+      // 언제 입금됐고 언제 나갔는지는 그대로 남아 있어야 나중에 확인할 수 있다.
+      break;
+  }
+}
 
 /**
  * 주문을 고치고 재고를 맞춘다.
@@ -268,8 +445,7 @@ export async function updateOrder(orderId: string, patch: OrderPatch): Promise<v
 
     const now = Date.now();
     if (patch.status && patch.status !== before.status) {
-      if (patch.status === '발송대기' && !after.paidAt) after.paidAt = now;
-      if (patch.status === '발송완료' && !after.shippedAt) after.shippedAt = now;
+      syncTimestamps(after, patch.status, now);
     }
 
     // ── 재고 차이 계산 ──
@@ -433,7 +609,7 @@ export async function expireStaleOrders({ force = false } = {}): Promise<number>
   const snap = await db
     .collection(COL.orders)
     .where('status', '==', '입금대기')
-    .where('createdAt', '<', now - PAYMENT_DEADLINE_MS)
+    .where('paymentDueAt', '<', now)
     .limit(50) // 한 번에 너무 많이 붙들지 않는다. 남으면 다음 정리에서 처리된다.
     .get();
 

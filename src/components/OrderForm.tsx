@@ -3,8 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 
-import { placeOrder, type PlaceOrderResult } from '@/app/(shop)/order/actions';
-import { formatDateTime, formatKRW } from '@/lib/format';
+import {
+  findPendingOrdersForDepositor,
+  placeOrder,
+  type PlaceOrderResult,
+} from '@/app/(shop)/order/actions';
+import { formatDateTime, formatKRW, summarizeItems } from '@/lib/format';
+import type { MergeableOrder } from '@/lib/orders';
 import { PAYMENT_DEADLINE_HOURS, type OrderItem, type Settings } from '@/lib/types';
 
 import { useCart } from './CartProvider';
@@ -24,6 +29,7 @@ type Completed = {
   items: OrderItem[];
   depositorName: string;
   paymentDueAt: number;
+  merged: boolean;
 };
 
 export function OrderForm({
@@ -45,6 +51,8 @@ export function OrderForm({
   const [address, setAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<Completed | null>(null);
+  /** 합칠 수 있는 입금대기 주문이 있을 때 물어보는 화면 */
+  const [mergeChoice, setMergeChoice] = useState<MergeableOrder[] | null>(null);
   const [pending, startTransition] = useTransition();
 
   // "받는 분이 입금하는 분과 같습니다"가 켜져 있으면 이름과 연락처를 그대로 따라간다.
@@ -78,39 +86,73 @@ export function OrderForm({
   const total = lines.reduce((sum, l) => (l.unavailable ? sum : sum + l.price * l.qty), 0);
   const blocked = lines.some((l) => l.unavailable || l.overStock);
 
+  /**
+   * 주문을 넣기 전에, 같은 사람의 입금대기 주문이 있는지 먼저 본다.
+   * 있으면 합칠지 따로 할지 묻는다 — 두 건을 한 번에 송금하면 자동 매칭이 실패한다.
+   */
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
 
     startTransition(async () => {
-      const result: PlaceOrderResult = await placeOrder({
-        // 가격은 보내지 않는다 — 서버가 계산한다.
-        lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
-        depositorName,
-        depositorPhone,
-        sameAsDepositor,
-        recipient: { name: recipientName, phone, address },
-      });
-
-      if (!result.ok) {
-        setError(result.error);
+      const existing = await findPendingOrdersForDepositor(depositorName, depositorPhone);
+      if (existing.length > 0) {
+        setMergeChoice(existing);
         return;
       }
-
-      setCompleted({
-        orderNo: result.orderNo,
-        totalAmount: result.totalAmount,
-        items: result.items,
-        depositorName: depositorName.trim(),
-        paymentDueAt: result.paymentDueAt,
-      });
-      clear();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      await runPlaceOrder(null);
     });
+  }
+
+  /** 합칠지 따로 할지 고른 뒤 실제로 주문을 넣는다 */
+  function submit(mergeIntoOrderId: string | null) {
+    setMergeChoice(null);
+    startTransition(() => runPlaceOrder(mergeIntoOrderId));
+  }
+
+  async function runPlaceOrder(mergeIntoOrderId: string | null) {
+    const result: PlaceOrderResult = await placeOrder({
+      // 가격은 보내지 않는다 — 서버가 계산한다.
+      lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
+      depositorName,
+      depositorPhone,
+      sameAsDepositor,
+      recipient: { name: recipientName, phone, address },
+      mergeIntoOrderId,
+    });
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setCompleted({
+      orderNo: result.orderNo,
+      totalAmount: result.totalAmount,
+      items: result.items,
+      depositorName: depositorName.trim(),
+      paymentDueAt: result.paymentDueAt,
+      merged: result.merged,
+    });
+    clear();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   if (completed) {
     return <OrderComplete completed={completed} settings={settings} />;
+  }
+
+  if (mergeChoice) {
+    return (
+      <MergeChoice
+        existing={mergeChoice}
+        newItemsTotal={total}
+        pending={pending}
+        onMerge={(orderId) => submit(orderId)}
+        onSeparate={() => submit(null)}
+        onCancel={() => setMergeChoice(null)}
+      />
+    );
   }
 
   if (!ready) {
@@ -333,6 +375,107 @@ export function OrderForm({
 }
 
 /* ────────────────────────────────────────────────────────────
+ * 합칠지 따로 할지 고르는 화면
+ * ──────────────────────────────────────────────────────────── */
+
+function MergeChoice({
+  existing,
+  newItemsTotal,
+  pending,
+  onMerge,
+  onSeparate,
+  onCancel,
+}: {
+  existing: MergeableOrder[];
+  newItemsTotal: number;
+  pending: boolean;
+  onMerge: (orderId: string) => void;
+  onSeparate: () => void;
+  onCancel: () => void;
+}) {
+  // 가장 최근 입금대기 주문에 합친다. 여러 건이면 나머지는 아래에 알려만 준다.
+  const target = existing[0];
+  const mergedTotal = target.totalAmount + newItemsTotal;
+
+  return (
+    <div className="mt-6 space-y-5">
+      <div className="rounded-card border-2 border-shell/30 bg-shell-tint px-5 py-5">
+        <h2 className="font-display text-[1.25rem] text-shell">
+          아직 입금하지 않은 주문이 있습니다
+        </h2>
+        <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-soft">
+          입금을 <b className="text-ink">한 번에 하실 건가요, 따로 하실 건가요?</b>
+          <br />
+          합쳐서 보내실 거라면 주문도 합쳐야 입금 확인이 자동으로 됩니다.
+        </p>
+      </div>
+
+      <div className="card px-4 py-4">
+        <p className="text-[0.8rem] font-semibold text-ink-faint">먼저 하신 주문</p>
+        <p className="mt-1.5 text-[0.92rem]">{summarizeItems(target.items)}</p>
+        <p className="tnum mt-1 text-[1.05rem] font-bold">{formatKRW(target.totalAmount)}</p>
+
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="text-[0.8rem] font-semibold text-ink-faint">지금 담으신 밤</p>
+          <p className="tnum mt-1.5 text-[1.05rem] font-bold">{formatKRW(newItemsTotal)}</p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onMerge(target.id)}
+        disabled={pending}
+        className="w-full rounded-card border-2 border-burr bg-burr-tint px-5 py-4 text-left"
+      >
+        <span className="block text-[1.02rem] font-bold text-burr-deep">
+          합쳐서 한 번에 입금할게요
+        </span>
+        <span className="tnum mt-1 block text-[1.15rem] font-bold text-shell">
+          {formatKRW(mergedTotal)}
+        </span>
+        <span className="mt-1 block text-[0.83rem] leading-snug text-ink-soft">
+          두 주문이 하나로 합쳐집니다. 이 금액을 한 번에 보내주세요.
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onSeparate}
+        disabled={pending}
+        className="w-full rounded-card border border-line bg-surface px-5 py-4 text-left"
+      >
+        <span className="block text-[1.02rem] font-bold">따로 입금할게요</span>
+        <span className="tnum mt-1 block text-[0.92rem] text-ink-soft">
+          {formatKRW(target.totalAmount)} + {formatKRW(newItemsTotal)}
+        </span>
+        <span className="mt-1 block text-[0.83rem] leading-snug text-ink-soft">
+          주문이 따로 남습니다. <b>각 금액을 따로 보내주세요.</b> 합쳐서 보내면 입금 확인이
+          자동으로 되지 않습니다.
+        </span>
+      </button>
+
+      {existing.length > 1 && (
+        <p className="rounded-xl bg-amber-tint px-4 py-3 text-[0.83rem] leading-relaxed text-amber">
+          입금하지 않은 주문이 {existing.length}건 있습니다. 합치기는 가장 최근 주문에만
+          적용됩니다. 나머지는 배송 조회에서 확인해 주세요.
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={pending}
+        className="w-full py-2 text-center text-[0.85rem] text-ink-faint underline underline-offset-2"
+      >
+        돌아가서 더 고칠래요
+      </button>
+
+      {pending && <p className="text-center text-[0.85rem] text-ink-soft">주문 접수 중…</p>}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
  * 완료 화면
  * ──────────────────────────────────────────────────────────── */
 
@@ -355,6 +498,11 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
         <p className="text-[2rem] leading-none">🌰</p>
         <h2 className="mt-3 font-display text-[1.35rem]">주문이 접수되었습니다</h2>
         <p className="tnum mt-1.5 text-[0.9rem] text-ink-soft">주문번호 {completed.orderNo}</p>
+        {completed.merged && (
+          <p className="mt-2.5 rounded-xl bg-burr-tint px-3.5 py-2.5 text-[0.85rem] leading-snug text-burr-deep">
+            먼저 하신 주문과 합쳤습니다. 아래 금액을 <b>한 번에</b> 보내주세요.
+          </p>
+        )}
       </div>
 
       {/* 입금 안내가 이 화면의 핵심이라 가장 눈에 띄게 둔다 */}
@@ -415,10 +563,18 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
         </ul>
       </div>
 
-      <p className="rounded-xl bg-burr-tint px-4 py-3.5 text-[0.85rem] leading-relaxed text-burr-deep">
-        입금이 확인되면 발송 준비가 시작됩니다. 진행 상태는 <b>배송 조회</b>에서
-        입금자명과 연락처로 확인하실 수 있습니다. 문의 {settings.contactPhone}
-      </p>
+      <div className="rounded-xl bg-burr-tint px-4 py-3.5">
+        <p className="text-[0.88rem] leading-relaxed font-semibold text-burr-deep">
+          입금 후 3분 이내에 입금 완료가 자동 처리 됩니다.
+          <br />
+          입금 완료가 처리되지 않는 다면 연락주세요.
+        </p>
+        <p className="mt-2 text-[0.85rem] leading-relaxed text-ink-soft">
+          진행 상태는 <b>배송 조회</b>에서 입금자명과 연락처로 확인하실 수 있습니다.
+          <br />
+          문의 <b className="tnum text-ink">{settings.contactPhone}</b>
+        </p>
+      </div>
 
       <div className="flex gap-2 pb-6">
         <Link href="/track" className="btn btn-primary flex-1">

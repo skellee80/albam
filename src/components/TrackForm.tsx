@@ -5,7 +5,6 @@ import { useState, useTransition } from 'react';
 
 import { findOrders, type TrackedOrder } from '@/app/(shop)/track/actions';
 import { formatDate, formatDateTime, formatKRW } from '@/lib/format';
-import { paymentDueAt } from '@/lib/types';
 
 import { OrderStatusTrail, SpecialStatusBadge } from './OrderStatusTrail';
 import { TrackingNumber } from './TrackingNumber';
@@ -129,7 +128,7 @@ function TrackedOrderCard({ order }: { order: TrackedOrder }) {
             아직 입금이 확인되지 않았습니다.
           </p>
           <p className="mt-1 text-[0.8rem] leading-relaxed text-ink-soft">
-            {formatDateTime(paymentDueAt(order.createdAt))}까지 입금되지 않으면 주문이 자동으로
+            {formatDateTime(order.paymentDueAt)}까지 입금되지 않으면 주문이 자동으로
             취소됩니다.
           </p>
         </div>
