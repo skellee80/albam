@@ -22,6 +22,10 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
 /** 점검 시작 시 모든 상품 재고를 이 값으로 맞춘다. */
 const SEED_STOCK = 50;
 
+/** 점검에 쓰는 기준 상품 (시드가 넣는 이름) */
+const DAEBO_MID_NAME = '대보 중 4kg';
+const OKGWANG_LARGE_NAME = '옥광 특대 4kg';
+
 let passed = 0;
 let failed = 0;
 
@@ -61,8 +65,13 @@ async function main() {
     products.map((p) => db.collection(COL.products).doc(p.id).update({ stock: SEED_STOCK })),
   );
 
-  const daeboMid = products.find((p) => p.name === '대보 중')!;
-  const okgwangLarge = products.find((p) => p.name === '옥광 특대')!;
+  const daeboMid = products.find((p) => p.name === DAEBO_MID_NAME);
+  const okgwangLarge = products.find((p) => p.name === OKGWANG_LARGE_NAME);
+  if (!daeboMid || !okgwangLarge) {
+    console.error(`상품 "${DAEBO_MID_NAME}" / "${OKGWANG_LARGE_NAME}" 이 없습니다.`);
+    console.error('`npm run seed -- --replace` 로 상품을 새 이름 규칙으로 다시 넣으세요.');
+    process.exit(1);
+  }
 
   /* ────────────────────────────────────────────── */
   section('1. 주문 생성 — 서버 가격 재계산 / 재고 선점');
@@ -139,7 +148,7 @@ async function main() {
     bankName: '농협',
   });
   check('금액·이름이 맞으면 확정된다', exact.status === '확정', exact.message);
-  check('확정 응답에 상품 요약이 들어간다', exact.message.includes('대보 중'), exact.message);
+  check('확정 응답에 상품 요약이 들어간다', exact.message.includes(DAEBO_MID_NAME), exact.message);
 
   const confirmedOrder = await getOrder(created.orderId);
   check('주문이 발송대기로 넘어간다', confirmedOrder?.status === '발송대기', confirmedOrder?.status);
@@ -225,7 +234,7 @@ async function main() {
   section('7. 관리자 수정 — 합계 자동 재계산');
 
   await updateOrder(created.orderId, {
-    items: [{ productId: daeboMid.id, name: '대보 중', price: 30000, qty: 3, subtotal: 90000 }],
+    items: [{ productId: daeboMid.id, name: DAEBO_MID_NAME, price: 30000, qty: 3, subtotal: 90000 }],
   });
   const edited = await getOrder(created.orderId);
   check('수량·가격을 고치면 합계가 다시 계산된다', edited?.totalAmount === 90000, `${edited?.totalAmount}`);
@@ -292,21 +301,31 @@ async function main() {
   const { updateProduct } = await import('../src/lib/products');
   const { parseProductName } = await import('../src/lib/format');
 
-  check('"대보 중" → 품종 대보 / 크기 중', (() => {
+  check('"대보 중 4kg" → 품종·크기·무게로 나뉜다', (() => {
+    const p = parseProductName('대보 중 4kg');
+    return p.variety === '대보' && p.size === '중' && p.weight === '4kg';
+  })());
+  check('무게가 없어도 품종·크기는 나뉜다', (() => {
     const p = parseProductName('대보 중');
-    return p.variety === '대보' && p.size === '중';
+    return p.variety === '대보' && p.size === '중' && p.weight === '';
   })());
-  check('크기가 없는 이름은 통째로 품종이 된다', (() => {
+  check('무게만 있어도 품종은 나뉜다', (() => {
+    const p = parseProductName('대보 10kg');
+    return p.variety === '대보' && p.size === '' && p.weight === '10kg';
+  })());
+  check('알아보지 못하는 이름은 통째로 품종이 된다', (() => {
     const p = parseProductName('꿀밤 선물세트');
-    return p.variety === '꿀밤 선물세트' && p.size === '';
+    return p.variety === '꿀밤 선물세트' && p.size === '' && p.weight === '';
   })());
+  check('대문자 KG도 알아본다', parseProductName('대보 대 10KG').weight === '10kg');
 
-  await updateProduct(daeboMid.id, { name: '햇대보 특대' });
+  await updateProduct(daeboMid.id, { name: '햇대보 특대 10kg' });
   const renamed = (await listProducts()).find((p) => p.id === daeboMid.id)!;
   check('이름을 바꾸면 품종이 따라 바뀐다', renamed.variety === '햇대보', renamed.variety);
   check('이름을 바꾸면 크기도 따라 바뀐다', renamed.size === '특대', renamed.size);
+  check('이름을 바꾸면 무게도 따라 바뀐다', renamed.weight === '10kg', renamed.weight);
 
-  await updateProduct(daeboMid.id, { name: '대보 중' }); // 원복
+  await updateProduct(daeboMid.id, { name: DAEBO_MID_NAME }); // 원복
 
   section('12. 재고 알림은 매진만');
 

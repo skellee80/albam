@@ -105,24 +105,43 @@ export function kstDayLabel(ms: number): string {
 }
 
 /**
- * 상품 이름에서 품종과 크기를 뽑는다. "대보 중" → { variety: '대보', size: '중' }
+ * 상품 이름에서 품종·크기·무게를 뽑는다.
  *
- * 관리자는 이름 하나만 입력하고, 품종·크기는 여기서 유도한다.
+ *   "대보 중 4kg"  → { variety: '대보', size: '중', weight: '4kg' }
+ *   "대보 중"      → { variety: '대보', size: '중', weight: '' }
+ *   "꿀밤 선물세트" → { variety: '꿀밤 선물세트', size: '', weight: '' }
+ *
+ * 관리자는 이름 하나만 입력하고 나머지는 여기서 유도한다.
  * 같은 값을 두 군데 입력받으면 반드시 어긋나기 때문이다
  * (이름만 바꾸고 품종을 그대로 두면 손님 화면이 옛 이름으로 남는다).
  *
- * 마지막 낱말이 알려진 크기가 아니면 이름 전체를 품종으로 본다.
- * 그래야 "꿀밤 선물세트" 같은 새 이름을 넣어도 목록에서 사라지지 않는다.
+ * 뒤에서부터 무게 → 크기 순으로 떼어내고, 남은 앞부분을 품종으로 본다.
+ * 알아보지 못하는 이름은 통째로 품종이 되어, 새 이름을 넣어도 목록에서 사라지지 않는다.
  */
-export function parseProductName(name: string): { variety: string; size: string } {
+export function parseProductName(name: string): {
+  variety: string;
+  size: string;
+  weight: string;
+} {
   const cleaned = name.trim().replace(/\s+/g, ' ');
   const parts = cleaned.split(' ');
-  const last = parts[parts.length - 1];
 
-  if (parts.length >= 2 && (SIZES as readonly string[]).includes(last)) {
-    return { variety: parts.slice(0, -1).join(' '), size: last };
+  let weight = '';
+  if (parts.length >= 2 && /^\d+(\.\d+)?kg$/i.test(parts[parts.length - 1])) {
+    weight = parts.pop()!.toLowerCase();
   }
-  return { variety: cleaned, size: '' };
+
+  let size = '';
+  if (parts.length >= 2 && (SIZES as readonly string[]).includes(parts[parts.length - 1])) {
+    size = parts.pop()!;
+  }
+
+  return { variety: parts.join(' ') || cleaned, size, weight };
+}
+
+/** 손님 화면에서 상품을 묶는 이름. "대보" + "4kg" → "대보 4kg" */
+export function varietyGroupLabel(variety: string, weight: string): string {
+  return weight ? `${variety} ${weight}` : variety;
 }
 
 /** "대보 중 2 · 옥광 특대 1" 형태의 주문 요약 */

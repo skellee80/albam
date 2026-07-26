@@ -18,7 +18,7 @@ export function isSoldOut(p: Pick<Product, 'stock'>): boolean {
 function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {
   const now = Date.now();
   const name = data.name ?? '';
-  // 예전 문서에 variety/size가 없거나 이름과 어긋나 있어도 이름 기준으로 맞춘다.
+  // 예전 문서에 variety/size/weight가 없거나 이름과 어긋나 있어도 이름 기준으로 맞춘다.
   const derived = parseProductName(name);
 
   return {
@@ -26,6 +26,7 @@ function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {
     name,
     variety: derived.variety,
     size: derived.size,
+    weight: derived.weight,
     price: Number(data.price ?? 0),
     imageUrl: data.imageUrl ?? '',
     stock: Number(data.stock ?? 0),
@@ -62,7 +63,7 @@ export type ProductInput = {
   sortOrder: number;
 };
 
-/** 이름에서 유도한 품종·크기를 함께 저장한다. 손님 화면 묶음이 이 값을 쓴다. */
+/** 이름에서 유도한 품종·크기·무게를 함께 저장한다. 손님 화면 묶음이 이 값을 쓴다. */
 function withDerivedFields(input: Partial<ProductInput>) {
   if (input.name === undefined) return { ...input };
   const name = input.name.trim();

@@ -1,37 +1,33 @@
 import { CartBar } from '@/components/CartBar';
 import { ProductRow, type ShopProduct } from '@/components/ProductRow';
 import { SiteHeader } from '@/components/SiteHeader';
+import { varietyGroupLabel } from '@/lib/format';
 import { expireStaleOrders } from '@/lib/orders';
 import { listProducts } from '@/lib/products';
-import { PAYMENT_DEADLINE_HOURS, type Product } from '@/lib/types';
+import { PAYMENT_DEADLINE_HOURS, SIZE_GUIDE, type Product } from '@/lib/types';
 
 // 재고와 가격이 바로 반영되어야 하므로 캐시하지 않는다.
 export const dynamic = 'force-dynamic';
 
 /**
- * 크기별 안내 — 손님이 "어느 걸 사야 하나"를 고르는 기준이다.
- * 품종은 취향이지만 크기는 용도라, 용도를 말해 주는 쪽이 고르는 데 도움이 된다.
- * 여기 없는 크기는 문구 없이 이름만 나온다.
- */
-const SIZE_NOTE: Record<string, string> = {
-  중: '온 가족이 편하게 나눠 먹기 좋은 크기',
-  대: '선물로 건네기 좋은 넉넉한 크기',
-  특대: '귀한 분께 드리는 가장 굵은 알',
-};
-
-/**
- * 상품을 품종별로 묶는다.
+ * 상품을 품종 + 무게로 묶는다 ("대보 4kg", "대보 10kg").
  *
- * 미리 정해둔 품종 목록을 훑지 않고 **실제 상품에 있는 품종**을 순서대로 모은다.
+ * 미리 정해둔 목록을 훑지 않고 **실제 상품에 있는 값**을 순서대로 모은다.
  * 관리자가 새 이름의 상품을 넣어도 목록에서 조용히 사라지지 않는다.
  */
-function groupByVariety(products: Product[]) {
-  const groups: { variety: string; image: string; items: Product[] }[] = [];
+function groupProducts(products: Product[]) {
+  const groups: { key: string; label: string; image: string; items: Product[] }[] = [];
 
   for (const product of products) {
-    let group = groups.find((g) => g.variety === product.variety);
+    const key = `${product.variety}|${product.weight}`;
+    let group = groups.find((g) => g.key === key);
     if (!group) {
-      group = { variety: product.variety, image: product.imageUrl, items: [] };
+      group = {
+        key,
+        label: varietyGroupLabel(product.variety, product.weight),
+        image: product.imageUrl,
+        items: [],
+      };
       groups.push(group);
     }
     if (!group.image) group.image = product.imageUrl;
@@ -48,7 +44,7 @@ export default async function ShopPage() {
   await expireStaleOrders();
 
   const products = await listProducts();
-  const groups = groupByVariety(products);
+  const groups = groupProducts(products);
 
   return (
     <>
@@ -61,14 +57,33 @@ export default async function ShopPage() {
           품종과 크기를 고르고 수량만 담아 주세요.
         </p>
 
+        {/*
+          크기 안내는 여기서 한 번만 한다.
+          중·대·특대가 모든 묶음에서 똑같이 반복되므로, 상품마다 붙이면 같은 문장을
+          열여덟 번 읽게 된다.
+        */}
+        <section className="mt-5 rounded-card bg-burr-tint px-4 py-4">
+          <h2 className="font-display text-[1.05rem] text-burr-deep">크기 고르는 법</h2>
+          <dl className="mt-2.5 space-y-2">
+            {SIZE_GUIDE.map((guide) => (
+              <div key={guide.size} className="flex gap-3">
+                <dt className="w-9 shrink-0 text-[0.9rem] font-bold text-burr-deep">
+                  {guide.size}
+                </dt>
+                <dd className="text-[0.87rem] leading-snug text-ink-soft">{guide.note}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         {groups.length === 0 ? (
           <p className="mt-10 rounded-card border border-dashed border-line px-5 py-10 text-center text-ink-soft">
             아직 등록된 상품이 없습니다.
           </p>
         ) : (
-          <div className="mt-6 space-y-8">
+          <div className="mt-7 space-y-8">
             {groups.map((group) => (
-              <section key={group.variety}>
+              <section key={group.key}>
                 <div className="flex items-center gap-3.5 px-1">
                   {group.image ? (
                     // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
@@ -80,7 +95,7 @@ export default async function ShopPage() {
                       loading="lazy"
                     />
                   ) : null}
-                  <h2 className="font-display text-[1.4rem] leading-tight">{group.variety}</h2>
+                  <h2 className="font-display text-[1.4rem] leading-tight">{group.label}</h2>
                 </div>
 
                 <div className="card mt-3 divide-y divide-line overflow-hidden">
@@ -120,9 +135,8 @@ function toShopProduct(p: Product): ShopProduct {
   return {
     id: p.id,
     name: p.name,
-    // 이름이 "대보 중" 꼴이 아니면 크기가 비어 있다. 그때는 이름을 그대로 줄 이름표로 쓴다.
+    // 이름이 "대보 중 4kg" 꼴이 아니면 크기가 비어 있다. 그때는 이름을 그대로 줄 이름표로 쓴다.
     label: p.size || p.name,
-    note: SIZE_NOTE[p.size] ?? '',
     price: p.price,
     stock: p.stock,
   };

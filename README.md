@@ -60,7 +60,7 @@ npm install
 cp .env.local.example .env.local
 
 npm run emulators   # 터미널 1 — Firestore 에뮬레이터
-npm run seed        # 터미널 2 — 상품 9종 + 기본 설정 넣기
+npm run seed        # 터미널 2 — 상품 18종 + 기본 설정 넣기
 npm run dev         # http://localhost:3000
 ```
 
@@ -69,7 +69,7 @@ npm run dev         # http://localhost:3000
 ### 확인용 명령
 
 ```bash
-npm run smoke   # 가격 재계산·입금 매칭·자동 취소·재고 복원 등 핵심 로직 69가지 점검
+npm run smoke   # 가격 재계산·입금 매칭·자동 취소·재고 복원 등 핵심 로직 79가지 점검
 npx tsc --noEmit
 npm run build
 ```
@@ -144,9 +144,12 @@ firebase deploy --only firestore:rules,firestore:indexes
 1. **설정** 에서 입금 계좌와 문의 전화번호를 실제 값으로 바꾼다.
 2. **상품·재고** 에서 가격과 재고를 실제 값으로 채운다.
 
-상품 9종을 코드로 한 번에 넣으려면, `.env.local` 에서 `FIRESTORE_EMULATOR_HOST` 를 지우고
-`gcloud auth application-default login` 후 `npm run seed` 를 돌린다.
-가격과 사진은 **임시값**이므로 관리자 화면에서 바꿔야 한다.
+상품 18종(품종 3 × 크기 3 × 무게 2)을 코드로 한 번에 넣으려면, `.env.local` 에서
+`FIRESTORE_EMULATOR_HOST` 를 지우고 `gcloud auth application-default login` 후
+`npm run seed` 를 돌린다. 가격과 사진은 **임시값**이므로 관리자 화면에서 바꿔야 한다.
+
+> 이름 규칙이 바뀌어 예전 이름의 상품이 남아 있다면 `npm run seed -- --replace` 로
+> 상품을 전부 지우고 새로 넣을 수 있다. 주문 기록은 건드리지 않는다.
 
 ---
 
@@ -202,7 +205,7 @@ HTTP 요청 동작에서 **응답을 변수에 저장** 을 켜고(`response` �
 그러면 입금 문자가 올 때마다 이런 알림이 뜬다.
 
 ```
-✅ 확정: 홍길동님 50,000원 → 발송대기 (대보 중 2)
+✅ 확정: 홍길동님 50,000원 → 발송대기 (대보 중 4kg 2)
 ⚠️ 확인필요: 홍길동 50,000원, 후보 2건. 관리자에서 선택하세요.
 ❓ 미매칭: 홍길동 50,000원. 관리자에서 확인하세요.
 ```
@@ -261,18 +264,24 @@ curl -X POST https://albam--albam-416fd.us-central1.hosted.app/api/deposit \
 
 ### 상품 이름에 대해
 
-상품 이름이 손님 화면 표시의 **유일한 출처**다. 품종과 크기를 따로 입력받지 않고
-이름을 띄어쓰기로 나눠서 쓴다.
+상품 이름이 손님 화면 표시의 **유일한 출처**다. 품종·크기·무게를 따로 입력받지 않고
+`품종 크기 무게` 순으로 띄어 적으면 알아서 나뉜다.
 
 | 이름 | 손님 화면 |
 |---|---|
-| `대보 중` | **대보** 묶음 안에 `중` 줄 |
-| `대보 특대` | **대보** 묶음 안에 `특대` 줄 |
+| `대보 중 4kg` | **대보 4kg** 묶음 안에 `중` 줄 |
+| `대보 특대 10kg` | **대보 10kg** 묶음 안에 `특대` 줄 |
+| `대보 중` | **대보** 묶음 안에 `중` 줄 (무게 없이도 됨) |
 | `꿀밤 선물세트` | **꿀밤 선물세트** 묶음 하나 |
 
-마지막 낱말이 `중`·`대`·`특대` 중 하나면 크기로 보고, 아니면 이름 전체를 묶음 이름으로 본다.
-그래서 새 이름을 넣어도 목록에서 사라지지 않는다.
+뒤에서부터 무게(`4kg`·`10kg` 같은 `숫자+kg`) → 크기(`중`·`대`·`특대`) 순으로 떼어내고
+남은 앞부분을 품종으로 본다. 알아보지 못하는 이름은 통째로 묶음 이름이 되므로
+새 이름을 넣어도 목록에서 사라지지 않는다.
+
 품종·크기를 따로 입력받던 시절에는 이름만 고치면 손님 화면이 옛 이름 그대로 남는 문제가 있었다.
+
+**크기 설명은 상품마다 붙이지 않는다.** 중·대·특대가 여섯 묶음에서 똑같이 반복되므로
+목록 맨 위에서 한 번만 안내한다. 문구는 `src/lib/types.ts` 의 `SIZE_GUIDE` 에 있다.
 
 ---
 
@@ -302,7 +311,7 @@ apphosting.yaml           App Hosting 설정 + 시크릿 참조
 firestore.rules           클라이언트 접근 전면 차단
 firestore.indexes.json    복합 인덱스 4개
 scripts/
-  seed.ts                 상품 9종 + 기본 설정
+  seed.ts                 상품 18종 + 기본 설정
   smoke.ts                핵심 로직 점검 (에뮬레이터 전용)
   generate-icons.mjs      icon.svg → PWA용 PNG
 src/

@@ -29,13 +29,16 @@ const EMPTY_DRAFT: Draft = {
 
 /**
  * 이름을 어떻게 나눠서 손님 화면에 보일지 미리 알려준다.
- * 품종·크기를 따로 입력받지 않으므로, 이름을 바꿀 때 결과가 눈에 보여야 한다.
+ * 품종·크기·무게를 따로 입력받지 않으므로, 이름을 바꿀 때 결과가 눈에 보여야 한다.
  */
 function namePreview(name: string): string {
-  const { variety, size } = parseProductName(name);
-  if (!variety) return '손님 화면에 "대보 중" 처럼 품종과 크기를 띄어 적으면 자동으로 묶입니다.';
-  if (!size) return `손님 화면에 "${variety}" 묶음으로 하나만 나옵니다.`;
-  return `손님 화면에서 "${variety}" 묶음 안에 "${size}" 로 나옵니다.`;
+  const { variety, size, weight } = parseProductName(name);
+  if (!variety) {
+    return '"대보 중 4kg" 처럼 품종 · 크기 · 무게를 띄어 적으면 손님 화면에서 자동으로 묶입니다.';
+  }
+  const group = weight ? `${variety} ${weight}` : variety;
+  if (!size) return `손님 화면에 "${group}" 묶음으로 하나만 나옵니다.`;
+  return `손님 화면에서 "${group}" 묶음 안에 "${size}" 로 나옵니다.`;
 }
 
 export function ProductManager({ products }: { products: ManagedProduct[] }) {

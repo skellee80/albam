@@ -14,8 +14,6 @@ export type ShopProduct = {
   name: string;
   /** 묶음 안에서 이 줄에 보일 짧은 이름표 ("중") */
   label: string;
-  /** 이 크기가 어떤 자리에 맞는지 한 줄 안내. 없으면 표시하지 않는다. */
-  note: string;
   price: number;
   stock: number;
 };
@@ -47,11 +45,7 @@ export function ProductRow({ product }: { product: ShopProduct }) {
         <span className="tnum text-[1.05rem] font-bold">{formatKRW(product.price)}</span>
       </div>
 
-      {product.note ? (
-        <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">{product.note}</p>
-      ) : null}
-
-      <div className="mt-2.5 flex items-center justify-between gap-3">
+      <div className="mt-2 flex items-center justify-between gap-3">
         {/* 재고가 얼마 안 남았을 때만 숫자를 드러낸다 */}
         <p className={`text-[0.8rem] ${lowStock ? 'font-semibold text-amber' : 'text-ink-faint'}`}>
           {stockNotice(product.stock)}

@@ -12,6 +12,21 @@ export type Variety = (typeof VARIETIES)[number];
 export const SIZES = ['중', '대', '특대'] as const;
 export type Size = (typeof SIZES)[number];
 
+/** 판매 단위 무게. 상품 이름 끝에 붙여서 쓴다 ("대보 중 4kg"). */
+export const WEIGHTS = ['4kg', '10kg'] as const;
+export type Weight = (typeof WEIGHTS)[number];
+
+/**
+ * 크기 안내.
+ * 크기는 모든 품종·무게에서 똑같이 반복되므로 상품마다 붙이지 않고
+ * 목록 맨 위에서 한 번만 설명한다.
+ */
+export const SIZE_GUIDE: { size: Size; note: string }[] = [
+  { size: '중', note: '온 가족이 편하게 나눠 먹기 좋은 크기' },
+  { size: '대', note: '선물로 건네기 좋은 넉넉한 크기' },
+  { size: '특대', note: '귀한 분께 드리는 가장 굵은 알' },
+];
+
 export interface Product {
   id: string;
   /**
@@ -20,10 +35,12 @@ export interface Product {
    * 관리자가 이름만 고치면 손님 화면의 묶음 제목과 크기 표시가 함께 따라간다.
    */
   name: string;
-  /** 이름에서 유도된 값. 손님 화면에서 상품을 묶는 기준. 직접 입력하지 않는다. */
+  /** 이름에서 유도된 값. 품종 + 무게가 손님 화면의 묶음 기준. 직접 입력하지 않는다. */
   variety: string;
   /** 이름에서 유도된 값. 묶음 안에서 각 줄의 이름표. 직접 입력하지 않는다. */
   size: string;
+  /** 이름에서 유도된 값. "4kg" / "10kg". 품종과 함께 묶음을 나눈다. */
+  weight: string;
   price: number; // 원
   imageUrl: string;
   stock: number; // 현재 남은 재고 (0이면 매진)
