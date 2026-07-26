@@ -139,11 +139,6 @@ export function parseProductName(name: string): {
   return { variety: parts.join(' ') || cleaned, size, weight };
 }
 
-/** 손님 화면에서 상품을 묶는 이름. "대보" + "4kg" → "대보 4kg" */
-export function varietyGroupLabel(variety: string, weight: string): string {
-  return weight ? `${variety} ${weight}` : variety;
-}
-
 /** "대보 중 2 · 옥광 특대 1" 형태의 주문 요약 */
 export function summarizeItems(items: { name: string; qty: number }[]): string {
   return items.map((i) => `${i.name} ${i.qty}`).join(' · ');

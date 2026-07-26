@@ -66,9 +66,10 @@ async function main() {
   let created = 0;
   let updated = 0;
 
+  // 손님 화면이 품종 → 크기 → 무게 순으로 묶이므로 sortOrder도 같은 순서로 매긴다
   for (const variety of VARIETIES) {
-    for (const weight of WEIGHTS) {
-      for (const size of SIZES) {
+    for (const size of SIZES) {
+      for (const weight of WEIGHTS) {
         const name = `${variety} ${size} ${weight}`;
         // variety/size/weight는 이름에서 유도되는 값이지만, 시드는 db를 직접 쓰므로 함께 넣어 준다.
         const payload = {

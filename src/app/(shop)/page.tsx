@@ -1,7 +1,6 @@
 import { CartBar } from '@/components/CartBar';
 import { ProductRow, type ShopProduct } from '@/components/ProductRow';
 import { SiteHeader } from '@/components/SiteHeader';
-import { varietyGroupLabel } from '@/lib/format';
 import { expireStaleOrders } from '@/lib/orders';
 import { listProducts } from '@/lib/products';
 import { PAYMENT_DEADLINE_HOURS, SIZE_GUIDE, type Product } from '@/lib/types';
@@ -10,28 +9,40 @@ import { PAYMENT_DEADLINE_HOURS, SIZE_GUIDE, type Product } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 /**
- * 상품을 품종 + 무게로 묶는다 ("대보 4kg", "대보 10kg").
+ * 품종 → 크기 → 무게 순으로 두 겹으로 묶는다.
+ *
+ *   대보
+ *     중    4kg / 10kg
+ *     대    4kg / 10kg
+ *     특대  4kg / 10kg
+ *
+ * 무게를 바깥 묶음으로 올리면 "대보 4kg", "대보 10kg" 처럼 같은 품종이 두 번 나온다.
+ * 손님은 품종을 먼저 고르고 그다음 크기와 양을 정하므로, 고르는 순서대로 겹쳐 둔다.
  *
  * 미리 정해둔 목록을 훑지 않고 **실제 상품에 있는 값**을 순서대로 모은다.
  * 관리자가 새 이름의 상품을 넣어도 목록에서 조용히 사라지지 않는다.
  */
 function groupProducts(products: Product[]) {
-  const groups: { key: string; label: string; image: string; items: Product[] }[] = [];
+  const groups: {
+    variety: string;
+    image: string;
+    sizes: { size: string; items: Product[] }[];
+  }[] = [];
 
   for (const product of products) {
-    const key = `${product.variety}|${product.weight}`;
-    let group = groups.find((g) => g.key === key);
+    let group = groups.find((g) => g.variety === product.variety);
     if (!group) {
-      group = {
-        key,
-        label: varietyGroupLabel(product.variety, product.weight),
-        image: product.imageUrl,
-        items: [],
-      };
+      group = { variety: product.variety, image: product.imageUrl, sizes: [] };
       groups.push(group);
     }
     if (!group.image) group.image = product.imageUrl;
-    group.items.push(product);
+
+    let sizeGroup = group.sizes.find((s) => s.size === product.size);
+    if (!sizeGroup) {
+      sizeGroup = { size: product.size, items: [] };
+      group.sizes.push(sizeGroup);
+    }
+    sizeGroup.items.push(product);
   }
 
   return groups;
@@ -83,7 +94,7 @@ export default async function ShopPage() {
         ) : (
           <div className="mt-7 space-y-8">
             {groups.map((group) => (
-              <section key={group.key}>
+              <section key={group.variety}>
                 <div className="flex items-center gap-3.5 px-1">
                   {group.image ? (
                     // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
@@ -95,12 +106,23 @@ export default async function ShopPage() {
                       loading="lazy"
                     />
                   ) : null}
-                  <h2 className="font-display text-[1.4rem] leading-tight">{group.label}</h2>
+                  <h2 className="font-display text-[1.4rem] leading-tight">{group.variety}</h2>
                 </div>
 
-                <div className="card mt-3 divide-y divide-line overflow-hidden">
-                  {group.items.map((p) => (
-                    <ProductRow key={p.id} product={toShopProduct(p)} />
+                <div className="card mt-3 divide-y-2 divide-line overflow-hidden">
+                  {group.sizes.map((sizeGroup) => (
+                    <div key={sizeGroup.size || '_'}>
+                      {sizeGroup.size ? (
+                        <p className="bg-flesh/45 px-4 py-2 text-[0.9rem] font-bold text-shell">
+                          {sizeGroup.size}
+                        </p>
+                      ) : null}
+                      <div className="divide-y divide-line/70">
+                        {sizeGroup.items.map((p) => (
+                          <ProductRow key={p.id} product={toShopProduct(p)} />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </section>
@@ -135,8 +157,9 @@ function toShopProduct(p: Product): ShopProduct {
   return {
     id: p.id,
     name: p.name,
-    // 이름이 "대보 중 4kg" 꼴이 아니면 크기가 비어 있다. 그때는 이름을 그대로 줄 이름표로 쓴다.
-    label: p.size || p.name,
+    // 크기는 위 소제목이 말해 주므로, 각 줄은 무게를 이름표로 쓴다.
+    // 무게가 없는 이름이면 크기, 그것도 없으면 이름 전체로 물러선다.
+    label: p.weight || p.size || p.name,
     price: p.price,
     stock: p.stock,
   };
