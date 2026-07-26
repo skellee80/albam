@@ -81,6 +81,69 @@ export type DepositResult = {
   duplicate: boolean;
 };
 
+/** 후보 주문에서 판정에 필요한 것만 추린 모양 */
+type Candidate = { id: string; itemsSummary: string };
+
+type Decision = {
+  status: DepositStatus;
+  message: string;
+  matchedOrderId: string | null;
+  candidateOrderIds: string[];
+};
+
+/**
+ * 입금 1건을 어떻게 처리할지 정한다.
+ *
+ * 실제 처리(recordDeposit)와 미리보기(previewDeposit)가 **같은 함수**를 쓴다.
+ * 판정 규칙이 두 벌이면 미리보기가 거짓말을 하게 되고, 그러면 테스트가 무의미해진다.
+ */
+function decide(candidates: Candidate[], depositorName: string, amount: number): Decision {
+  const candidateOrderIds = candidates.map((c) => c.id);
+
+  if (candidates.length === 1) {
+    const only = candidates[0];
+    return {
+      status: '확정',
+      message: `✅ 확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${only.itemsSummary ? ` (${only.itemsSummary})` : ''}`,
+      matchedOrderId: only.id,
+      candidateOrderIds,
+    };
+  }
+
+  if (candidates.length > 1) {
+    return {
+      status: '확인필요',
+      message: `⚠️ 확인필요: ${depositorName} ${formatKRW(amount)}, 후보 ${candidates.length}건. 관리자에서 선택하세요.`,
+      matchedOrderId: null,
+      candidateOrderIds,
+    };
+  }
+
+  return {
+    status: '미매칭',
+    message: `❓ 미매칭: ${depositorName} ${formatKRW(amount)}. 관리자에서 확인하세요.`,
+    matchedOrderId: null,
+    candidateOrderIds,
+  };
+}
+
+/** 입금대기 주문 중 이름·금액이 정확히 일치하는 건 (삭제된 주문 제외) */
+function matchQuery(nameNorm: string, amount: number) {
+  return db
+    .collection(COL.orders)
+    .where('status', '==', '입금대기')
+    .where('depositorNameNorm', '==', nameNorm)
+    .where('totalAmount', '==', amount);
+}
+
+function toCandidate(doc: FirebaseFirestore.QueryDocumentSnapshot): Candidate {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    itemsSummary: summarizeItems(Array.isArray(data.items) ? data.items : []),
+  };
+}
+
 /**
  * MacroDroid가 보낸 입금 1건을 기록하고 주문과 매칭한다.
  *
@@ -126,32 +189,16 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
       };
     }
 
-    const candidateSnap = await t.get(
-      db
-        .collection(COL.orders)
-        .where('status', '==', '입금대기')
-        .where('depositorNameNorm', '==', nameNorm)
-        .where('totalAmount', '==', amount),
-    );
+    const candidateSnap = await t.get(matchQuery(nameNorm, amount));
     // 삭제된 주문은 메모리에서 걸러낸다 (인덱스를 늘리지 않으려고)
-    const candidates = candidateSnap.docs.filter((d) => !d.data().deleted);
+    const matched = candidateSnap.docs.filter((d) => !d.data().deleted);
 
     // ── 판정 ──
-    let status: DepositStatus;
-    let message: string;
-    let matchedOrderId: string | null = null;
-    const candidateOrderIds: string[] = candidates.map((d) => d.id);
+    const decision = decide(matched.map(toCandidate), depositorName, amount);
 
-    if (candidates.length === 1) {
-      const orderDoc = candidates[0];
-      const orderData = orderDoc.data();
-      matchedOrderId = orderDoc.id;
-      status = '확정';
-
-      const items = Array.isArray(orderData.items) ? orderData.items : [];
-      const summary = summarizeItems(items);
-      message = `✅ 확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${summary ? ` (${summary})` : ''}`;
-
+    // ── 쓰기 ──
+    if (decision.matchedOrderId) {
+      const orderDoc = matched.find((d) => d.id === decision.matchedOrderId)!;
       // 입금대기 → 발송대기는 둘 다 재고를 잡고 있는 상태라 재고 변동이 없다.
       // 이미 트랜잭션 안이므로 여기서 직접 갱신한다.
       t.update(orderDoc.ref, {
@@ -159,30 +206,102 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
         paidAt: now,
         updatedAt: now,
       });
-    } else if (candidates.length > 1) {
-      status = '확인필요';
-      message = `⚠️ 확인필요: ${depositorName} ${formatKRW(amount)}, 후보 ${candidates.length}건. 관리자에서 선택하세요.`;
-    } else {
-      status = '미매칭';
-      message = `❓ 미매칭: ${depositorName} ${formatKRW(amount)}. 관리자에서 확인하세요.`;
     }
 
-    // ── 쓰기 ──
     t.set(depositRefs[0], {
       amount,
       depositorName,
       depositorNameNorm: nameNorm,
       bankName,
-      status,
-      matchedOrderId,
-      candidateOrderIds,
-      responseText: message,
+      status: decision.status,
+      matchedOrderId: decision.matchedOrderId,
+      candidateOrderIds: decision.candidateOrderIds,
+      responseText: decision.message,
       receivedAt: now,
-      resolvedAt: status === '확정' ? now : null,
+      resolvedAt: decision.status === '확정' ? now : null,
     });
 
-    return { ok: true, status, message, depositId: depositRefs[0].id, duplicate: false };
+    return {
+      ok: true,
+      status: decision.status,
+      message: decision.message,
+      depositId: depositRefs[0].id,
+      duplicate: false,
+    };
   });
+}
+
+/* ────────────────────────────────────────────────────────────
+ * 미리보기 — 아무것도 바꾸지 않고 결과만 보여준다
+ * ──────────────────────────────────────────────────────────── */
+
+export type DepositPreview = {
+  ok: boolean;
+  status: DepositStatus | null;
+  /** 실제로 보냈다면 MacroDroid에 떴을 문구 */
+  message: string;
+  /** 이미 같은 입금이 들어와 중복으로 걸릴 상태인지 */
+  duplicate: boolean;
+  /** 이름·금액이 맞아떨어진 주문들 */
+  candidates: { id: string; orderNo: string; recipientName: string; phone: string }[];
+};
+
+/**
+ * 같은 판정 규칙을 그대로 돌려보되 **읽기만 한다.**
+ *
+ * 테스트하려고 주문 상태를 실제로 바꿔 버리면, 입금도 안 된 주문이 발송대기로 올라가
+ * 아버지가 그냥 물건을 부칠 수 있다. 그래서 확인은 기본적으로 미리보기로 한다.
+ */
+export async function previewDeposit(input: DepositInput): Promise<DepositPreview> {
+  const amount = Math.round(Number(input.amount));
+  const depositorName = (input.depositorName ?? '').trim();
+  const bankName = (input.bankName ?? '').trim();
+  const nameNorm = normalizeName(depositorName);
+  const bankNorm = normalizeName(bankName);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, status: null, message: '❌ 입금액을 읽지 못했습니다.', duplicate: false, candidates: [] };
+  }
+  if (!nameNorm) {
+    return { ok: false, status: null, message: '❌ 입금자명을 읽지 못했습니다.', duplicate: false, candidates: [] };
+  }
+
+  const keys = dedupeKeysToCheck(amount, nameNorm, bankNorm, Date.now());
+  const [dedupeSnaps, candidateSnap] = await Promise.all([
+    db.getAll(...keys.map((k) => db.collection(COL.deposits).doc(k))),
+    matchQuery(nameNorm, amount).get(),
+  ]);
+
+  const alreadySeen = dedupeSnaps.find((s) => s.exists);
+  if (alreadySeen) {
+    const prev = mapDeposit(alreadySeen.id, alreadySeen.data()!);
+    return {
+      ok: true,
+      status: prev.status,
+      message: prev.responseText,
+      duplicate: true,
+      candidates: [],
+    };
+  }
+
+  const matched = candidateSnap.docs.filter((d) => !d.data().deleted);
+  const decision = decide(matched.map(toCandidate), depositorName, amount);
+
+  return {
+    ok: true,
+    status: decision.status,
+    message: decision.message,
+    duplicate: false,
+    candidates: matched.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        orderNo: data.orderNo ?? d.id,
+        recipientName: data.recipient?.name ?? '',
+        phone: data.recipient?.phone ?? '',
+      };
+    }),
+  };
 }
 
 /* ────────────────────────────────────────────────────────────

@@ -448,7 +448,48 @@ async function main() {
   const autoCancelled = await lookupOrders('기한지남', '010-4444-5555');
   check('자동 취소된 주문은 배송조회에서 사라진다', autoCancelled.length === 0);
 
-  section('16. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
+  section('16. 입금 미리보기 — 판정은 같고 아무것도 바꾸지 않는다');
+
+  const { previewDeposit } = await import('../src/lib/deposits');
+
+  const previewTarget = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '미리보기',
+    sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
+    recipient: { name: '미리보기', phone: '010-1212-3434', address: '원주시 어딘가' },
+  });
+  if (!previewTarget.ok) throw new Error('점검용 주문 생성 실패');
+
+  const depositCountBefore = (await db.collection(COL.deposits).get()).size;
+  const pv = await previewDeposit({
+    amount: previewTarget.totalAmount,
+    depositorName: '미리보기',
+    bankName: '농협',
+  });
+  check('맞는 주문이 있으면 확정으로 예고한다', pv.status === '확정', pv.message);
+  check('맞아떨어진 주문을 알려준다', pv.candidates.length === 1, `${pv.candidates.length}건`);
+
+  const stillPending = await getOrder(previewTarget.orderId);
+  check('미리보기는 주문 상태를 바꾸지 않는다', stillPending?.status === '입금대기', stillPending?.status);
+  const depositCountAfter = (await db.collection(COL.deposits).get()).size;
+  check('미리보기는 입금 기록을 남기지 않는다', depositCountAfter === depositCountBefore);
+
+  const pvMiss = await previewDeposit({ amount: 13, depositorName: '없는사람', bankName: '농협' });
+  check('맞는 주문이 없으면 미매칭으로 예고한다', pvMiss.status === '미매칭', pvMiss.message);
+
+  // 미리보기와 실제 처리의 문구가 같아야 테스트가 의미를 갖는다
+  const real = await recordDeposit({
+    amount: previewTarget.totalAmount,
+    depositorName: '미리보기',
+    bankName: '농협',
+  });
+  check('미리보기 문구가 실제 처리 문구와 같다', pv.message === real.message, `${pv.message} / ${real.message}`);
+
+  const nowShipping = await getOrder(previewTarget.orderId);
+  check('실제 처리는 주문 상태를 바꾼다', nowShipping?.status === '발송대기', nowShipping?.status);
+
+  section('17. 재고 안내는 10개 이하일 때만 숫자를 보여준다');
 
   const { stockNotice, LOW_STOCK_NOTICE_THRESHOLD } = await import('../src/lib/types');
 
@@ -459,7 +500,7 @@ async function main() {
   check('1개 남아도 주문할 수 있다', stockNotice(1) === '1개 남았습니다', stockNotice(1));
   check('0개면 품절 안내', stockNotice(0) === '지금은 준비된 물량이 없습니다', stockNotice(0));
 
-  section('17. 환불요청·교환요청 상태는 없다');
+  section('18. 환불요청·교환요청 상태는 없다');
 
   const { ORDER_STATUSES: statuses } = await import('../src/lib/types');
   check('환불요청이 상태 목록에 없다', !(statuses as readonly string[]).includes('환불요청'));
@@ -468,7 +509,7 @@ async function main() {
   check('교환완료는 남아 있다', (statuses as readonly string[]).includes('교환완료'));
 
   /* ────────────────────────────────────────────── */
-  section('18. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
+  section('19. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
 
   // 서버(Node)와 브라우저의 ICU 데이터가 달라 ko-KR 오전/오후가 "PM"으로 나오는 바람에
   // 하이드레이션이 깨진 적이 있다. 고정 시각으로 결과를 못 박아 재발을 잡는다.

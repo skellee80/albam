@@ -4,7 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { requireAdmin, logout } from '@/lib/auth';
-import { ignoreDeposit, resolveDeposit } from '@/lib/deposits';
+import {
+  ignoreDeposit,
+  previewDeposit,
+  recordDeposit,
+  resolveDeposit,
+  type DepositPreview,
+  type DepositResult,
+} from '@/lib/deposits';
 import {
   markShipped,
   restoreOrder,
@@ -128,6 +135,52 @@ export async function restockProductAction(
 
 export async function updateSettingsAction(settings: Settings): Promise<ActionResult> {
   return run(() => updateSettings(settings), ['/admin', '/admin/settings', '/order']);
+}
+
+/* ── 입금 문자 테스트 ── */
+
+/** 아무것도 바꾸지 않고 판정 결과만 본다 */
+export async function previewDepositAction(input: {
+  amount: string;
+  depositorName: string;
+  bankName: string;
+}): Promise<{ ok: true; preview: DepositPreview } | { ok: false; error: string }> {
+  try {
+    await requireAdmin();
+    const preview = await previewDeposit({
+      // MacroDroid가 "50,000원" 같은 형태로 보내는 것과 똑같이 숫자만 뽑는다
+      amount: Number(String(input.amount).replace(/[^\d]/g, '')),
+      depositorName: input.depositorName,
+      bankName: input.bankName,
+    });
+    return { ok: true, preview };
+  } catch (err) {
+    console.error('[previewDepositAction]', err);
+    return { ok: false, error: err instanceof Error ? err.message : '확인하지 못했습니다.' };
+  }
+}
+
+/** 실제 입금이 온 것처럼 처리한다 (주문 상태가 바뀐다) */
+export async function sendTestDepositAction(input: {
+  amount: string;
+  depositorName: string;
+  bankName: string;
+}): Promise<{ ok: true; result: DepositResult } | { ok: false; error: string }> {
+  try {
+    await requireAdmin();
+    const result = await recordDeposit({
+      amount: Number(String(input.amount).replace(/[^\d]/g, '')),
+      depositorName: input.depositorName,
+      bankName: input.bankName,
+    });
+    revalidatePath('/admin');
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin/test');
+    return { ok: true, result };
+  } catch (err) {
+    console.error('[sendTestDepositAction]', err);
+    return { ok: false, error: err instanceof Error ? err.message : '처리하지 못했습니다.' };
+  }
 }
 
 /* ── 로그아웃 ── */
