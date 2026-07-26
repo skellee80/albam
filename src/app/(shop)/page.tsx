@@ -9,6 +9,16 @@ import { PAYMENT_DEADLINE_HOURS, SIZE_GUIDE, type Product } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 /**
+ * 크기 등급별 색.
+ * 실속(초록) → 선물(밤색) → 최상급(주황)으로 올라가, 글을 읽기 전에도 순서가 보인다.
+ */
+const SIZE_TONE = {
+  burr: { chip: 'bg-burr text-white', tag: 'bg-burr-tint text-burr-deep' },
+  shell: { chip: 'bg-shell text-white', tag: 'bg-shell-tint text-shell' },
+  amber: { chip: 'bg-amber text-white', tag: 'bg-amber-tint text-amber' },
+} as const;
+
+/**
  * 품종 → 크기 → 무게 순으로 두 겹으로 묶는다.
  *
  *   대보
@@ -73,15 +83,24 @@ export default async function ShopPage() {
           중·대·특대가 모든 묶음에서 똑같이 반복되므로, 상품마다 붙이면 같은 문장을
           열여덟 번 읽게 된다.
         */}
-        <section className="mt-5 rounded-card bg-burr-tint px-4 py-4">
-          <h2 className="font-display text-[1.05rem] text-burr-deep">크기 고르는 법</h2>
-          <dl className="mt-2.5 space-y-2">
+        <section className="mt-5 rounded-card border border-line bg-surface px-4 py-4">
+          <h2 className="font-display text-[1.05rem]">크기 고르는 법</h2>
+          <dl className="mt-3 space-y-3">
             {SIZE_GUIDE.map((guide) => (
-              <div key={guide.size} className="flex gap-3">
-                <dt className="w-9 shrink-0 text-[0.9rem] font-bold text-burr-deep">
+              <div key={guide.size} className="flex items-start gap-3">
+                <dt
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.85rem] font-bold ${SIZE_TONE[guide.tone].chip}`}
+                >
                   {guide.size}
                 </dt>
-                <dd className="text-[0.87rem] leading-snug text-ink-soft">{guide.note}</dd>
+                <dd className="min-w-0 pt-0.5">
+                  <span
+                    className={`inline-block rounded-full px-2.5 py-0.5 text-[0.78rem] font-bold ${SIZE_TONE[guide.tone].tag}`}
+                  >
+                    {guide.tag}
+                  </span>
+                  <p className="mt-1 text-[0.87rem] leading-snug text-ink-soft">{guide.note}</p>
+                </dd>
               </div>
             ))}
           </dl>

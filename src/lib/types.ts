@@ -20,11 +20,18 @@ export type Weight = (typeof WEIGHTS)[number];
  * 크기 안내.
  * 크기는 모든 품종·무게에서 똑같이 반복되므로 상품마다 붙이지 않고
  * 목록 맨 위에서 한 번만 설명한다.
+ *
+ * tone은 실속 → 선물 → 최상급으로 올라가는 등급을 색으로도 알려준다.
  */
-export const SIZE_GUIDE: { size: Size; note: string }[] = [
-  { size: '중', note: '온 가족이 편하게 나눠 먹기 좋은 크기' },
-  { size: '대', note: '선물로 건네기 좋은 넉넉한 크기' },
-  { size: '특대', note: '귀한 분께 드리는 가장 굵은 알' },
+export const SIZE_GUIDE: {
+  size: Size;
+  tag: string;
+  note: string;
+  tone: 'burr' | 'shell' | 'amber';
+}[] = [
+  { size: '중', tag: '온가족 행복', note: '온 가족 부담없이 즐기는 실속용', tone: 'burr' },
+  { size: '대', tag: '품격있는 추천', note: '품질과 가격 만족도 높은 선물용', tone: 'shell' },
+  { size: '특대', tag: '최상급 프리미엄', note: '격식 있는 최상급 선물용', tone: 'amber' },
 ];
 
 export interface Product {
