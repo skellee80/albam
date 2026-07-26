@@ -14,7 +14,7 @@ import {
 } from '@/lib/orders';
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '@/lib/products';
 import { updateSettings } from '@/lib/settings';
-import type { OrderItem, OrderStatus, Settings, Size, Variety } from '@/lib/types';
+import type { OrderItem, OrderStatus, Settings } from '@/lib/types';
 
 /**
  * 관리자 서버 액션 모음.
@@ -67,6 +67,7 @@ export async function updateOrderAction(
   patch: {
     recipient?: { name: string; phone: string; address: string };
     depositorName?: string;
+    depositorPhone?: string;
     items?: OrderItem[];
     status?: OrderStatus;
     trackingNo?: string;
@@ -104,21 +105,11 @@ export async function restoreOrderAction(orderId: string): Promise<ActionResult>
 
 export async function saveProductAction(
   productId: string | null,
-  input: {
-    name: string;
-    variety: Variety;
-    size: Size;
-    price: number;
-    imageUrl: string;
-    stock: number;
-    initialStock: number;
-    hidden: boolean;
-    sortOrder: number;
-  },
+  input: ProductInput,
 ): Promise<ActionResult> {
   return run(async () => {
-    if (productId) await updateProduct(productId, input as Partial<ProductInput>);
-    else await createProduct(input as ProductInput);
+    if (productId) await updateProduct(productId, input);
+    else await createProduct(input);
   }, ['/admin', '/admin/products', '/']);
 }
 
@@ -126,16 +117,11 @@ export async function deleteProductAction(productId: string): Promise<ActionResu
   return run(() => deleteProduct(productId), ['/admin', '/admin/products', '/']);
 }
 
-/** 재고를 채우고 경고 기준선도 같이 올린다 (20% 경고가 새 수량 기준으로 동작하도록) */
 export async function restockProductAction(
   productId: string,
   stock: number,
 ): Promise<ActionResult> {
-  return run(() => updateProduct(productId, { stock, initialStock: stock }), [
-    '/admin',
-    '/admin/products',
-    '/',
-  ]);
+  return run(() => updateProduct(productId, { stock }), ['/admin', '/admin/products', '/']);
 }
 
 /* ── 설정 ── */

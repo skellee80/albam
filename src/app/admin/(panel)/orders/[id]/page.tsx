@@ -44,6 +44,7 @@ export default async function AdminOrderDetailPage({
             orderNo: order.orderNo,
             recipient: order.recipient,
             depositorName: order.depositorName,
+            depositorPhone: order.depositorPhone,
             items: order.items,
             totalAmount: order.totalAmount,
             status: order.status,

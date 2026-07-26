@@ -11,12 +11,22 @@
       ]
     },
     {
-      "__comment__": "/track 배송조회: 입금자명 + 전화번호 정확 일치",
+      "__comment__": "/track 배송조회: 입금자명 + 받는 분 전화번호",
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "depositorNameNorm", "order": "ASCENDING" },
         { "fieldPath": "phoneNorm", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "__comment__": "/track 배송조회: 입금자명 + 입금하신 분 전화번호 (둘 중 어느 번호로 찾아도 나오도록)",
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "depositorNameNorm", "order": "ASCENDING" },
+        { "fieldPath": "depositorPhoneNorm", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },

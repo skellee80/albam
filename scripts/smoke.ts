@@ -19,6 +19,9 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
   process.exit(1);
 }
 
+/** 점검 시작 시 모든 상품 재고를 이 값으로 맞춘다. */
+const SEED_STOCK = 50;
+
 let passed = 0;
 let failed = 0;
 
@@ -55,7 +58,7 @@ async function main() {
     process.exit(1);
   }
   await Promise.all(
-    products.map((p) => db.collection(COL.products).doc(p.id).update({ stock: p.initialStock })),
+    products.map((p) => db.collection(COL.products).doc(p.id).update({ stock: SEED_STOCK })),
   );
 
   const daeboMid = products.find((p) => p.name === '대보 중')!;
@@ -71,6 +74,7 @@ async function main() {
     ],
     depositorName: '홍길동',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '홍길동', phone: '010-1111-2222', address: '서울시 어딘가 1-2' },
   });
 
@@ -88,7 +92,7 @@ async function main() {
   const afterOrder = await listProducts();
   check(
     '주문 즉시 재고가 차감된다',
-    afterOrder.find((p) => p.id === daeboMid.id)!.stock === daeboMid.initialStock - 2,
+    afterOrder.find((p) => p.id === daeboMid.id)!.stock === SEED_STOCK - 2,
   );
 
   // 같은 상품을 여러 줄로 보내도 합쳐져야 한다 (트랜잭션 중복 읽기 방지)
@@ -99,6 +103,7 @@ async function main() {
     ],
     depositorName: '중복상품',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '중복상품', phone: '010-9999-0000', address: '부산시 어딘가' },
   });
   check(
@@ -111,6 +116,7 @@ async function main() {
     lines: [{ productId: daeboMid.id, qty: 99999 }],
     depositorName: '과다주문',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '과다주문', phone: '010-3333-4444', address: '대구시 어딘가' },
   });
   check('재고보다 많이 주문하면 거절된다', !overStock.ok, JSON.stringify(overStock));
@@ -119,6 +125,7 @@ async function main() {
     lines: [{ productId: daeboMid.id, qty: 1 }],
     depositorName: '전화없음',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '전화없음', phone: '123', address: '광주시 어딘가' },
   });
   check('전화번호가 부실하면 거절된다', !noPhone.ok);
@@ -159,12 +166,14 @@ async function main() {
     lines: [{ productId: daeboMid.id, qty: 1 }],
     depositorName: '김철수',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '김철수', phone: '010-5555-6666', address: '인천시 어딘가' },
   });
   const twinB = await createOrder({
     lines: [{ productId: daeboMid.id, qty: 1 }],
     depositorName: '김철수',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '김철수', phone: '010-7777-8888', address: '수원시 어딘가' },
   });
   check('동명이인 주문 2건이 만들어진다', twinA.ok && twinB.ok);
@@ -228,6 +237,13 @@ async function main() {
   check('입금자명+전화가 맞으면 조회된다', found.length === 1, `${found.length}건`);
   check('하이픈 없는 전화번호도 동일하게 조회된다', found[0]?.id === created.orderId);
 
+  const byDepositorPhone = await lookupOrders('홍길동', '010-1234-5678');
+  check(
+    '입금하신 분 연락처로도 조회된다',
+    byDepositorPhone.some((o) => o.id === created.orderId),
+    `${byDepositorPhone.length}건`,
+  );
+
   const notFound = await lookupOrders('홍길동', '01099998888');
   check('전화번호가 다르면 조회되지 않는다', notFound.length === 0, `${notFound.length}건`);
 
@@ -251,6 +267,7 @@ async function main() {
     lines: [{ productId: okgwangLarge.id, qty: 1 }],
     depositorName: '삭제대상',
     sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
     recipient: { name: '삭제대상', phone: '010-2222-3333', address: '제주시 어딘가' },
   });
   if (deletedOrder.ok) await updateOrder(deletedOrder.orderId, { deleted: true });
@@ -268,6 +285,78 @@ async function main() {
   check('상태별 조회가 동작한다', pending.length >= 1, `${pending.length}건`);
   const all = await listOrders({});
   check('삭제된 주문은 기본 목록에서 빠진다', all.every((o) => !o.deleted));
+
+  /* ────────────────────────────────────────────── */
+  section('11. 상품 이름이 손님 화면 표시의 단일 출처');
+
+  const { updateProduct } = await import('../src/lib/products');
+  const { parseProductName } = await import('../src/lib/format');
+
+  check('"대보 중" → 품종 대보 / 크기 중', (() => {
+    const p = parseProductName('대보 중');
+    return p.variety === '대보' && p.size === '중';
+  })());
+  check('크기가 없는 이름은 통째로 품종이 된다', (() => {
+    const p = parseProductName('꿀밤 선물세트');
+    return p.variety === '꿀밤 선물세트' && p.size === '';
+  })());
+
+  await updateProduct(daeboMid.id, { name: '햇대보 특대' });
+  const renamed = (await listProducts()).find((p) => p.id === daeboMid.id)!;
+  check('이름을 바꾸면 품종이 따라 바뀐다', renamed.variety === '햇대보', renamed.variety);
+  check('이름을 바꾸면 크기도 따라 바뀐다', renamed.size === '특대', renamed.size);
+
+  await updateProduct(daeboMid.id, { name: '대보 중' }); // 원복
+
+  section('12. 재고 알림은 매진만');
+
+  const { isSoldOut } = await import('../src/lib/products');
+  await updateProduct(okgwangLarge.id, { stock: 1 });
+  const almost = (await listProducts()).find((p) => p.id === okgwangLarge.id)!;
+  check('재고가 조금 남은 건 매진이 아니다', !isSoldOut(almost));
+
+  await updateProduct(okgwangLarge.id, { stock: 0 });
+  const empty = (await listProducts()).find((p) => p.id === okgwangLarge.id)!;
+  check('재고가 0이면 매진이다', isSoldOut(empty));
+
+  const soldOutOrder = await createOrder({
+    lines: [{ productId: okgwangLarge.id, qty: 1 }],
+    depositorName: '매진주문',
+    sameAsDepositor: true,
+    depositorPhone: '010-1234-5678',
+    recipient: { name: '매진주문', phone: '010-8888-9999', address: '울산시 어딘가' },
+  });
+  check('매진 상품은 주문이 거절된다', !soldOutOrder.ok, JSON.stringify(soldOutOrder));
+
+  await updateProduct(okgwangLarge.id, { stock: SEED_STOCK }); // 점검 뒤 재고 원복
+
+  section('13. 입금자 연락처 검증');
+
+  const noDepositorPhone = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '연락처없음',
+    sameAsDepositor: false,
+    depositorPhone: '',
+    recipient: { name: '받는분', phone: '010-1111-0000', address: '세종시 어딘가' },
+  });
+  check('입금자 연락처가 없으면 거절된다', !noDepositorPhone.ok, JSON.stringify(noDepositorPhone));
+
+  const withDepositorPhone = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '연락처있음',
+    sameAsDepositor: false,
+    depositorPhone: '010-5252-5252',
+    recipient: { name: '다른받는분', phone: '010-7070-7070', address: '천안시 어딘가' },
+  });
+  check('입금자와 받는 분이 달라도 주문된다', withDepositorPhone.ok);
+  if (withDepositorPhone.ok) {
+    const saved = await getOrder(withDepositorPhone.orderId);
+    check('입금자 연락처가 저장된다', saved?.depositorPhone === '010-5252-5252', saved?.depositorPhone);
+    const foundByDep = await lookupOrders('연락처있음', '01052525252');
+    check('입금자 연락처로 조회된다', foundByDep.length === 1, `${foundByDep.length}건`);
+    const foundByRec = await lookupOrders('연락처있음', '01070707070');
+    check('받는 분 연락처로도 조회된다', foundByRec.length === 1, `${foundByRec.length}건`);
+  }
 
   /* ────────────────────────────────────────────── */
   console.log(`\n${'─'.repeat(50)}`);

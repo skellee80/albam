@@ -10,7 +10,7 @@ import { ShipQueue, type ShipItem } from '@/components/admin/ShipQueue';
 import { listUnresolvedDeposits } from '@/lib/deposits';
 import { formatKRW, summarizeItems } from '@/lib/format';
 import { getOrders, listOrders } from '@/lib/orders';
-import { isLowStock, isSoldOut, listProducts } from '@/lib/products';
+import { isSoldOut, listProducts } from '@/lib/products';
 import { dailySales, productSales, statusCounts, totals } from '@/lib/stats';
 import type { Order } from '@/lib/types';
 
@@ -68,7 +68,6 @@ export default async function AdminDashboardPage() {
     }));
 
   const soldOut = products.filter((p) => !p.hidden && isSoldOut(p));
-  const lowStock = products.filter((p) => !p.hidden && isLowStock(p));
 
   const summary = totals(orders);
   const statuses = statusCounts(orders);
@@ -78,24 +77,19 @@ export default async function AdminDashboardPage() {
       {/* 1. 가장 급한 것 — 돈은 들어왔는데 주문이 안 움직이는 건 */}
       <DepositAlerts deposits={alertDeposits} pendingOrders={pendingOrders} />
 
-      {/* 2. 재고 경고 */}
-      {(soldOut.length > 0 || lowStock.length > 0) && (
+      {/* 2. 매진 — 손님이 지금 주문할 수 없는 상품 */}
+      {soldOut.length > 0 && (
         <section className="rounded-card border-2 border-amber/30 bg-amber-tint px-4 py-4">
-          <h2 className="font-display text-[1.15rem] text-amber">재고를 확인하세요</h2>
+          <h2 className="font-display text-[1.15rem] text-amber">매진된 상품 {soldOut.length}개</h2>
+          <p className="mt-1 text-[0.85rem] leading-snug text-ink-soft">
+            지금 손님이 주문할 수 없습니다. 물량이 있으면 재고를 채워 주세요.
+          </p>
           <ul className="mt-2.5 space-y-1.5 text-[0.92rem]">
             {soldOut.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3">
                 <span className="font-semibold">{p.name}</span>
                 <span className="rounded-full bg-berry-tint px-2.5 py-1 text-[0.78rem] font-bold text-berry">
-                  다 팔림
-                </span>
-              </li>
-            ))}
-            {lowStock.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3">
-                <span className="font-semibold">{p.name}</span>
-                <span className="tnum rounded-full bg-surface px-2.5 py-1 text-[0.78rem] font-bold text-amber">
-                  {p.stock}개 남음
+                  매진
                 </span>
               </li>
             ))}

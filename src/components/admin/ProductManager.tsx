@@ -4,18 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import { deleteProductAction, restockProductAction, saveProductAction } from '@/app/admin/actions';
-import { formatKRW } from '@/lib/format';
-import { SIZES, VARIETIES, type Size, type Variety } from '@/lib/types';
+import { formatKRW, parseProductName } from '@/lib/format';
 
 export type ManagedProduct = {
   id: string;
   name: string;
-  variety: Variety;
-  size: Size;
   price: number;
   imageUrl: string;
   stock: number;
-  initialStock: number;
   hidden: boolean;
   sortOrder: number;
 };
@@ -24,24 +20,22 @@ type Draft = Omit<ManagedProduct, 'id'>;
 
 const EMPTY_DRAFT: Draft = {
   name: '',
-  variety: '대보',
-  size: '중',
   price: 0,
   imageUrl: '/products/daebo.svg',
   stock: 0,
-  initialStock: 0,
   hidden: false,
   sortOrder: 99,
 };
 
-function stockTone(product: ManagedProduct): { label: string; className: string } | null {
-  if (product.stock <= 0) {
-    return { label: '다 팔림', className: 'bg-berry-tint text-berry' };
-  }
-  if (product.initialStock > 0 && product.stock <= product.initialStock * 0.2) {
-    return { label: `${product.stock}개 남음`, className: 'bg-amber-tint text-amber' };
-  }
-  return null;
+/**
+ * 이름을 어떻게 나눠서 손님 화면에 보일지 미리 알려준다.
+ * 품종·크기를 따로 입력받지 않으므로, 이름을 바꿀 때 결과가 눈에 보여야 한다.
+ */
+function namePreview(name: string): string {
+  const { variety, size } = parseProductName(name);
+  if (!variety) return '손님 화면에 "대보 중" 처럼 품종과 크기를 띄어 적으면 자동으로 묶입니다.';
+  if (!size) return `손님 화면에 "${variety}" 묶음으로 하나만 나옵니다.`;
+  return `손님 화면에서 "${variety}" 묶음 안에 "${size}" 로 나옵니다.`;
 }
 
 export function ProductManager({ products }: { products: ManagedProduct[] }) {
@@ -77,7 +71,7 @@ function ProductCard({ product }: { product: ManagedProduct }) {
   const [editing, setEditing] = useState(false);
   const [restock, setRestock] = useState('');
   const [pending, startTransition] = useTransition();
-  const warning = stockTone(product);
+  const soldOut = product.stock <= 0;
 
   function applyRestock() {
     const value = Number(restock.replace(/[^\d]/g, ''));
@@ -92,7 +86,7 @@ function ProductCard({ product }: { product: ManagedProduct }) {
   return (
     <article
       className={`card px-4 py-4 ${product.hidden ? 'opacity-60' : ''} ${
-        warning ? 'border-2 border-amber/35' : ''
+        soldOut ? 'border-2 border-berry/35' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -108,9 +102,9 @@ function ProductCard({ product }: { product: ManagedProduct }) {
           <p className="tnum mt-0.5 text-[0.9rem] text-ink-soft">{formatKRW(product.price)}</p>
         </div>
 
-        {warning ? (
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.76rem] font-bold ${warning.className}`}>
-            {warning.label}
+        {soldOut ? (
+          <span className="shrink-0 rounded-full bg-berry-tint px-2.5 py-1 text-[0.76rem] font-bold text-berry">
+            매진
           </span>
         ) : (
           <span className="tnum shrink-0 rounded-full bg-burr-tint px-2.5 py-1 text-[0.76rem] font-bold text-burr-deep">
@@ -193,7 +187,6 @@ function ProductForm({
         name: draft.name.trim(),
         price: Number(draft.price) || 0,
         stock: Number(draft.stock) || 0,
-        initialStock: Number(draft.initialStock) || 0,
         sortOrder: Number(draft.sortOrder) || 0,
       });
       if (!result.ok) {
@@ -223,37 +216,9 @@ function ProductForm({
       <div>
         <label className="label">상품 이름</label>
         <input className="field" value={draft.name} onChange={(e) => set('name', e.target.value)} />
-      </div>
-
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="label">품종</label>
-          <select
-            className="field"
-            value={draft.variety}
-            onChange={(e) => set('variety', e.target.value as Variety)}
-          >
-            {VARIETIES.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1">
-          <label className="label">크기</label>
-          <select
-            className="field"
-            value={draft.size}
-            onChange={(e) => set('size', e.target.value as Size)}
-          >
-            {SIZES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+        <p className="mt-1.5 text-[0.78rem] leading-snug text-ink-soft">
+          {namePreview(draft.name)}
+        </p>
       </div>
 
       <div className="flex gap-2">
@@ -277,29 +242,18 @@ function ProductForm({
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="label">현재 재고</label>
-          <input
-            className="field tnum"
-            value={draft.stock}
-            onChange={(e) => set('stock', Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
-            inputMode="numeric"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="label">경고 기준</label>
-          <input
-            className="field tnum"
-            value={draft.initialStock}
-            onChange={(e) => set('initialStock', Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
-            inputMode="numeric"
-          />
-        </div>
+      <div>
+        <label className="label">현재 재고</label>
+        <input
+          className="field tnum"
+          value={draft.stock}
+          onChange={(e) => set('stock', Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
+          inputMode="numeric"
+        />
+        <p className="mt-1.5 text-[0.78rem] leading-snug text-ink-soft">
+          0이 되면 손님 화면에 품절로 표시되고 첫 화면에서 알려 줍니다.
+        </p>
       </div>
-      <p className="text-[0.78rem] leading-snug text-ink-soft">
-        경고 기준의 20% 이하로 남으면 첫 화면에서 알려 줍니다. 보통 채워 넣은 수량과 같게 둡니다.
-      </p>
 
       <div>
         <label className="label">사진 주소</label>

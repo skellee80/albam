@@ -18,7 +18,12 @@ export type OrderProduct = {
   hidden: boolean;
 };
 
-type Completed = { orderNo: string; totalAmount: number; items: OrderItem[]; depositorName: string };
+type Completed = {
+  orderNo: string;
+  totalAmount: number;
+  items: OrderItem[];
+  depositorName: string;
+};
 
 export function OrderForm({
   products,
@@ -30,7 +35,10 @@ export function OrderForm({
   const { ready, items, setQty, remove, clear } = useCart();
 
   const [depositorName, setDepositorName] = useState('');
-  const [sameAsDepositor, setSameAsDepositor] = useState(true);
+  const [depositorPhone, setDepositorPhone] = useState('');
+  // 기본은 꺼둔다. 선물로 보내는 주문이 많아 받는 분이 다른 경우가 흔하고,
+  // 켜진 채로 두면 확인 없이 넘어가 엉뚱한 사람 이름으로 저장되기 쉽다.
+  const [sameAsDepositor, setSameAsDepositor] = useState(false);
   const [recipientName, setRecipientName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -38,10 +46,12 @@ export function OrderForm({
   const [completed, setCompleted] = useState<Completed | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // "입금자와 수령인 동일"이 켜져 있으면 입금자명을 그대로 따라간다.
+  // "받는 분이 입금하는 분과 같습니다"가 켜져 있으면 이름과 연락처를 그대로 따라간다.
   useEffect(() => {
-    if (sameAsDepositor) setRecipientName(depositorName);
-  }, [sameAsDepositor, depositorName]);
+    if (!sameAsDepositor) return;
+    setRecipientName(depositorName);
+    setPhone(depositorPhone);
+  }, [sameAsDepositor, depositorName, depositorPhone]);
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
@@ -76,6 +86,7 @@ export function OrderForm({
         // 가격은 보내지 않는다 — 서버가 계산한다.
         lines: items.map((i) => ({ productId: i.productId, qty: i.qty })),
         depositorName,
+        depositorPhone,
         sameAsDepositor,
         recipient: { name: recipientName, phone, address },
       });
@@ -201,6 +212,25 @@ export function OrderForm({
             </p>
           </div>
 
+          <div>
+            <label className="label" htmlFor="depositorPhone">
+              연락처
+            </label>
+            <input
+              id="depositorPhone"
+              className="field tnum"
+              value={depositorPhone}
+              onChange={(e) => setDepositorPhone(e.target.value)}
+              placeholder="010-0000-0000"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+            />
+            <p className="mt-1.5 text-[0.8rem] leading-snug text-ink-soft">
+              입금이 확인되지 않을 때 연락드릴 번호입니다.
+            </p>
+          </div>
+
           <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-burr-tint px-3.5 py-3">
             <input
               type="checkbox"
@@ -241,16 +271,17 @@ export function OrderForm({
             </label>
             <input
               id="phone"
-              className="field tnum"
+              className="field tnum disabled:bg-paper disabled:text-ink-soft"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              disabled={sameAsDepositor}
               placeholder="010-0000-0000"
               inputMode="tel"
               autoComplete="tel"
               required
             />
             <p className="mt-1.5 text-[0.8rem] text-ink-soft">
-              배송 조회에 쓰이니 정확히 적어주세요.
+              배송 기사님이 연락할 번호입니다.
             </p>
           </div>
 

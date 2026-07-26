@@ -1,32 +1,34 @@
 import 'server-only';
 
 import { COL, db, toMillisOr } from './firebase-admin';
-import type { Product, Size, Variety } from './types';
+import { parseProductName } from './format';
+import type { Product } from './types';
 
-/** 재고가 이 비율 이하로 남으면 관리자 화면에서 경고한다. (PRD: 20%) */
-export const LOW_STOCK_RATIO = 0.2;
-
+/**
+ * 재고 알림은 **매진 하나뿐이다.**
+ *
+ * 예전에는 "기준 수량의 20% 이하" 경고도 있었지만, 그러려면 관리자가 기준 수량을
+ * 따로 관리해야 했다. 실제로 필요한 판단은 "지금 팔 수 있나 없나" 하나여서
+ * 기준선을 없애고 매진만 알린다.
+ */
 export function isSoldOut(p: Pick<Product, 'stock'>): boolean {
   return p.stock <= 0;
 }
 
-export function isLowStock(p: Pick<Product, 'stock' | 'initialStock'>): boolean {
-  if (p.stock <= 0) return false; // 소진은 별도로 더 강하게 표시한다
-  if (p.initialStock <= 0) return false; // 기준선이 없으면 판단 불가
-  return p.stock <= p.initialStock * LOW_STOCK_RATIO;
-}
-
 function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {
   const now = Date.now();
+  const name = data.name ?? '';
+  // 예전 문서에 variety/size가 없거나 이름과 어긋나 있어도 이름 기준으로 맞춘다.
+  const derived = parseProductName(name);
+
   return {
     id,
-    name: data.name ?? '',
-    variety: data.variety as Variety,
-    size: data.size as Size,
+    name,
+    variety: derived.variety,
+    size: derived.size,
     price: Number(data.price ?? 0),
     imageUrl: data.imageUrl ?? '',
     stock: Number(data.stock ?? 0),
-    initialStock: Number(data.initialStock ?? 0),
     hidden: Boolean(data.hidden),
     sortOrder: Number(data.sortOrder ?? 0),
     createdAt: toMillisOr(data.createdAt, now),
@@ -50,21 +52,28 @@ export async function getProduct(id: string): Promise<Product | null> {
   return doc.exists ? mapProduct(doc.id, doc.data()!) : null;
 }
 
+/** 관리자가 실제로 입력하는 값. 품종·크기는 이름에서 유도하므로 여기에 없다. */
 export type ProductInput = {
   name: string;
-  variety: Variety;
-  size: Size;
   price: number;
   imageUrl: string;
   stock: number;
-  initialStock: number;
   hidden: boolean;
   sortOrder: number;
 };
 
+/** 이름에서 유도한 품종·크기를 함께 저장한다. 손님 화면 묶음이 이 값을 쓴다. */
+function withDerivedFields(input: Partial<ProductInput>) {
+  if (input.name === undefined) return { ...input };
+  const name = input.name.trim();
+  return { ...input, name, ...parseProductName(name) };
+}
+
 export async function createProduct(input: ProductInput): Promise<string> {
   const now = Date.now();
-  const ref = await db.collection(COL.products).add({ ...input, createdAt: now, updatedAt: now });
+  const ref = await db
+    .collection(COL.products)
+    .add({ ...withDerivedFields(input), createdAt: now, updatedAt: now });
   return ref.id;
 }
 
@@ -72,7 +81,7 @@ export async function updateProduct(id: string, patch: Partial<ProductInput>): P
   await db
     .collection(COL.products)
     .doc(id)
-    .update({ ...patch, updatedAt: Date.now() });
+    .update({ ...withDerivedFields(patch), updatedAt: Date.now() });
 }
 
 export async function deleteProduct(id: string): Promise<void> {

@@ -9,12 +9,9 @@ export default async function AdminProductsPage() {
   const managed: ManagedProduct[] = products.map((p) => ({
     id: p.id,
     name: p.name,
-    variety: p.variety,
-    size: p.size,
     price: p.price,
     imageUrl: p.imageUrl,
     stock: p.stock,
-    initialStock: p.initialStock,
     hidden: p.hidden,
     sortOrder: p.sortOrder,
   }));

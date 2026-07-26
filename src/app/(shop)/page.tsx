@@ -2,26 +2,46 @@ import { CartBar } from '@/components/CartBar';
 import { ProductRow, type ShopProduct } from '@/components/ProductRow';
 import { SiteHeader } from '@/components/SiteHeader';
 import { listProducts } from '@/lib/products';
-import { VARIETIES, type Variety } from '@/lib/types';
+import type { Product } from '@/lib/types';
 
 // 재고와 가격이 바로 반영되어야 하므로 캐시하지 않는다.
 export const dynamic = 'force-dynamic';
 
-/** 품종 소개 문구 — 아버지가 관리자 화면 대신 이 파일에서 고치면 된다. */
-const VARIETY_NOTE: Record<Variety, string> = {
+/**
+ * 품종 소개 문구 — 아버지가 관리자 화면 대신 이 파일에서 고치면 된다.
+ * 여기 없는 품종은 문구 없이 이름만 나온다.
+ */
+const VARIETY_NOTE: Record<string, string> = {
   대보: '알이 굵어 구워 먹기 좋습니다.',
   포르단: '껍질이 잘 벗겨져 손질이 편합니다.',
   옥광: '단맛이 좋아 쪄서 그대로 먹기 좋습니다.',
 };
 
+/**
+ * 상품을 품종별로 묶는다.
+ *
+ * 미리 정해둔 품종 목록을 훑지 않고 **실제 상품에 있는 품종**을 순서대로 모은다.
+ * 관리자가 새 이름의 상품을 넣어도 목록에서 조용히 사라지지 않는다.
+ */
+function groupByVariety(products: Product[]) {
+  const groups: { variety: string; image: string; items: Product[] }[] = [];
+
+  for (const product of products) {
+    let group = groups.find((g) => g.variety === product.variety);
+    if (!group) {
+      group = { variety: product.variety, image: product.imageUrl, items: [] };
+      groups.push(group);
+    }
+    if (!group.image) group.image = product.imageUrl;
+    group.items.push(product);
+  }
+
+  return groups;
+}
+
 export default async function ShopPage() {
   const products = await listProducts();
-
-  const groups = VARIETIES.map((variety) => ({
-    variety,
-    image: products.find((p) => p.variety === variety)?.imageUrl ?? '',
-    items: products.filter((p) => p.variety === variety),
-  })).filter((g) => g.items.length > 0);
+  const groups = groupByVariety(products);
 
   return (
     <>
@@ -55,9 +75,11 @@ export default async function ShopPage() {
                   ) : null}
                   <div>
                     <h2 className="font-display text-[1.4rem] leading-tight">{group.variety}</h2>
-                    <p className="mt-0.5 text-[0.85rem] leading-snug text-ink-soft">
-                      {VARIETY_NOTE[group.variety]}
-                    </p>
+                    {VARIETY_NOTE[group.variety] ? (
+                      <p className="mt-0.5 text-[0.85rem] leading-snug text-ink-soft">
+                        {VARIETY_NOTE[group.variety]}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -93,20 +115,13 @@ export default async function ShopPage() {
   );
 }
 
-function toShopProduct(p: {
-  id: string;
-  name: string;
-  size: string;
-  price: number;
-  stock: number;
-  initialStock: number;
-}): ShopProduct {
+function toShopProduct(p: Product): ShopProduct {
   return {
     id: p.id,
     name: p.name,
-    size: p.size,
+    // 이름이 "대보 중" 꼴이 아니면 크기가 비어 있다. 그때는 이름을 그대로 줄 이름표로 쓴다.
+    label: p.size || p.name,
     price: p.price,
     stock: p.stock,
-    initialStock: p.initialStock,
   };
 }

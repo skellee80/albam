@@ -14,13 +14,19 @@ export type Size = (typeof SIZES)[number];
 
 export interface Product {
   id: string;
-  name: string; // "대보 중"
-  variety: Variety;
-  size: Size;
+  /**
+   * "대보 중" 처럼 품종과 크기를 합친 이름. **이 값이 유일한 출처다.**
+   * variety/size는 여기서 자동으로 뽑아낸다(parseProductName).
+   * 관리자가 이름만 고치면 손님 화면의 묶음 제목과 크기 표시가 함께 따라간다.
+   */
+  name: string;
+  /** 이름에서 유도된 값. 손님 화면에서 상품을 묶는 기준. 직접 입력하지 않는다. */
+  variety: string;
+  /** 이름에서 유도된 값. 묶음 안에서 각 줄의 이름표. 직접 입력하지 않는다. */
+  size: string;
   price: number; // 원
   imageUrl: string;
-  stock: number; // 현재 남은 재고
-  initialStock: number; // 재고 경고(20%) 기준선
+  stock: number; // 현재 남은 재고 (0이면 매진)
   hidden: boolean; // 상품 목록에서 숨김
   sortOrder: number;
   createdAt: number;
@@ -73,9 +79,11 @@ export interface Order {
   id: string;
   orderNo: string; // "20260726-0001"
   recipient: Recipient;
-  phoneNorm: string; // 숫자만 남긴 전화번호 (조회용)
+  phoneNorm: string; // 받는 분 전화번호, 숫자만 (조회용)
   depositorName: string;
   depositorNameNorm: string; // 공백 제거 + NFC (매칭/조회용)
+  depositorPhone: string; // 입금하신 분 연락처 — 입금 문제로 연락할 곳
+  depositorPhoneNorm: string; // 숫자만 (조회용)
   sameAsDepositor: boolean;
   items: OrderItem[];
   totalAmount: number; // 서버가 재계산한 값만 저장

@@ -40,6 +40,8 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
     phoneNorm: data.phoneNorm ?? '',
     depositorName: data.depositorName ?? '',
     depositorNameNorm: data.depositorNameNorm ?? '',
+    depositorPhone: data.depositorPhone ?? '',
+    depositorPhoneNorm: data.depositorPhoneNorm ?? '',
     sameAsDepositor: Boolean(data.sameAsDepositor),
     items,
     totalAmount: Number(data.totalAmount ?? 0),
@@ -82,6 +84,7 @@ function reservationOf(order: Pick<Order, 'deleted' | 'status' | 'items'>): Map<
 export type CreateOrderInput = {
   lines: CartLine[];
   depositorName: string;
+  depositorPhone: string;
   sameAsDepositor: boolean;
   recipient: Recipient;
 };
@@ -99,6 +102,7 @@ export type CreateOrderResult =
  */
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const depositorName = input.depositorName.trim();
+  const depositorPhone = input.depositorPhone.trim();
   const recipient: Recipient = {
     name: input.recipient.name.trim(),
     phone: input.recipient.phone.trim(),
@@ -106,6 +110,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   };
 
   if (!depositorName) return { ok: false, error: '입금자명을 입력해 주세요.' };
+  if (normalizePhone(depositorPhone).length < 9)
+    return { ok: false, error: '입금하시는 분 연락처를 정확히 입력해 주세요.' };
   if (!recipient.name) return { ok: false, error: '받는 분 이름을 입력해 주세요.' };
   if (normalizePhone(recipient.phone).length < 9)
     return { ok: false, error: '받는 분 연락처를 정확히 입력해 주세요.' };
@@ -177,6 +183,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       phoneNorm: normalizePhone(recipient.phone),
       depositorName,
       depositorNameNorm: normalizeName(depositorName),
+      depositorPhone,
+      depositorPhoneNorm: normalizePhone(depositorPhone),
       sameAsDepositor: Boolean(input.sameAsDepositor),
       items,
       totalAmount,
@@ -204,6 +212,7 @@ export type OrderPatch = Partial<
     Order,
     | 'recipient'
     | 'depositorName'
+    | 'depositorPhone'
     | 'items'
     | 'status'
     | 'trackingNo'
@@ -234,6 +243,10 @@ export async function updateOrder(orderId: string, patch: OrderPatch): Promise<v
     if (patch.depositorName !== undefined) {
       after.depositorName = patch.depositorName.trim();
       after.depositorNameNorm = normalizeName(after.depositorName);
+    }
+    if (patch.depositorPhone !== undefined) {
+      after.depositorPhone = patch.depositorPhone.trim();
+      after.depositorPhoneNorm = normalizePhone(after.depositorPhone);
     }
 
     const now = Date.now();
@@ -268,6 +281,8 @@ export async function updateOrder(orderId: string, patch: OrderPatch): Promise<v
       phoneNorm: after.phoneNorm,
       depositorName: after.depositorName,
       depositorNameNorm: after.depositorNameNorm,
+      depositorPhone: after.depositorPhone,
+      depositorPhoneNorm: after.depositorPhoneNorm,
       items: after.items,
       totalAmount: after.totalAmount,
       status: after.status,
@@ -328,23 +343,38 @@ export async function listOrders(
 /**
  * 고객 배송조회. 입금자명 + 전화번호가 **둘 다 정확히** 일치하는 건만 돌려준다.
  * 취소/삭제 주문은 노출하지 않는다(PRD). 환불·교환은 진행 상태로 그대로 보여준다.
+ *
+ * 전화번호는 **입금하신 분 번호와 받는 분 번호 어느 쪽이든** 맞으면 찾아준다.
+ * 손님은 자기가 주문서에 적은 번호를 넣을 뿐, 그게 둘 중 어느 칸이었는지 기억하지 못한다.
+ * (Firestore는 서로 다른 필드의 OR를 한 번에 못 하므로 두 번 조회해 합친다)
  */
 export async function lookupOrders(depositorName: string, phone: string): Promise<Order[]> {
   const nameNorm = normalizeName(depositorName ?? '');
   const phoneNorm = normalizePhone(phone ?? '');
   if (!nameNorm || !phoneNorm) return [];
 
-  const snap = await db
-    .collection(COL.orders)
-    .where('depositorNameNorm', '==', nameNorm)
-    .where('phoneNorm', '==', phoneNorm)
-    .orderBy('createdAt', 'desc')
-    .limit(50)
-    .get();
+  const byField = (field: 'phoneNorm' | 'depositorPhoneNorm') =>
+    db
+      .collection(COL.orders)
+      .where('depositorNameNorm', '==', nameNorm)
+      .where(field, '==', phoneNorm)
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
 
-  return snap.docs
-    .map((d) => mapOrder(d.id, d.data()))
-    .filter((o) => !o.deleted && o.status !== '취소');
+  const [byRecipient, byDepositor] = await Promise.all([
+    byField('phoneNorm'),
+    byField('depositorPhoneNorm'),
+  ]);
+
+  const found = new Map<string, Order>();
+  for (const doc of [...byRecipient.docs, ...byDepositor.docs]) {
+    if (!found.has(doc.id)) found.set(doc.id, mapOrder(doc.id, doc.data()));
+  }
+
+  return [...found.values()]
+    .filter((o) => !o.deleted && o.status !== '취소')
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /** 입금 매칭 후보: 아직 입금 확인이 안 된 주문 */

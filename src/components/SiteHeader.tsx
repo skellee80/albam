@@ -7,13 +7,13 @@ import Link from 'next/link';
 export function SiteHeader({ active }: { active: 'shop' | 'track' | null }) {
   return (
     <header className="burr-edge bg-burr text-white">
-      <div className="mx-auto w-full max-w-[30rem] px-5 pt-5 pb-8">
+      <div className="mx-auto flex w-full max-w-[30rem] flex-col items-center px-5 pt-5 pb-8">
         <Link href="/" className="inline-flex items-baseline gap-2">
           <span className="font-display text-[1.7rem] leading-none tracking-tight">알밤</span>
           <span className="text-[0.8rem] text-white/75">햇밤 직거래</span>
         </Link>
 
-        <nav className="mt-4 flex gap-2" aria-label="주요 메뉴">
+        <nav className="mt-4 flex justify-center gap-2" aria-label="주요 메뉴">
           <NavLink href="/" label="밤 고르기" isActive={active === 'shop'} />
           <NavLink href="/track" label="배송 조회" isActive={active === 'track'} />
         </nav>

@@ -9,21 +9,13 @@ import { useCart } from './CartProvider';
 /** 상품 목록에 필요한 것만 추린 모양. 서버에서 클라이언트로 넘기는 값이라 최소로 유지한다. */
 export type ShopProduct = {
   id: string;
+  /** 장바구니·주문에 남는 정식 이름 ("대보 중") */
   name: string;
-  size: string;
+  /** 묶음 안에서 이 줄에 보일 짧은 이름표 ("중") */
+  label: string;
   price: number;
   stock: number;
-  initialStock: number;
 };
-
-/** 재고를 정확한 숫자로 노출하면 "얼마 없네" 하고 되레 망설인다. 적을 때만 알린다. */
-function stockHint(product: ShopProduct): string | null {
-  if (product.stock <= 0) return null;
-  if (product.initialStock > 0 && product.stock <= product.initialStock * 0.2) {
-    return `${product.stock}개 남았습니다`;
-  }
-  return null;
-}
 
 export function ProductRow({ product }: { product: ShopProduct }) {
   const { add } = useCart();
@@ -35,7 +27,6 @@ export function ProductRow({ product }: { product: ShopProduct }) {
 
   const soldOut = product.stock <= 0;
   const max = Math.max(1, product.stock);
-  const hint = stockHint(product);
 
   function handleAdd() {
     add({ productId: product.id, name: product.name, price: product.price }, qty);
@@ -48,13 +39,13 @@ export function ProductRow({ product }: { product: ShopProduct }) {
   return (
     <div className={`px-4 py-3.5 ${soldOut ? 'opacity-55' : ''}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[1.05rem] font-semibold">{product.size}</span>
+        <span className="text-[1.05rem] font-semibold">{product.label}</span>
         <span className="tnum text-[1.05rem] font-bold">{formatKRW(product.price)}</span>
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-3">
-        <p className={`text-[0.8rem] ${hint ? 'text-amber' : 'text-ink-faint'}`}>
-          {soldOut ? '지금은 준비된 물량이 없습니다' : (hint ?? '주문 가능')}
+        <p className="text-[0.8rem] text-ink-faint">
+          {soldOut ? '지금은 준비된 물량이 없습니다' : '주문 가능'}
         </p>
 
         {soldOut ? (

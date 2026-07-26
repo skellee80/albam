@@ -16,6 +16,7 @@ export type EditableOrder = {
   orderNo: string;
   recipient: { name: string; phone: string; address: string };
   depositorName: string;
+  depositorPhone: string;
   items: OrderItem[];
   totalAmount: number;
   status: OrderStatus;
@@ -51,6 +52,7 @@ export function OrderEditor({
   const [phone, setPhone] = useState(order.recipient.phone);
   const [address, setAddress] = useState(order.recipient.address);
   const [depositorName, setDepositorName] = useState(order.depositorName);
+  const [depositorPhone, setDepositorPhone] = useState(order.depositorPhone);
   const [items, setItems] = useState<OrderItem[]>(order.items);
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [trackingNo, setTrackingNo] = useState(order.trackingNo);
@@ -84,6 +86,7 @@ export function OrderEditor({
       const result = await updateOrderAction(order.id, {
         recipient: { name, phone, address },
         depositorName,
+        depositorPhone,
         items: items.map((i) => ({ ...i, subtotal: i.price * i.qty })),
         status,
         trackingNo,
@@ -266,6 +269,17 @@ export function OrderEditor({
         <p className="mt-1.5 text-[0.8rem] text-ink-soft">
           입금자명을 고치면 이후 들어오는 입금 문자와의 자동 매칭 기준도 바뀝니다.
         </p>
+
+        <label className="label mt-4" htmlFor="depositorPhone">
+          입금하신 분 연락처
+        </label>
+        <input
+          id="depositorPhone"
+          className="field tnum"
+          value={depositorPhone}
+          onChange={(e) => setDepositorPhone(e.target.value)}
+          inputMode="tel"
+        />
 
         <label className="label mt-4" htmlFor="name">
           받는 분 이름

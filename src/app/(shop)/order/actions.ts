@@ -17,6 +17,7 @@ export type PlaceOrderResult =
 export async function placeOrder(payload: {
   lines: { productId: string; qty: number }[];
   depositorName: string;
+  depositorPhone: string;
   sameAsDepositor: boolean;
   recipient: { name: string; phone: string; address: string };
 }): Promise<PlaceOrderResult> {
@@ -24,6 +25,7 @@ export async function placeOrder(payload: {
     const result = await createOrder({
       lines: payload.lines,
       depositorName: payload.depositorName,
+      depositorPhone: payload.depositorPhone,
       sameAsDepositor: payload.sameAsDepositor,
       recipient: payload.recipient,
     });

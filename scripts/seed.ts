@@ -47,6 +47,7 @@ async function main() {
   for (const variety of VARIETIES) {
     for (const size of SIZES) {
       const name = `${variety} ${size}`;
+      // variety/size는 이름에서 유도되는 값이지만, 시드는 db를 직접 쓰므로 함께 넣어 준다.
       const payload = {
         name,
         variety,
@@ -54,7 +55,6 @@ async function main() {
         price: priceTable[variety][size],
         imageUrl: imageByVariety[variety],
         stock: 50,
-        initialStock: 50,
         hidden: false,
         sortOrder: sortOrder++,
         updatedAt: now,
