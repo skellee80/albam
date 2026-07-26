@@ -1,12 +1,46 @@
 /**
  * 표시 형식과 정규화 유틸.
  *
- * 서버는 UTC로 돌기 때문에(Cloud Run) 날짜/시간은 반드시 Asia/Seoul을 명시한다.
+ * 날짜·금액을 Intl(=런타임 ICU 데이터)에 맡기지 않고 직접 만든다.
+ *
+ * 이유: 서버(Node)와 브라우저의 ICU 데이터가 달라 같은 값이 다르게 찍힌다.
+ * 실제로 ko-KR 오전/오후가 서버에서는 "PM", 브라우저에서는 "오후"로 나와
+ * 하이드레이션이 깨졌다. 여기서 만드는 문자열은 어느 런타임에서도 동일하다.
+ *
+ * 서버는 UTC로 돌기 때문에(Cloud Run) 시간은 반드시 한국 시간으로 옮겨서 쓴다.
  * 이걸 빼먹으면 오전 9시 이전 주문이 하루 전 날짜로 찍힌다.
  */
 import { SIZES } from './types';
 
-const KST = 'Asia/Seoul';
+/**
+ * 한국 표준시는 UTC+9 고정이고 서머타임이 없다(1988년 이후).
+ * 그래서 시간대 데이터베이스 없이 더하기 하나로 정확히 옮길 수 있다.
+ */
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+type KstParts = { year: number; month: number; day: number; hour: number; minute: number };
+
+/** epoch ms → 한국 시간의 달력 값. UTC 게터만 써서 실행 환경의 시간대와 무관하다. */
+function kstParts(ms: number): KstParts {
+  const shifted = new Date(ms + KST_OFFSET_MS);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+    hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes(),
+  };
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** 24시간 → 오전/오후 + 12시간제 (0시는 오전 12시, 12시는 오후 12시) */
+function toAmPm(hour: number): { period: '오전' | '오후'; hour12: number } {
+  return {
+    period: hour < 12 ? '오전' : '오후',
+    hour12: hour % 12 === 0 ? 12 : hour % 12,
+  };
+}
 
 /**
  * 입금자명 정규화.
@@ -22,8 +56,12 @@ export function normalizePhone(value: string): string {
   return value.replace(/\D/g, '');
 }
 
+/** 천 단위 쉼표도 직접 넣는다 — 로케일 데이터에 기대지 않기 위해. */
 export function formatKRW(amount: number): string {
-  return `${Math.round(amount).toLocaleString('ko-KR')}원`;
+  const rounded = Math.round(amount);
+  const sign = rounded < 0 ? '-' : '';
+  const digits = String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${sign}${digits}원`;
 }
 
 /** 010-1234-5678 형태로 보기 좋게 */
@@ -34,54 +72,36 @@ export function formatPhone(value: string): string {
   return value;
 }
 
+/** 2026년 7월 26일 */
 export function formatDate(ms: number): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: KST,
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date(ms));
+  const { year, month, day } = kstParts(ms);
+  return `${year}년 ${month}월 ${day}일`;
 }
 
+/** 2026년 7월 26일 오후 6:52 */
 export function formatDateTime(ms: number): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: KST,
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(ms));
+  const parts = kstParts(ms);
+  const { period, hour12 } = toAmPm(parts.hour);
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 ${period} ${hour12}:${pad2(parts.minute)}`;
 }
 
+/** 7월 26일 오후 6:52 — 목록에서 자리를 아껴야 할 때 */
 export function formatShortDateTime(ms: number): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: KST,
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(ms));
+  const parts = kstParts(ms);
+  const { period, hour12 } = toAmPm(parts.hour);
+  return `${parts.month}월 ${parts.day}일 ${period} ${hour12}:${pad2(parts.minute)}`;
 }
 
 /** KST 기준 YYYYMMDD. 주문번호 채번과 일별 매출 집계에 쓴다. */
 export function kstDateKey(ms: number = Date.now()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: KST,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(ms));
-  return parts.replace(/-/g, '');
+  const { year, month, day } = kstParts(ms);
+  return `${year}${pad2(month)}${pad2(day)}`;
 }
 
-/** KST 기준 M/D 라벨 (차트 축용) */
+/** KST 기준 7.26 라벨 (차트 축용) */
 export function kstDayLabel(ms: number): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: KST,
-    month: 'numeric',
-    day: 'numeric',
-  }).format(new Date(ms));
+  const { month, day } = kstParts(ms);
+  return `${month}.${day}`;
 }
 
 /**

@@ -359,6 +359,45 @@ async function main() {
   }
 
   /* ────────────────────────────────────────────── */
+  section('14. 날짜·금액 형식이 실행 환경에 좌우되지 않는가');
+
+  // 서버(Node)와 브라우저의 ICU 데이터가 달라 ko-KR 오전/오후가 "PM"으로 나오는 바람에
+  // 하이드레이션이 깨진 적이 있다. 고정 시각으로 결과를 못 박아 재발을 잡는다.
+  const { formatDate, formatDateTime, formatShortDateTime, kstDateKey, kstDayLabel, formatKRW } =
+    await import('../src/lib/format');
+
+  const evening = Date.UTC(2026, 6, 26, 9, 52); // KST 2026-07-26 18:52
+  check('연월일', formatDate(evening) === '2026년 7월 26일', formatDate(evening));
+  check(
+    '연월일 + 오후 시각',
+    formatDateTime(evening) === '2026년 7월 26일 오후 6:52',
+    formatDateTime(evening),
+  );
+  check(
+    '짧은 날짜시각',
+    formatShortDateTime(evening) === '7월 26일 오후 6:52',
+    formatShortDateTime(evening),
+  );
+  check('날짜 키', kstDateKey(evening) === '20260726', kstDateKey(evening));
+  check('차트 축 라벨', kstDayLabel(evening) === '7.26', kstDayLabel(evening));
+
+  // 자정과 정오는 12시간제에서 틀리기 쉬운 자리다
+  const midnightKst = Date.UTC(2026, 0, 1, 15, 0); // KST 2026-01-02 00:00
+  check(
+    '자정은 오전 12시이고 날짜가 넘어간다',
+    formatDateTime(midnightKst) === '2026년 1월 2일 오전 12:00',
+    formatDateTime(midnightKst),
+  );
+  check('자정의 날짜 키도 넘어간다', kstDateKey(midnightKst) === '20260102', kstDateKey(midnightKst));
+
+  const noonKst = Date.UTC(2026, 6, 26, 3, 0); // KST 12:00
+  check('정오는 오후 12시', formatShortDateTime(noonKst) === '7월 26일 오후 12:00', formatShortDateTime(noonKst));
+
+  check('금액에 천 단위 쉼표', formatKRW(1234567) === '1,234,567원', formatKRW(1234567));
+  check('세 자리 이하는 쉼표 없음', formatKRW(999) === '999원', formatKRW(999));
+  check('0원', formatKRW(0) === '0원', formatKRW(0));
+
+  /* ────────────────────────────────────────────── */
   console.log(`\n${'─'.repeat(50)}`);
   console.log(`통과 ${passed}건, 실패 ${failed}건`);
   if (failed > 0) process.exit(1);
