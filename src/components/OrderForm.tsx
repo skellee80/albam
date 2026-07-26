@@ -8,6 +8,7 @@ import { formatDateTime, formatKRW } from '@/lib/format';
 import { PAYMENT_DEADLINE_HOURS, type OrderItem, type Settings } from '@/lib/types';
 
 import { useCart } from './CartProvider';
+import { PaymentNotice } from './PaymentNotice';
 
 /** 주문 화면에서 참조하는 최신 상품 정보 (품절·가격 변동 확인용) */
 export type OrderProduct = {
@@ -400,23 +401,8 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
           </p>
         </div>
 
-        <p className="mt-4 text-[0.83rem] leading-relaxed text-shell">
-          입금자명이 <b>{completed.depositorName}</b> 과(와) 다르면 입금 확인이 늦어집니다.
-          이체할 때 이름을 꼭 확인해 주세요.
-        </p>
-
-        {/* 자동 확인은 금액이 정확히 맞을 때만 된다. 합산 입금이 가장 흔한 실패 원인이다. */}
-        <div className="mt-3 rounded-xl border-2 border-berry/35 bg-berry-tint px-3.5 py-3">
-          <p className="text-[0.85rem] font-bold text-berry">
-            주문마다 따로, 이 금액 그대로 보내주세요
-          </p>
-          <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-soft">
-            주문이 여러 건이면 <b>각 주문의 금액을 따로</b> 보내주셔야 합니다. 여러 건을 더해
-            한 번에 보내시면 <b>입금 확인이 되지 않습니다.</b>
-            <br />
-            이미 합쳐서 보내셨다면 <b>주문 조회에서 주문을 취소하고 다시 주문하신 뒤</b> 각
-            금액으로 보내주세요.
-          </p>
+        <div className="mt-4">
+          <PaymentNotice depositorName={completed.depositorName} />
         </div>
       </div>
 

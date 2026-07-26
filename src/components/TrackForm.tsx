@@ -7,6 +7,7 @@ import { cancelOwnOrder, findOrders, type TrackedOrder } from '@/app/(shop)/trac
 import { formatDate, formatDateTime, formatKRW } from '@/lib/format';
 
 import { OrderStatusTrail, SpecialStatusBadge } from './OrderStatusTrail';
+import { PaymentNotice } from './PaymentNotice';
 import { TrackingNumber } from './TrackingNumber';
 
 export function TrackForm({ contactPhone }: { contactPhone: string }) {
@@ -15,6 +16,9 @@ export function TrackForm({ contactPhone }: { contactPhone: string }) {
   const [error, setError] = useState<string | null>(null);
   const [orders, setOrders] = useState<TrackedOrder[] | null>(null);
   const [pending, startTransition] = useTransition();
+
+  /** 아직 입금하지 않은 주문 수. 둘 이상이면 합산 입금 주의를 띄운다. */
+  const pendingCount = (orders ?? []).filter((o) => o.status === '입금대기').length;
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -94,6 +98,12 @@ export function TrackForm({ contactPhone }: { contactPhone: string }) {
           <p className="px-1 text-[0.85rem] text-ink-soft">
             주문 <b className="tnum text-ink">{orders.length}</b>건을 찾았습니다.
           </p>
+
+          {/*
+            아직 입금 안 된 주문이 둘 이상일 때만 띄운다.
+            한 건뿐이면 합산할 것이 없어 안내할 이유가 없다.
+          */}
+          {pendingCount >= 2 && <PaymentNotice />}
           {orders.map((order) => (
             <TrackedOrderCard
               key={order.id}
@@ -172,13 +182,6 @@ function TrackedOrderCard({
           </p>
           <p className="mt-2 text-[0.8rem] leading-relaxed text-ink-soft">
             {formatDateTime(order.paymentDueAt)}까지 입금되지 않으면 주문이 자동으로 취소됩니다.
-          </p>
-
-          {/* 합산 입금이 자동 확인이 안 되는 가장 흔한 이유다 */}
-          <p className="mt-2 border-t border-shell/20 pt-2 text-[0.82rem] leading-relaxed text-berry">
-            이 주문은 <b className="tnum">{formatKRW(order.totalAmount)}</b> 을 그대로 보내주셔야
-            확인됩니다. 다른 주문과 <b>더해서 한 번에 보내시면 확인되지 않습니다.</b> 이미 합쳐
-            보내셨다면 아래에서 <b>주문을 취소하고 다시 주문</b>한 뒤 각 금액으로 보내주세요.
           </p>
         </div>
       )}
