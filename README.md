@@ -394,22 +394,101 @@ curl -X POST https://albam--albam-416fd.asia-east1.hosted.app/api/deposit \
 
 ---
 
-## 6. 시크릿 바꾸기
+## 6. 관리자 비밀번호 바꾸기
 
-관리자 비밀번호나 MacroDroid 토큰을 바꿀 때:
+> **사이트 안에는 비밀번호를 바꾸는 메뉴가 없다.** 관리자 화면을 아무리 뒤져도 안 나온다.
+> 비밀번호는 Firestore가 아니라 **Google Secret Manager** 라는 금고에 따로 들어 있어서,
+> 사이트 코드가 읽기만 할 뿐 고칠 수 없기 때문이다.
+> 사이트가 뚫려도 비밀번호는 안 새게 하려고 일부러 이렇게 나눠 놓았다.
+>
+> 그래서 바꾸는 곳은 **컴퓨터의 터미널** 이다. 명령 두 줄이면 끝난다.
 
-```bash
-firebase apphosting:secrets:set albam-admin-password
+### 1단계. 터미널 열기
+
+VS Code에서 이 프로젝트 폴더를 연 뒤 **Ctrl + `** (숫자 1 왼쪽의 `~` 키).
+메뉴로 가려면 상단 **터미널 → 새 터미널**.
+
+아래처럼 프로젝트 경로가 보이면 준비된 것이다.
+
+```
+PS D:\Project\VSCode\bam>
 ```
 
-새 버전이 만들어지고, **다음 배포부터** 적용된다. 바로 반영하려면 빈 커밋을 밀어 재배포한다.
+### 2단계. 새 비밀번호 넣기
+
+이 한 줄을 그대로 붙여넣고 Enter.
 
 ```bash
-git commit --allow-empty -m "chore: 시크릿 갱신 반영"
-git push
+npx firebase apphosting:secrets:set albam-admin-password --project albam-416fd
 ```
 
-`albam-session-secret` 을 바꾸면 기존 로그인 세션이 모두 풀려서 다시 로그인해야 한다.
+물어보는 것에 이렇게 답한다.
+
+| 물어보는 것 | 이렇게 |
+|---|---|
+| `? Enter a value for albam-admin-password` | 새 비밀번호를 치고 Enter. **화면에 아무 글자도 안 보이는 게 정상이다** (어깨너머로 못 보게) |
+| `? Would you like to add this secret to apphosting.yaml?` | **No** — 이미 적혀 있다. 화살표로 No 를 고르고 Enter |
+
+`✔ Created new secret version projects/.../versions/2` 가 나오면 성공이다.
+`versions/2`, `versions/3` … 처럼 숫자가 하나씩 올라간다.
+
+### 3단계. 사이트에 반영하기 — 이걸 빠뜨리면 안 바뀐다
+
+2단계는 **금고에만** 새 비밀번호를 넣었을 뿐이다. 돌아가고 있는 사이트는
+배포될 때 읽어 둔 **옛 비밀번호를 그대로 쥐고 있다.** 새로 배포해야 바뀐다.
+
+```bash
+npx firebase apphosting:rollouts:create albam -b main --project albam-416fd
+```
+
+`✔ Successfully created a new rollout!` 이 나온 뒤 **3~5분** 기다린다.
+
+### 4단계. 확인
+
+폰이나 컴퓨터에서 시크릿 창(사생활 보호 모드)으로 `/admin/login` 에 들어가
+**새 비밀번호로** 로그인해 본다.
+
+- 들어가진다 → 끝났다
+- 아직 옛 비밀번호로 들어가진다 → 3단계 배포가 아직 안 끝난 것이다. 좀 더 기다린다
+
+> **아버지 폰은 다시 로그인하지 않아도 된다.** 로그인 상태(쿠키)는 비밀번호가 아니라
+> `albam-session-secret` 으로 서명해 두기 때문에, 비밀번호를 바꿔도 이미 들어가 있는
+> 폰은 그대로 유지된다. 아버지가 모르는 사이에 로그아웃돼서 당황할 일이 없다.
+
+### 어떤 비밀번호가 좋은가
+
+이 사이트는 인터넷에 열려 있어 누구나 `/admin/login` 화면까지는 볼 수 있다.
+(비밀번호를 5번 틀리면 10분 동안 막히긴 한다)
+
+- **좋다**: `밤농사2026`, `chilgap7788` — 아버지에게 익숙한 말 + 숫자, 8자 이상
+- **피한다**: 생년월일, 전화번호 뒷자리, `1234`, 가게 이름 그대로
+
+한글도 된다. 다만 아버지 폰 자판에서 한/영 바꾸는 게 번거로우면 영문+숫자가 편하다.
+
+### 다른 시크릿도 같은 방법이다
+
+| 시크릿 이름 | 무엇 |
+|---|---|
+| `albam-admin-password` | 관리자 비밀번호 |
+| `albam-macrodroid-token` | 아버지 폰이 입금 문자를 보낼 때 쓰는 열쇠 |
+| `albam-session-secret` | 로그인 상태 서명 키 |
+
+이름만 바꿔서 2단계·3단계를 똑같이 하면 된다. 단:
+
+- `albam-macrodroid-token` 을 바꾸면 **MacroDroid 설정의 토큰도 같이 고쳐야** 한다.
+  안 고치면 입금 문자가 전부 `❌ 인증 실패` 가 된다.
+- `albam-session-secret` 을 바꾸면 **로그인이 전부 풀린다.** 아버지 폰도 다시 로그인해야 한다.
+
+### 지금 값이 뭔지 잊었다면
+
+**값은 다시 볼 수 없다.** 금고는 넣을 수만 있고 꺼내 볼 수는 없게 되어 있다.
+잊었으면 위 방법으로 새로 넣으면 된다.
+
+언제 몇 번째 버전이 만들어졌는지는 볼 수 있다.
+
+```bash
+npx firebase apphosting:secrets:describe albam-admin-password --project albam-416fd
+```
 
 ---
 

@@ -1,11 +1,15 @@
 # Firebase App Hosting 백엔드 설정
-# 배포 주소: https://albam--albam-416fd.us-central1.hosted.app
+# 배포 주소: https://albam--albam-416fd.asia-east1.hosted.app
 #
 # 아래 secret 3개는 소스에 값을 두지 않는다. 배포 전에 한 번만 등록:
 #   firebase apphosting:secrets:set albam-admin-password
 #   firebase apphosting:secrets:set albam-session-secret
 #   firebase apphosting:secrets:set albam-macrodroid-token
-# 자세한 절차는 README.md 참고.
+#
+# 값을 바꾼 뒤에는 **반드시 새 롤아웃을 만들어야** 적용된다.
+# 아래 secret 값은 배포(롤아웃) 시점에 읽혀 환경변수로 굳어지기 때문이다.
+#   firebase apphosting:rollouts:create albam -b main
+# 자세한 절차는 README.md 6장 참고.
 
 runConfig:
   # 주문이 몰리는 시즌 상품이라 0 → 스케일업을 허용하되 상한을 낮게 둔다.
