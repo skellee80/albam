@@ -8,7 +8,7 @@
 
 | | |
 |---|---|
-| 배포 주소 | `https://albam--albam-416fd.us-central1.hosted.app` |
+| 배포 주소 | `https://albam--albam-416fd.asia-east1.hosted.app` |
 | 호스팅 | Firebase App Hosting (Blaze) — GitHub push 시 자동 빌드 |
 | 저장소 | Firestore (프로덕션 모드) |
 | 프레임워크 | Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 |
@@ -127,7 +127,7 @@ firebase apphosting:backends:create --project albam-416fd
 
 물어보는 대로 고르면 된다.
 
-- 리전: `us-central1`
+- 리전: `asia-east1`
 - GitHub 저장소: `skellee80/albam` (Firebase GitHub 앱 권한 승인 필요)
 - 라이브 브랜치: `main`
 - 백엔드 ID: `albam`
@@ -186,7 +186,7 @@ MacroDroid 앱 → 아래 `+` → **매크로 추가** → 트리거의 `+`
 | 항목 | 값 |
 |---|---|
 | 방식 | `POST` |
-| URL | `https://albam--albam-416fd.us-central1.hosted.app/api/deposit` |
+| URL | `https://albam--albam-416fd.asia-east1.hosted.app/api/deposit` |
 | 콘텐츠 타입 | `application/json` |
 | 본문 | 아래 |
 
@@ -265,7 +265,7 @@ npm run sms -- "<새마을금고>382710**5 김지수 입금450,000 잔액1,600,0
 `❌ 인증 실패` 면 토큰이 틀린 것이고, `❓ 미매칭` 이면 연결은 정상이다.
 
 ```bash
-curl -X POST https://albam--albam-416fd.us-central1.hosted.app/api/deposit \
+curl -X POST https://albam--albam-416fd.asia-east1.hosted.app/api/deposit \
   -H "content-type: application/json" \
   -d '{"token":"등록한_토큰","text":"<새마을금고>382710**5 연결테스트 입금1 잔액1,000원"}'
 ```
