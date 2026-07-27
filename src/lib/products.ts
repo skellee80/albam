@@ -2,6 +2,7 @@ import 'server-only';
 
 import { COL, db, toMillisOr } from './firebase-admin';
 import { parseProductName } from './format';
+import { defaultProducts } from './seed-products';
 import type { Product } from './types';
 
 /**
@@ -87,4 +88,29 @@ export async function updateProduct(id: string, patch: Partial<ProductInput>): P
 
 export async function deleteProduct(id: string): Promise<void> {
   await db.collection(COL.products).doc(id).delete();
+}
+
+/**
+ * 상품이 하나도 없을 때 기본 18종을 넣는다.
+ *
+ * 배포 직후 관리자 화면에서 한 번 누르면 되도록 만든 것이다.
+ * 서버 자격증명 없이 로컬에서 운영 DB에 시드하려면 gcloud 설정이 필요한데,
+ * 그걸 아버지나 사용자가 하게 만들 이유가 없다.
+ *
+ * **이미 상품이 있으면 아무것도 하지 않는다.** 실수로 눌러도 기존 재고·가격이
+ * 덮어써지지 않아야 한다.
+ */
+export async function seedDefaultProductsIfEmpty(): Promise<number> {
+  const existing = await db.collection(COL.products).limit(1).get();
+  if (!existing.empty) return 0;
+
+  const seeds = defaultProducts();
+  const now = Date.now();
+  const batch = db.batch();
+  for (const product of seeds) {
+    batch.set(db.collection(COL.products).doc(), { ...product, createdAt: now, updatedAt: now });
+  }
+  await batch.commit();
+
+  return seeds.length;
 }

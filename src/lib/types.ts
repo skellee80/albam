@@ -22,6 +22,19 @@ export const SIZE_ALIASES: Record<string, Size> = { 특대: '특' };
 export const WEIGHTS = ['4kg', '10kg'] as const;
 export type Weight = (typeof WEIGHTS)[number];
 
+/** 처음 넣는 상품 한 건 (variety/size/weight 는 이름에서 유도되지만 시드는 함께 저장한다) */
+export type ProductSeed = {
+  name: string;
+  variety: string;
+  size: string;
+  weight: string;
+  price: number;
+  imageUrl: string;
+  stock: number;
+  hidden: boolean;
+  sortOrder: number;
+};
+
 /**
  * 크기 안내.
  * 크기는 모든 품종·무게에서 똑같이 반복되므로 상품마다 붙이지 않고

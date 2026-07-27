@@ -788,6 +788,59 @@ async function main() {
   check('0원', formatKRW(0) === '0원', formatKRW(0));
 
   /* ────────────────────────────────────────────── */
+  // 상품을 지웠다가 다시 넣으므로 반드시 마지막에 둔다.
+  section('23. 기본 상품 넣기 — 비어 있을 때 한 번만');
+
+  const { seedDefaultProductsIfEmpty } = await import('../src/lib/products');
+  const { defaultProducts } = await import('../src/lib/seed-products');
+
+  const expected = defaultProducts();
+  check('기본 목록이 18종이다', expected.length === 18, `${expected.length}종`);
+  check(
+    '이름이 겹치지 않는다',
+    new Set(expected.map((p) => p.name)).size === expected.length,
+  );
+  check(
+    '모든 상품에 가격이 있다',
+    expected.every((p) => p.price > 0),
+  );
+  check(
+    'sortOrder가 0부터 빠짐없이 이어진다',
+    expected.every((p, i) => p.sortOrder === i),
+  );
+
+  const before = await db.collection(COL.products).get();
+  await Promise.all(before.docs.map((d) => d.ref.delete()));
+
+  const seeded = await seedDefaultProductsIfEmpty();
+  check('빈 상태에서 18종을 넣는다', seeded === 18, `${seeded}종`);
+
+  // 관리자가 실수로 두 번 눌러도 재고·가격이 초기화되면 안 된다.
+  const marker = (await db.collection(COL.products).limit(1).get()).docs[0];
+  await marker.ref.update({ stock: 7 });
+
+  const reseeded = await seedDefaultProductsIfEmpty();
+  check('이미 상품이 있으면 넣지 않는다', reseeded === 0, `${reseeded}종`);
+
+  const afterSeed = await db.collection(COL.products).get();
+  check('상품 수가 그대로다', afterSeed.size === 18, `${afterSeed.size}개`);
+  check(
+    '고쳐 둔 재고가 덮어써지지 않았다',
+    (await marker.ref.get()).data()?.stock === 7,
+  );
+
+  const seededProducts = await listProducts();
+  check(
+    '손님 화면에 18종이 모두 보인다',
+    seededProducts.length === 18,
+    `${seededProducts.length}종`,
+  );
+  check(
+    '이름에서 품종·크기·무게가 뽑힌다',
+    seededProducts.every((p) => p.variety && p.size && p.weight),
+  );
+
+  /* ────────────────────────────────────────────── */
   console.log(`\n${'─'.repeat(50)}`);
   console.log(`통과 ${passed}건, 실패 ${failed}건`);
   if (failed > 0) process.exit(1);

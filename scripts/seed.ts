@@ -18,34 +18,13 @@ loadEnvConfig(process.cwd());
 async function main() {
   // .env 를 먼저 읽어야 에뮬레이터 설정이 적용되므로 동적 import 를 쓴다.
   const { COL, db } = await import('../src/lib/firebase-admin');
-  const { DEFAULT_SETTINGS, SIZES, VARIETIES, WEIGHTS } = await import('../src/lib/types');
+  const { DEFAULT_SETTINGS } = await import('../src/lib/types');
+  const { defaultProducts } = await import('../src/lib/seed-products');
 
   const target = process.env.FIRESTORE_EMULATOR_HOST
     ? `에뮬레이터(${process.env.FIRESTORE_EMULATOR_HOST})`
     : `실제 Firestore(${process.env.GOOGLE_CLOUD_PROJECT ?? 'albam-416fd'})`;
   console.log(`시드 대상: ${target}\n`);
-
-  // 임시 가격. PRD상 추후 업데이트 예정이며 관리자 화면에서 바꿀 수 있다.
-  // 4kg 기준 가격에 10kg는 대략 2.2배(대량 할인)로 잡았다.
-  const priceTable: Record<string, Record<string, Record<string, number>>> = {
-    대보: {
-      '4kg': { 중: 28000, 대: 35000, 특: 45000 },
-      '10kg': { 중: 62000, 대: 78000, 특: 99000 },
-    },
-    포르단: {
-      '4kg': { 중: 26000, 대: 33000, 특: 42000 },
-      '10kg': { 중: 58000, 대: 73000, 특: 93000 },
-    },
-    옥광: {
-      '4kg': { 중: 32000, 대: 40000, 특: 52000 },
-      '10kg': { 중: 71000, 대: 89000, 특: 115000 },
-    },
-  };
-  const imageByVariety: Record<string, string> = {
-    대보: '/products/daebo.svg',
-    포르단: '/products/poredan.svg',
-    옥광: '/products/okgwang.svg',
-  };
 
   const existing = await db.collection(COL.products).get();
 
@@ -62,42 +41,24 @@ async function main() {
     : new Map(existing.docs.map((d) => [d.data().name as string, d.ref]));
 
   const now = Date.now();
-  let sortOrder = 0;
   let created = 0;
   let updated = 0;
 
-  // 손님 화면이 품종 → 크기 → 무게 순으로 묶이므로 sortOrder도 같은 순서로 매긴다
-  for (const variety of VARIETIES) {
-    for (const size of SIZES) {
-      for (const weight of WEIGHTS) {
-        const name = `${variety} ${size} ${weight}`;
-        // variety/size/weight는 이름에서 유도되는 값이지만, 시드는 db를 직접 쓰므로 함께 넣어 준다.
-        const payload = {
-          name,
-          variety,
-          size,
-          weight,
-          price: priceTable[variety][weight][size],
-          imageUrl: imageByVariety[variety],
-          stock: 50,
-          hidden: false,
-          sortOrder: sortOrder++,
-          updatedAt: now,
-        };
+  // 목록은 관리자 화면의 "기본 상품 넣기" 버튼과 같은 곳(src/lib/seed-products.ts)에서 온다.
+  for (const product of defaultProducts()) {
+    const payload = { ...product, updatedAt: now };
+    const ref = byName.get(product.name);
 
-        const ref = byName.get(name);
-        if (ref) {
-          await ref.update(payload);
-          updated++;
-        } else {
-          await db.collection(COL.products).add({ ...payload, createdAt: now });
-          created++;
-        }
-        console.log(
-          `  ${ref ? '갱신' : '생성'}  ${name.padEnd(14)} ${String(payload.price.toLocaleString('ko-KR')).padStart(8)}원  재고 ${payload.stock}`,
-        );
-      }
+    if (ref) {
+      await ref.update(payload);
+      updated++;
+    } else {
+      await db.collection(COL.products).add({ ...payload, createdAt: now });
+      created++;
     }
+    console.log(
+      `  ${ref ? '갱신' : '생성'}  ${product.name.padEnd(14)} ${String(product.price.toLocaleString('ko-KR')).padStart(8)}원  재고 ${product.stock}`,
+    );
   }
 
   const settingsRef = db.collection(COL.settings).doc('config');

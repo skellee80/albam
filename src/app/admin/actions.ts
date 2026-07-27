@@ -19,7 +19,13 @@ import {
   updateOrder,
   type OrderPatch,
 } from '@/lib/orders';
-import { createProduct, deleteProduct, updateProduct, type ProductInput } from '@/lib/products';
+import {
+  createProduct,
+  deleteProduct,
+  seedDefaultProductsIfEmpty,
+  updateProduct,
+  type ProductInput,
+} from '@/lib/products';
 import { updateSettings } from '@/lib/settings';
 import type { OrderItem, OrderStatus, Settings } from '@/lib/types';
 
@@ -129,6 +135,17 @@ export async function restockProductAction(
   stock: number,
 ): Promise<ActionResult> {
   return run(() => updateProduct(productId, { stock }), ['/admin', '/admin/products', '/']);
+}
+
+/**
+ * 상품이 하나도 없을 때만 기본 18종을 넣는다.
+ * 배포 직후 빈 상품 목록을 채우는 용도 — 이미 상품이 있으면 아무것도 하지 않는다.
+ */
+export async function seedProductsAction(): Promise<ActionResult> {
+  return run(async () => {
+    const count = await seedDefaultProductsIfEmpty();
+    if (count === 0) throw new Error('이미 상품이 있어 넣지 않았습니다.');
+  }, ['/admin', '/admin/products', '/']);
 }
 
 /* ── 설정 ── */
