@@ -53,6 +53,7 @@ export default async function AdminDashboardPage() {
     bankName: d.bankName,
     status: d.status,
     receivedAt: d.receivedAt,
+    rawText: d.rawText,
     candidates: d.candidateOrderIds
       .map((id) => candidateById.get(id))
       .filter((o): o is Order => Boolean(o) && !o!.deleted)

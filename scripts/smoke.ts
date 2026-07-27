@@ -73,6 +73,12 @@ async function main() {
     process.exit(1);
   }
 
+  // 판매 계좌 은행 — 입금을 만들 때 이 값을 써야 은행 대조를 통과한다.
+  // 설정에 무엇이 들어 있든 테스트가 깨지지 않도록 하드코딩하지 않는다.
+  const { banksMatch } = await import('../src/lib/deposits');
+  const { getSettings } = await import('../src/lib/settings');
+  const accountBank = (await getSettings()).bankName;
+
   /* ────────────────────────────────────────────── */
   section('1. 주문 생성 — 서버 가격 재계산 / 재고 선점');
 
@@ -145,7 +151,7 @@ async function main() {
   const exact = await recordDeposit({
     amount: expectedTotal,
     depositorName: '홍 길동', // 은행 문자에 공백이 섞여도 매칭되어야 한다
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('금액·이름이 맞으면 확정된다', exact.status === '확정', exact.message);
   check('확정 응답에 상품 요약이 들어간다', exact.message.includes(DAEBO_MID_NAME), exact.message);
@@ -160,7 +166,7 @@ async function main() {
   const again = await recordDeposit({
     amount: expectedTotal,
     depositorName: '홍 길동',
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('같은 입금이 다시 오면 중복으로 처리된다', again.duplicate, JSON.stringify(again));
   check('중복이어도 처음 문구를 그대로 돌려준다', again.message === exact.message);
@@ -190,7 +196,7 @@ async function main() {
   const ambiguous = await recordDeposit({
     amount: daeboMid.price,
     depositorName: '김철수',
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('후보가 여러 건이면 확인필요가 된다', ambiguous.status === '확인필요', ambiguous.message);
   check('후보 건수가 문구에 들어간다', ambiguous.message.includes('2건'), ambiguous.message);
@@ -201,7 +207,7 @@ async function main() {
   const wrongAmount = await recordDeposit({
     amount: 12345,
     depositorName: '박영희',
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('맞는 주문이 없으면 미매칭이 된다', wrongAmount.status === '미매칭', wrongAmount.message);
 
@@ -283,7 +289,7 @@ async function main() {
   const matchDeleted = await recordDeposit({
     amount: okgwangLarge.price,
     depositorName: '삭제대상',
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('삭제된 주문에는 입금이 붙지 않는다', matchDeleted.status === '미매칭', matchDeleted.message);
 
@@ -451,10 +457,6 @@ async function main() {
   const autoCancelled = await lookupOrders('기한지남', '010-4444-5555');
   check('자동 취소된 주문은 배송조회에서 사라진다', autoCancelled.length === 0);
 
-  // 판매 계좌 은행 — 아래 여러 절에서 입금을 만들 때 쓴다
-  const { banksMatch } = await import('../src/lib/deposits');
-  const { getSettings } = await import('../src/lib/settings');
-  const accountBank = (await getSettings()).bankName;
 
   section('16. 상태를 되돌리면 진행 시각도 함께 지워진다');
 
@@ -602,6 +604,56 @@ async function main() {
   const afterPaid = await cancelOwnOrder(paidOne.orderId, '입금끝', '010-5656-5656');
   check('입금 확인된 주문은 스스로 취소할 수 없다', !afterPaid.ok, JSON.stringify(afterPaid));
 
+  section('17-2. 문자 원문을 서버가 해석한다');
+
+  const { parseDepositSms } = await import('../src/lib/sms');
+  const { recordUnparsedDeposit } = await import('../src/lib/deposits');
+
+  const smsOrder = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '문자해석',
+    sameAsDepositor: true,
+    depositorPhone: '010-7373-7373',
+    recipient: { name: '문자해석', phone: '010-7373-7373', address: '공주시 어딘가' },
+  });
+  if (!smsOrder.ok) throw new Error('점검용 주문 생성 실패');
+
+  const sms = `<${accountBank}>382710**5 문자해석 입금${smsOrder.totalAmount.toLocaleString('ko-KR')} 잔액1,600,000원 07/26 21:58`;
+  const parsed = parseDepositSms(sms);
+  check('문자에서 금액을 뽑는다', parsed.ok && parsed.amount === smsOrder.totalAmount, JSON.stringify(parsed));
+  check('문자에서 이름을 뽑는다', parsed.ok && parsed.depositorName === '문자해석');
+  check('문자에서 은행을 알아본다', parsed.ok && parsed.bankName === accountBank);
+
+  // 출금 문자가 입금으로 처리되면 돈을 받지 않은 주문이 발송대기로 올라간다
+  const withdrawal = parseDepositSms('<농협>382710**5 출금50,000 잔액1,000,000원');
+  check('출금 문자는 해석하지 않는다', !withdrawal.ok, JSON.stringify(withdrawal));
+
+  if (parsed.ok) {
+    const viaSms = await recordDeposit({
+      amount: parsed.amount,
+      depositorName: parsed.depositorName,
+      bankName: parsed.bankName,
+      rawText: sms,
+    });
+    check('해석한 값으로 주문이 확정된다', viaSms.status === '확정', viaSms.message);
+
+    const confirmed = (await db.collection(COL.deposits).doc(viaSms.depositId!).get()).data()!;
+    check(
+      '확정된 건에는 원문을 남기지 않는다 (계좌번호·잔액)',
+      !confirmed.rawText,
+      JSON.stringify(confirmed.rawText),
+    );
+  }
+
+  // 해석 실패도 흔적을 남겨야 나중에 규칙을 고칠 수 있다
+  const brokenSms = '[Web발신] 이번달 청구금액 33,000원';
+  await recordUnparsedDeposit(brokenSms, '입금 문자가 아닙니다.');
+  const unparsed = (await db.collection(COL.deposits).get()).docs
+    .map((d) => d.data())
+    .find((d) => d.rawText === brokenSms);
+  check('해석 실패한 문자도 기록에 남는다', !!unparsed, '기록 없음');
+  check('실패 기록은 미매칭으로 남는다', unparsed?.status === '미매칭', unparsed?.status);
+
   section('18. 은행 대조 — 판매 계좌가 아닌 은행 입금은 매칭하지 않는다');
 
   check('표기가 달라도 같은 은행으로 본다', banksMatch('NH농협은행', '농협'));
@@ -653,7 +705,7 @@ async function main() {
   const pv = await previewDeposit({
     amount: previewTarget.totalAmount,
     depositorName: '미리보기',
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('맞는 주문이 있으면 확정으로 예고한다', pv.status === '확정', pv.message);
   check('맞아떨어진 주문을 알려준다', pv.candidates.length === 1, `${pv.candidates.length}건`);
@@ -663,14 +715,14 @@ async function main() {
   const depositCountAfter = (await db.collection(COL.deposits).get()).size;
   check('미리보기는 입금 기록을 남기지 않는다', depositCountAfter === depositCountBefore);
 
-  const pvMiss = await previewDeposit({ amount: 13, depositorName: '없는사람', bankName: '농협' });
+  const pvMiss = await previewDeposit({ amount: 13, depositorName: '없는사람', bankName: accountBank });
   check('맞는 주문이 없으면 미매칭으로 예고한다', pvMiss.status === '미매칭', pvMiss.message);
 
   // 미리보기와 실제 처리의 문구가 같아야 테스트가 의미를 갖는다
   const real = await recordDeposit({
     amount: previewTarget.totalAmount,
     depositorName: '미리보기',
-    bankName: '농협',
+    bankName: accountBank,
   });
   check('미리보기 문구가 실제 처리 문구와 같다', pv.message === real.message, `${pv.message} / ${real.message}`);
 

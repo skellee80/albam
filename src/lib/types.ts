@@ -183,6 +183,11 @@ export interface Deposit {
   depositorName: string;
   depositorNameNorm: string;
   bankName: string;
+  /**
+   * 문자 원문. 사람이 확인해야 하는 건(확인필요·미매칭·해석실패)에만 남는다.
+   * 확정된 건은 비어 있다 — 계좌번호와 잔액이 들어 있어 쌓아둘 이유가 없다.
+   */
+  rawText: string;
   status: DepositStatus;
   matchedOrderId: string | null;
   candidateOrderIds: string[]; // 동명이인일 때 후보 주문

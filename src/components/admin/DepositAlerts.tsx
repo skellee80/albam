@@ -26,6 +26,8 @@ export type AlertDeposit = {
   bankName: string;
   status: DepositStatus;
   receivedAt: number;
+  /** 문자 원문. 자동 해석이 어긋났을 때 무엇 때문인지 보려고 남긴다. */
+  rawText: string;
   candidates: CandidateOrder[];
   /** 판매 계좌가 아닌 은행에서 온 입금 — 우리 돈이 아닐 가능성이 높다 */
   otherBank: boolean;
@@ -171,6 +173,21 @@ function DepositCard({
             ? '같은 이름·같은 금액의 주문이 여러 건입니다. 어느 주문인가요?'
             : '자동으로 맞는 주문을 찾지 못했습니다. 아래에서 직접 골라 주세요.'}
         </p>
+      )}
+
+      {/*
+        문자 원문. 자동 해석이 틀렸을 때 원문을 봐야 왜 틀렸는지 알 수 있다.
+        확정된 건에는 남기지 않으므로 여기 보이는 건 전부 손볼 것들이다.
+      */}
+      {deposit.rawText && (
+        <details className="mt-2.5">
+          <summary className="cursor-pointer text-[0.8rem] text-ink-faint underline underline-offset-2">
+            받은 문자 원문 보기
+          </summary>
+          <pre className="mt-1.5 overflow-x-auto rounded-xl bg-paper px-3.5 py-3 text-[0.78rem] leading-relaxed whitespace-pre-wrap text-ink-soft">
+            {deposit.rawText}
+          </pre>
+        </details>
       )}
 
       {/* 확인필요: 서버가 뽑아준 후보를 먼저 보여준다 */}

@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { COL, db, toMillis, toMillisOr } from './firebase-admin';
 import { formatKRW, normalizeName, summarizeItems } from './format';
 import { getSettings } from './settings';
+import { detectBank } from './sms';
 import {
   UNRESOLVED_DEPOSIT_STATUSES,
   type Deposit,
@@ -54,6 +55,7 @@ function mapDeposit(id: string, data: FirebaseFirestore.DocumentData): Deposit {
     depositorName: data.depositorName ?? '',
     depositorNameNorm: data.depositorNameNorm ?? '',
     bankName: data.bankName ?? '',
+    rawText: data.rawText ?? '',
     status: (data.status ?? '미매칭') as DepositStatus,
     matchedOrderId: data.matchedOrderId ?? null,
     candidateOrderIds: Array.isArray(data.candidateOrderIds) ? data.candidateOrderIds : [],
@@ -71,6 +73,14 @@ export type DepositInput = {
   amount: number;
   depositorName: string;
   bankName: string;
+  /**
+   * 문자 원문. 서버가 해석한 경우에만 들어온다.
+   *
+   * **확정된 건에는 남기지 않는다.** 원문에는 계좌번호와 잔액이 들어 있어서
+   * 굳이 쌓아둘 이유가 없다. 사람이 들여다봐야 하는 건(확인필요·미매칭)에만 남겨
+   * 왜 안 맞았는지 볼 수 있게 한다.
+   */
+  rawText?: string;
 };
 
 export type DepositResult = {
@@ -279,6 +289,8 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
       matchedOrderId: decision.matchedOrderId,
       candidateOrderIds: decision.candidateOrderIds,
       responseText: decision.message,
+      // 확정된 건은 원문을 버린다 (계좌번호·잔액이 들어 있어 쌓아둘 이유가 없다)
+      rawText: decision.status === '확정' ? '' : (input.rawText ?? ''),
       receivedAt: now,
       resolvedAt: decision.status === '확정' ? now : null,
     });
@@ -291,6 +303,34 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
       duplicate: false,
     };
   });
+}
+
+/**
+ * 문자를 해석하지 못했을 때도 기록을 남긴다.
+ *
+ * 조용히 버리면 돈은 들어왔는데 아무도 모르는 상태가 된다.
+ * 원문을 남겨야 관리자 화면에서 보고 해석 규칙을 고칠 수 있다.
+ */
+export async function recordUnparsedDeposit(rawText: string, reason: string): Promise<void> {
+  const now = Date.now();
+  const key = dedupeKey(0, normalizeName(rawText).slice(0, 60), '', Math.floor(now / BUCKET_MS));
+
+  await db
+    .collection(COL.deposits)
+    .doc(key)
+    .set({
+      amount: 0,
+      depositorName: '(문자 해석 실패)',
+      depositorNameNorm: '',
+      bankName: detectBank(rawText),
+      rawText,
+      status: '미매칭' satisfies DepositStatus,
+      matchedOrderId: null,
+      candidateOrderIds: [],
+      responseText: `❓ 문자를 읽지 못했습니다: ${reason}`,
+      receivedAt: now,
+      resolvedAt: null,
+    });
 }
 
 /* ────────────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { recordDeposit } from '@/lib/deposits';
+import { recordDeposit, recordUnparsedDeposit } from '@/lib/deposits';
+import { parseDepositSms } from '@/lib/sms';
 
 /**
  * MacroDroid 전용 입금 수신 엔드포인트.
@@ -93,6 +94,14 @@ async function handle(request: NextRequest) {
     return plain('❌ 인증 실패: 토큰이 맞지 않습니다.', 401);
   }
 
+  // 문자를 통째로 보낸 경우 — 서버가 해석한다 (권장)
+  const rawText = String(params.text ?? params.message ?? params.sms ?? params.body ?? '').trim();
+
+  if (rawText) {
+    return handleRawSms(rawText);
+  }
+
+  // 폰에서 이미 값을 뽑아 보낸 경우 — 예전 방식도 그대로 받는다
   const amount = parseAmount(params.amount ?? params.money ?? params.price);
   const depositorName = String(params.name ?? params.depositor ?? params.depositorName ?? '');
   const bankName = String(params.bank ?? params.bankName ?? '');
@@ -101,6 +110,39 @@ async function handle(request: NextRequest) {
     const result = await recordDeposit({ amount, depositorName, bankName });
     // 판정 결과와 무관하게 200으로 답한다.
     // 오류 코드를 주면 MacroDroid가 재시도를 반복하면서 알림만 계속 울린다.
+    return plain(result.message);
+  } catch (err) {
+    console.error('[deposit]', err);
+    return plain('❌ 처리 실패: 관리자 화면에서 직접 확인해 주세요.');
+  }
+}
+
+/**
+ * 문자 원문을 받아 서버에서 값을 뽑는다.
+ *
+ * 해석에 실패해도 **기록은 남긴다.** 원문이 관리자 화면에 보여야
+ * 왜 실패했는지 알고 해석 규칙을 고칠 수 있다. 아무 흔적 없이 사라지면
+ * 돈은 들어왔는데 아무도 모르는 상태가 된다.
+ */
+async function handleRawSms(rawText: string) {
+  const parsed = parseDepositSms(rawText);
+
+  if (!parsed.ok) {
+    try {
+      await recordUnparsedDeposit(rawText, parsed.reason);
+    } catch (err) {
+      console.error('[deposit] 해석 실패 기록 실패', err);
+    }
+    return plain(`❓ 문자를 읽지 못했습니다: ${parsed.reason} 관리자에서 확인하세요.`);
+  }
+
+  try {
+    const result = await recordDeposit({
+      amount: parsed.amount,
+      depositorName: parsed.depositorName,
+      bankName: parsed.bankName,
+      rawText,
+    });
     return plain(result.message);
   } catch (err) {
     console.error('[deposit]', err);

@@ -10,7 +10,7 @@
     "seed": "tsx scripts/seed.ts",
     "smoke": "tsx --conditions=react-server scripts/smoke.ts",
     "emulators": "firebase emulators:start --only firestore --project albam-416fd",
-    "sms": "node scripts/check-sms.mjs"
+    "sms": "tsx scripts/check-sms.ts"
   },
   "dependencies": {
     "firebase-admin": "^14.2.0",
