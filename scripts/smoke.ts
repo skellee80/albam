@@ -388,7 +388,7 @@ async function main() {
   }
 
   /* ────────────────────────────────────────────── */
-  section('15. 입금 기한 24시간이 지나면 자동 취소 + 재고 복원');
+  section('15. 입금 기한이 지나면 자동 취소 + 재고 복원');
 
   const { expireStaleOrders } = await import('../src/lib/orders');
   const { PAYMENT_DEADLINE_MS } = await import('../src/lib/types');
@@ -416,7 +416,7 @@ async function main() {
   check('주문으로 재고 3개가 빠진다', stockAfterOrders === stockBeforeExpire - 3, `${stockAfterOrders}`);
 
   check(
-    '입금 마감 시각을 알려준다 (주문 + 24시간)',
+    '입금 마감 시각을 알려준다 (주문 + PAYMENT_DEADLINE_HOURS)',
     Math.abs(stale.paymentDueAt - (Date.now() + PAYMENT_DEADLINE_MS)) < 60_000,
   );
 
@@ -786,6 +786,34 @@ async function main() {
   check('금액에 천 단위 쉼표', formatKRW(1234567) === '1,234,567원', formatKRW(1234567));
   check('세 자리 이하는 쉼표 없음', formatKRW(999) === '999원', formatKRW(999));
   check('0원', formatKRW(0) === '0원', formatKRW(0));
+
+  /* ────────────────────────────────────────────── */
+  section('22-1. 주문 상태 색이 서로 구별되는가');
+
+  // 상태를 새로 추가하고 색을 빠뜨리면 목록에서 전부 회색으로 보인다.
+  const { ORDER_STATUS_TONE } = await import('../src/lib/status-tone');
+  const { ORDER_STATUSES: allStatuses } = await import('../src/lib/types');
+
+  const missingTone = allStatuses.filter((s) => !ORDER_STATUS_TONE[s]);
+  check('모든 상태에 색이 있다', missingTone.length === 0, missingTone.join(', '));
+
+  const tones = allStatuses.map((s) => ORDER_STATUS_TONE[s]);
+  check('상태마다 색이 다르다', new Set(tones).size === tones.length);
+
+  // 예전에 이 둘이 둘 다 연한 따뜻한 색이라 나란히 놓으면 구별이 안 됐다
+  check(
+    '입금대기와 발송완료가 확실히 다르다',
+    ORDER_STATUS_TONE['입금대기'] !== ORDER_STATUS_TONE['발송완료'],
+  );
+
+  /* ────────────────────────────────────────────── */
+  section('22-2. 입금 기한');
+
+  const { PAYMENT_DEADLINE_HOURS: hours, PAYMENT_DEADLINE_MS: ms } = await import(
+    '../src/lib/types'
+  );
+  check(`기한이 ${hours}시간이다`, hours === 1, `${hours}시간`);
+  check('시간과 밀리초가 어긋나지 않는다', ms === hours * 60 * 60 * 1000);
 
   /* ────────────────────────────────────────────── */
   // 상품을 지웠다가 다시 넣으므로 반드시 마지막에 둔다.

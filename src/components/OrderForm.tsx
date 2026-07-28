@@ -311,14 +311,18 @@ export function OrderForm({
         </p>
       )}
 
-      {/* 주문을 누르기 전에 알려야 할 것 — 누른 뒤에 알면 늦다 */}
-      <div className="rounded-xl bg-shell-tint px-4 py-3.5">
-        <p className="text-[0.88rem] font-semibold text-shell">
+      {/*
+        주문을 누르기 전에 알려야 할 것 — 누른 뒤에 알면 늦다.
+        기한이 짧아졌으므로 "입금할 준비가 됐을 때 주문하라"는 쪽을 먼저 말한다.
+      */}
+      <div className="rounded-xl border-2 border-amber/40 bg-amber-tint px-4 py-3.5">
+        <p className="text-[0.88rem] font-bold text-amber">
           주문 후 {PAYMENT_DEADLINE_HOURS}시간 안에 입금해 주세요
         </p>
         <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-soft">
-          기한이 지나면 주문이 자동으로 취소되고, 담아 둔 밤은 다른 분이 주문할 수 있게 됩니다.
-          다시 주문하시면 됩니다.
+          기한이 지나면 주문이 <b className="text-ink">자동으로 취소되고</b>, 담아 둔 밤은 다른
+          분이 주문할 수 있게 됩니다. <b className="text-ink">지금 바로 입금이 어려우시면</b>{' '}
+          입금하실 수 있을 때 주문해 주세요. 취소되어도 다시 주문하시면 됩니다.
         </p>
         <p className="mt-2 border-t border-shell/20 pt-2 text-[0.82rem] leading-relaxed text-ink-soft">
           입금은 <b className="text-ink">주문 한 건에 한 번씩</b>, 그 주문의 금액 그대로

@@ -24,6 +24,19 @@ export type ManagedProduct = {
 
 type Draft = Omit<ManagedProduct, 'id'>;
 
+/**
+ * 사이트에 함께 들어 있는 기본 그림.
+ *
+ * 아버지가 주소를 타이핑하지 않고 눌러서 고를 수 있게 둔다.
+ * 진짜 밤 사진으로 바꾸려면 public/products/ 에 파일을 넣고 배포하면
+ * (같은 파일 이름을 쓰는 한) 관리자 화면을 손대지 않아도 사진만 바뀐다.
+ */
+const PRESET_IMAGES = [
+  { label: '대보', url: '/products/daebo.svg' },
+  { label: '포르단', url: '/products/poredan.svg' },
+  { label: '옥광', url: '/products/okgwang.svg' },
+];
+
 const EMPTY_DRAFT: Draft = {
   name: '',
   price: 0,
@@ -328,13 +341,56 @@ function ProductForm({
       </div>
 
       <div>
-        <label className="label">사진 주소</label>
+        <label className="label">사진</label>
+
+        <div className="flex items-start gap-3">
+          {/* 지금 무엇이 걸려 있는지 눈으로 보여준다. 주소만 보고는 알 수 없다. */}
+          <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-line bg-paper">
+            {draft.imageUrl ? (
+              // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={draft.imageUrl}
+                alt="지금 걸린 사진"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-[0.7rem] text-ink-faint">사진 없음</span>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="mb-1.5 text-[0.78rem] font-semibold text-ink-soft">준비된 그림에서 고르기</p>
+            <div className="flex gap-1.5">
+              {PRESET_IMAGES.map((preset) => (
+                <button
+                  key={preset.url}
+                  type="button"
+                  onClick={() => set('imageUrl', preset.url)}
+                  aria-label={`${preset.label} 그림으로`}
+                  className={`h-12 w-12 shrink-0 overflow-hidden rounded-xl border-2 ${
+                    draft.imageUrl === preset.url ? 'border-burr' : 'border-line'
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preset.url} alt={preset.label} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <input
-          className="field"
+          className="field mt-2.5"
           value={draft.imageUrl}
           onChange={(e) => set('imageUrl', e.target.value)}
           placeholder="/products/daebo.svg"
+          aria-label="사진 주소"
         />
+        <p className="mt-1.5 text-[0.78rem] leading-snug text-ink-soft">
+          찍은 사진을 여기서 바로 올릴 수는 없습니다. 인터넷에 올라간 사진의 주소
+          (<b>https://</b> 로 시작하고 <b>.jpg</b> 나 <b>.png</b> 로 끝나는 것)를 붙여넣으세요.
+        </p>
       </div>
 
       <label className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">

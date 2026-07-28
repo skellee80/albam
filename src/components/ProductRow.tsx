@@ -19,19 +19,38 @@ export type ShopProduct = {
 };
 
 export function ProductRow({ product }: { product: ShopProduct }) {
-  const { add } = useCart();
+  const { add, items } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+  /**
+   * **이미 장바구니에 담은 수량은 재고에서 빼야 한다.**
+   *
+   * 예전에는 재고만 보고 상한을 정했다. 재고가 1개일 때 1개를 담아도 화면의 재고는
+   * 그대로 1개라, 담기를 누를 때마다 1개씩 계속 담을 수 있었다. 주문 단계에서 서버가
+   * 막아주긴 하지만, 손님은 다 담고 이름·주소까지 적은 뒤에야 그 사실을 알게 된다.
+   */
+  const inCart = items.find((i) => i.productId === product.id)?.qty ?? 0;
+  const remaining = Math.max(0, product.stock - inCart);
+
   const soldOut = product.stock <= 0;
-  const lowStock = !soldOut && product.stock <= LOW_STOCK_NOTICE_THRESHOLD;
-  const max = Math.max(1, product.stock);
+  /** 재고는 있지만 남은 만큼 이미 다 담은 상태 */
+  const allTaken = !soldOut && remaining <= 0;
+  const lowStock = !soldOut && !allTaken && remaining <= LOW_STOCK_NOTICE_THRESHOLD;
+  const max = Math.max(1, remaining);
+
+  // 다른 화면(장바구니)에서 수량을 늘려 남은 수가 줄면 여기 고른 수량도 따라 줄인다
+  useEffect(() => {
+    setQty((q) => Math.min(q, Math.max(1, remaining)));
+  }, [remaining]);
 
   function handleAdd() {
-    add({ productId: product.id, name: product.name, price: product.price }, qty);
+    const amount = Math.min(qty, remaining);
+    if (amount <= 0) return;
+    add({ productId: product.id, name: product.name, price: product.price }, amount);
     setQty(1);
     setAdded(true);
     if (timer.current) clearTimeout(timer.current);
@@ -47,13 +66,21 @@ export function ProductRow({ product }: { product: ShopProduct }) {
 
       <div className="mt-2 flex items-center justify-between gap-3">
         {/* 재고가 얼마 안 남았을 때만 숫자를 드러낸다 */}
-        <p className={`text-[0.8rem] ${lowStock ? 'font-semibold text-amber' : 'text-ink-faint'}`}>
-          {stockNotice(product.stock)}
+        <p
+          className={`text-[0.8rem] ${
+            allTaken ? 'font-semibold text-burr-deep' : lowStock ? 'font-semibold text-amber' : 'text-ink-faint'
+          }`}
+        >
+          {allTaken ? `남은 ${product.stock}개를 모두 담았습니다` : stockNotice(remaining)}
         </p>
 
         {soldOut ? (
           <span className="rounded-full bg-line px-4 py-2 text-sm font-semibold text-ink-soft">
             품절
+          </span>
+        ) : allTaken ? (
+          <span className="rounded-full bg-burr-tint px-4 py-2 text-sm font-semibold text-burr-deep">
+            담기 완료
           </span>
         ) : (
           <div className="flex items-center gap-2">

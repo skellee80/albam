@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import { formatKRW, formatShortDateTime, normalizeName, normalizePhone } from '@/lib/format';
+import { orderStatusTone } from '@/lib/status-tone';
 import type { OrderStatus } from '@/lib/types';
 
 export type OrderRow = {
@@ -18,15 +19,6 @@ export type OrderRow = {
   trackingNo: string;
   deleted: boolean;
   createdAt: number;
-};
-
-const STATUS_TONE: Record<string, string> = {
-  입금대기: 'bg-shell-tint text-shell',
-  발송대기: 'bg-burr-tint text-burr-deep',
-  발송완료: 'bg-line text-ink-soft',
-  취소: 'bg-berry-tint text-berry',
-  환불완료: 'bg-berry-tint text-berry',
-  교환완료: 'bg-line text-ink-soft',
 };
 
 export function OrderList({ orders }: { orders: OrderRow[] }) {
@@ -90,9 +82,10 @@ export function OrderList({ orders }: { orders: OrderRow[] }) {
                   </div>
 
                   <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[0.75rem] font-bold ${
-                      order.deleted ? 'bg-line text-ink-soft' : (STATUS_TONE[order.status] ?? 'bg-line text-ink-soft')
-                    }`}
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[0.75rem] font-bold ${orderStatusTone(
+                      order.status,
+                      order.deleted,
+                    )}`}
                   >
                     {order.deleted ? '삭제됨' : order.status}
                   </span>

@@ -98,8 +98,11 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
  *
  * 무통장이라 주문 시점에 재고를 선점하는데, 입금하지 않은 주문이 재고를 계속
  * 붙들고 있으면 정작 살 사람이 못 산다.
+ *
+ * 제철 상품이라 재고를 오래 붙들어 두지 않으려고 짧게 잡았다.
+ * 취소돼도 손님이 다시 주문하면 되므로 되돌릴 수 없는 손해는 아니다.
  */
-export const PAYMENT_DEADLINE_HOURS = 24;
+export const PAYMENT_DEADLINE_HOURS = 1;
 
 export const PAYMENT_DEADLINE_MS = PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000;
 

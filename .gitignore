@@ -53,3 +53,4 @@ next-env.d.ts
 
 # 로컬 백업 압축 파일
 *.zip
+memo.md

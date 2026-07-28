@@ -54,7 +54,7 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
     deleted: Boolean(data.deleted),
     createdAt: toMillisOr(data.createdAt, now),
     updatedAt: toMillisOr(data.updatedAt, now),
-    // 예전 문서에는 이 필드가 없다. 그때 규칙대로 주문 시각 + 24시간으로 본다.
+    // 예전 문서에는 이 필드가 없다. 그런 건 지금 기한을 적용해 계산한다.
     paymentDueAt: toMillisOr(data.paymentDueAt, toMillisOr(data.createdAt, now) + PAYMENT_DEADLINE_MS),
     paidAt: toMillis(data.paidAt),
     shippedAt: toMillis(data.shippedAt),
@@ -446,7 +446,7 @@ const globalForSweep = globalThis as unknown as { __albamLastSweep?: number };
 const SWEEP_INTERVAL_MS = 60_000;
 
 /**
- * 입금 기한(24시간)이 지난 입금대기 주문을 취소한다.
+ * 입금 기한(PAYMENT_DEADLINE_HOURS)이 지난 입금대기 주문을 취소한다.
  *
  * 취소 처리는 updateOrder를 그대로 쓴다. 재고 복원이 상태에서 유도되므로
  * 여기서 재고를 따로 건드리지 않아도 정확히 한 번만 돌아간다.

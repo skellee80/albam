@@ -37,6 +37,14 @@
   --color-amber: #c47f14; /* 주의 (재고 부족) */
   --color-amber-tint: #fcefd8;
 
+  /*
+   * 끝난 것 (발송완료).
+   * 나머지 색이 전부 따뜻한 계열(밤·크림·주황·분홍)이라 그 안에서 회색을 만들면
+   * 옆 색과 구별이 안 된다. 유일하게 차가운 색을 하나 둬서 한눈에 갈라지게 한다.
+   */
+  --color-slate: #4f6d80;
+  --color-slate-tint: #e4edf3;
+
   --font-display: var(--font-display-face), system-ui, sans-serif;
   --font-sans: var(--font-body-face), system-ui, sans-serif;
 

@@ -9,8 +9,9 @@ import { BRAND } from '@/lib/brand';
 
 const TABS = [
   { href: '/admin', label: '오늘 할 일' },
-  { href: '/admin/orders', label: '주문' },
-  { href: '/admin/products', label: '상품·재고' },
+  { href: '/admin/orders', label: '주문관리' },
+  { href: '/admin/products', label: '재고관리' },
+  { href: '/admin/sales', label: '판매현황' },
   { href: '/admin/settings', label: '설정' },
 ];
 

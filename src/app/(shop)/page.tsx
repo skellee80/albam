@@ -13,9 +13,9 @@ export const dynamic = 'force-dynamic';
  * 실속(초록) → 선물(밤색) → 최상급(주황)으로 올라가, 글을 읽기 전에도 순서가 보인다.
  */
 const SIZE_TONE = {
-  burr: { chip: 'bg-burr text-white', tag: 'bg-burr-tint text-burr-deep' },
-  shell: { chip: 'bg-shell text-white', tag: 'bg-shell-tint text-shell' },
-  amber: { chip: 'bg-amber text-white', tag: 'bg-amber-tint text-amber' },
+  burr: { chip: 'bg-burr text-white', label: 'text-burr-deep' },
+  shell: { chip: 'bg-shell text-white', label: 'text-shell' },
+  amber: { chip: 'bg-amber text-white', label: 'text-amber' },
 } as const;
 
 /**
@@ -82,24 +82,25 @@ export default async function ShopPage() {
           크기 안내는 여기서 한 번만 한다.
           중·대·특이 모든 묶음에서 똑같이 반복되므로, 상품마다 붙이면 같은 문장을
           열여덟 번 읽게 된다.
+
+          한 크기당 한 줄만 쓴다. 예전에는 이름표와 설명을 위아래로 쌓아 세 크기가
+          여섯 줄을 차지했고, 정작 팔 상품이 첫 화면에서 밀려났다.
         */}
-        <section className="mt-5 rounded-card border border-line bg-surface px-4 py-4">
-          <h2 className="font-display text-[1.05rem]">크기 고르는 법</h2>
-          <dl className="mt-3 space-y-3">
+        <section className="mt-5 overflow-hidden rounded-card border border-line bg-surface">
+          <h2 className="bg-flesh/45 px-4 py-2.5 font-display text-[1rem] text-shell">
+            어떤 자리에 놓을 밤인가요
+          </h2>
+          <dl className="divide-y divide-line/70">
             {SIZE_GUIDE.map((guide) => (
-              <div key={guide.size} className="flex items-start gap-3">
+              <div key={guide.size} className="flex items-center gap-2.5 px-4 py-2.5">
                 <dt
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[0.85rem] font-bold ${SIZE_TONE[guide.tone].chip}`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.8rem] font-bold ${SIZE_TONE[guide.tone].chip}`}
                 >
                   {guide.size}
                 </dt>
-                <dd className="min-w-0 pt-0.5">
-                  <span
-                    className={`inline-block rounded-full px-2.5 py-0.5 text-[0.78rem] font-bold ${SIZE_TONE[guide.tone].tag}`}
-                  >
-                    {guide.tag}
-                  </span>
-                  <p className="mt-1 text-[0.87rem] leading-snug text-ink-soft">{guide.note}</p>
+                <dd className="min-w-0 flex-1 text-[0.83rem] leading-snug">
+                  <b className={SIZE_TONE[guide.tone].label}>{guide.tag}</b>
+                  <span className="text-ink-soft"> · {guide.note}</span>
                 </dd>
               </div>
             ))}
@@ -157,8 +158,9 @@ export default async function ShopPage() {
             </li>
             <li>
               <b className="text-ink">2.</b> 안내된 계좌로 <b className="text-ink">{PAYMENT_DEADLINE_HOURS}시간 안에</b>{' '}
-              입금합니다. 입금자명을 주문할 때 적은 이름과 똑같이 해주세요. 기한이 지나면 주문이
-              자동으로 취소됩니다.
+              입금합니다. 입금자명을 주문할 때 적은 이름과 똑같이 해주세요.{' '}
+              <b className="text-ink">기한이 지나면 주문이 자동으로 취소되니</b> 바로 입금하실 수
+              있을 때 주문해 주세요.
             </li>
             <li>
               <b className="text-ink">3.</b> 입금이 확인되면 발송 준비에 들어갑니다.
