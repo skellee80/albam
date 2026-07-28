@@ -118,30 +118,33 @@ export default async function ShopPage() {
             아직 등록된 상품이 없습니다.
           </p>
         ) : (
-          <div className="mt-7 space-y-8">
+          <div className="mt-7 space-y-6">
             {groups.map((group) => (
-              <section key={group.variety}>
-                {/*
-                  사진이 커져 이름과 나란히 두면 한 줄에 안 들어간다.
-                  사진을 위에 크게 놓고 이름을 그 아래 가운데에 둔다.
-                */}
-                <div className="flex flex-col items-center px-1">
-                  {group.image ? (
-                    // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
-                    // eslint-disable-next-line @next/next/no-img-element
+              /*
+                품종 하나 = 카드 하나. 사진·이름·가격 줄이 **한 테두리 안에** 들어간다.
+                예전에는 사진과 이름이 카드 밖에 떠 있어서, 사진 따로 가격표 따로
+                두 덩어리로 보였다. 손님이 고르는 단위는 품종이므로 그 단위로 묶는다.
+              */
+              <section key={group.variety} className="card overflow-hidden">
+                {group.image ? (
+                  // 사진이 카드의 머리다. 아래 가시 선이 사진과 본문을 물어 준다.
+                  // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
+                  <div className="burr-edge burr-edge-surface relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={group.image}
                       alt=""
-                      className="h-[13.5rem] w-[13.5rem] max-w-full rounded-3xl border border-line object-cover"
+                      className="block aspect-[5/3] w-full bg-flesh/40 object-cover"
                       loading="lazy"
                     />
-                  ) : null}
-                  <h2 className="mt-2.5 font-display text-[1.4rem] leading-tight">
-                    {group.variety}
-                  </h2>
-                </div>
+                  </div>
+                ) : null}
 
-                <div className="card mt-3 divide-y-2 divide-line overflow-hidden">
+                <h2 className="px-4 pt-3 pb-2.5 text-center font-display text-[1.5rem] leading-tight">
+                  {group.variety}
+                </h2>
+
+                <div className="divide-y-2 divide-line border-t border-line">
                   {group.sizes.map((sizeGroup) => (
                     <div key={sizeGroup.size || '_'}>
                       {sizeGroup.size ? (

@@ -22,7 +22,7 @@ export default async function AdminSalesPage() {
     <div>
       <h1 className="px-1 font-display text-[1.4rem]">판매 현황</h1>
       <p className="mt-1 px-1 text-[0.88rem] leading-snug text-ink-soft">
-        매출은 <b>입금이 확인된 주문</b>만 셉니다. 입금대기와 취소는 빠집니다.
+        매출은 <b>입금이 확인된 주문</b>만 셉니다. 입금대기·삭제·환불완료는 빠집니다.
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">

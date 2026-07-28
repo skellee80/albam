@@ -88,20 +88,11 @@ export async function updateOrderAction(
     refundAmount?: number;
   },
 ): Promise<ActionResult> {
-  return run(() => {
-    /**
-     * 관리자는 주문을 **취소로 바꿀 수 없다.**
-     *
-     * 취소는 입금 기한이 지났을 때와 손님이 스스로 취소했을 때만 생긴다.
-     * 아버지가 주문을 물릴 때는 되살릴 수 있는 "주문 삭제"를 쓴다.
-     * 화면의 목록에서 이미 뺐지만, 서버 액션은 화면을 거치지 않고도 부를 수 있어
-     * 여기서 한 번 더 막는다.
-     */
-    if (patch.status === '취소') {
-      throw new Error('주문을 취소로 바꿀 수 없습니다. 주문 삭제를 쓰세요.');
-    }
-    return updateOrder(orderId, patch as OrderPatch);
-  }, ['/admin', '/admin/orders', `/admin/orders/${orderId}`]);
+  return run(() => updateOrder(orderId, patch as OrderPatch), [
+    '/admin',
+    '/admin/orders',
+    `/admin/orders/${orderId}`,
+  ]);
 }
 
 export async function deleteOrderAction(orderId: string): Promise<ActionResult> {

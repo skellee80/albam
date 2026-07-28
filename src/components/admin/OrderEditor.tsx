@@ -9,7 +9,7 @@ import {
   updateOrderAction,
 } from '@/app/admin/actions';
 import { formatDateTime, formatKRW } from '@/lib/format';
-import { adminStatusOptions, type OrderItem, type OrderStatus } from '@/lib/types';
+import { ORDER_STATUSES, type OrderItem, type OrderStatus } from '@/lib/types';
 
 export type EditableOrder = {
   id: string;
@@ -151,7 +151,7 @@ export function OrderEditor({
           value={status}
           onChange={(e) => setStatus(e.target.value as OrderStatus)}
         >
-          {adminStatusOptions(order.status).map((s) => (
+          {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

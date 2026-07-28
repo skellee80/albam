@@ -216,22 +216,22 @@ async function main() {
 
   const stockBeforeCancel = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
 
-  await updateOrder(twinA.ok ? twinA.orderId : '', { status: '취소' });
+  await updateOrder(twinA.ok ? twinA.orderId : '', { deleted: true });
   const stockAfterCancel = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
-  check('취소하면 재고가 돌아온다', stockAfterCancel === stockBeforeCancel + 1, `${stockBeforeCancel} → ${stockAfterCancel}`);
+  check('물러난 주문의 재고가 돌아온다', stockAfterCancel === stockBeforeCancel + 1, `${stockBeforeCancel} → ${stockAfterCancel}`);
 
-  await updateOrder(twinA.ok ? twinA.orderId : '', { status: '취소' });
+  await updateOrder(twinA.ok ? twinA.orderId : '', { deleted: true });
   const stockAfterDoubleCancel = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
   check(
-    '같은 취소를 반복해도 재고가 더 늘지 않는다',
+    '같은 삭제를 반복해도 재고가 더 늘지 않는다',
     stockAfterDoubleCancel === stockAfterCancel,
     `${stockAfterCancel} → ${stockAfterDoubleCancel}`,
   );
 
-  await updateOrder(twinA.ok ? twinA.orderId : '', { status: '입금대기' });
+  await updateOrder(twinA.ok ? twinA.orderId : '', { deleted: false });
   const stockAfterRevert = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
   check(
-    '취소를 되돌리면 재고가 다시 차감된다',
+    '되살리면 재고가 다시 차감된다',
     stockAfterRevert === stockBeforeCancel,
     `${stockAfterCancel} → ${stockAfterRevert}`,
   );
@@ -263,10 +263,10 @@ async function main() {
   check('전화번호가 다르면 조회되지 않는다', notFound.length === 0, `${notFound.length}건`);
 
   const cancelledLookup = await lookupOrders('김철수', '010-5555-6666');
-  await updateOrder(twinA.ok ? twinA.orderId : '', { status: '취소' });
+  await updateOrder(twinA.ok ? twinA.orderId : '', { deleted: true });
   const afterCancelLookup = await lookupOrders('김철수', '010-5555-6666');
   check(
-    '취소된 주문은 배송조회에서 사라진다',
+    '물러난 주문은 배송조회에서 사라진다',
     cancelledLookup.length === 1 && afterCancelLookup.length === 0,
     `${cancelledLookup.length} → ${afterCancelLookup.length}`,
   );
@@ -430,11 +430,12 @@ async function main() {
     });
 
   const cancelledCount = await expireStaleOrders({ force: true });
-  check('기한 지난 주문만 취소된다', cancelledCount === 1, `${cancelledCount}건 취소`);
+  check('기한 지난 주문만 정리된다', cancelledCount === 1, `${cancelledCount}건`);
 
   const staleAfter = await getOrder(stale.orderId);
   const freshAfter = await getOrder(fresh.orderId);
-  check('기한 지난 주문이 취소 상태가 된다', staleAfter?.status === '취소', staleAfter?.status);
+  check('기한 지난 주문이 삭제된다', staleAfter?.deleted === true, String(staleAfter?.deleted));
+  check('상태는 입금대기 그대로다 (취소 상태는 없앴다)', staleAfter?.status === '입금대기', staleAfter?.status);
   check('방금 들어온 주문은 그대로 입금대기다', freshAfter?.status === '입금대기', freshAfter?.status);
   check(
     '자동 취소 사유가 메모에 남는다',
@@ -581,7 +582,7 @@ async function main() {
   const selfCancel = await cancelOwnOrder(mine.orderId, '내주문', '010-3434-3434');
   check('본인이면 취소된다', selfCancel.ok, JSON.stringify(selfCancel));
   const cancelled = await getOrder(mine.orderId);
-  check('상태가 취소가 된다', cancelled?.status === '취소', cancelled?.status);
+  check('주문이 삭제된다', cancelled?.deleted === true, String(cancelled?.deleted));
 
   const stockAfterSelfCancel = (await listProducts()).find((p) => p.id === daeboMid.id)!.stock;
   check(
@@ -807,31 +808,42 @@ async function main() {
   );
 
   /* ────────────────────────────────────────────── */
-  section('22-3. 취소는 관리자가 직접 고를 수 없다');
+  section('22-3. 취소 상태는 없다 — 물러난 주문은 삭제로만 다룬다');
 
-  // 취소는 기한이 지나거나 손님이 스스로 취소할 때만 생긴다.
-  // 아버지가 주문을 물릴 때는 되살릴 수 있는 "주문 삭제"를 쓴다.
-  const { ADMIN_SELECTABLE_STATUSES, adminStatusOptions } = await import('../src/lib/types');
-
-  check(
-    '관리자 상태 목록에 취소가 없다',
-    !ADMIN_SELECTABLE_STATUSES.includes('취소'),
-    ADMIN_SELECTABLE_STATUSES.join(', '),
-  );
-  check('발송대기·환불완료는 남아 있다', ADMIN_SELECTABLE_STATUSES.includes('발송대기') && ADMIN_SELECTABLE_STATUSES.includes('환불완료'));
-  check(
-    '이미 취소된 주문을 열면 취소가 목록에 끼어든다',
-    adminStatusOptions('취소')[0] === '취소',
-    adminStatusOptions('취소').join(', '),
-  );
-  check(
-    '취소가 아닌 주문에는 취소가 안 보인다',
-    !adminStatusOptions('발송대기').includes('취소'),
+  const { ORDER_STATUSES: statusList, STOCK_RELEASING_STATUSES: releasing } = await import(
+    '../src/lib/types'
   );
 
-  // 그래도 자동 취소와 손님 취소는 계속 동작해야 한다 (15번·17-1번에서 확인됨)
-  const { STOCK_RELEASING_STATUSES } = await import('../src/lib/types');
-  check('취소는 여전히 재고를 되돌리는 상태다', STOCK_RELEASING_STATUSES.includes('취소'));
+  check(
+    '상태 목록에 취소가 없다',
+    !(statusList as readonly string[]).includes('취소'),
+    statusList.join(', '),
+  );
+  check(
+    '재고를 놓아주는 상태에도 취소가 없다',
+    !(releasing as readonly string[]).includes('취소'),
+    releasing.join(', '),
+  );
+  check('환불완료는 여전히 재고를 놓아준다', (releasing as readonly string[]).includes('환불완료'));
+
+  // 예전 문서에 남아 있는 '취소' 는 삭제된 것으로 읽어야 한다.
+  // 안 그러면 상태 목록에 없는 값이 화면에 떠서 저장할 때 엉뚱하게 바뀐다.
+  const legacy = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '옛취소',
+    sameAsDepositor: true,
+    depositorPhone: '010-1212-3434',
+    recipient: { name: '옛취소', phone: '010-1212-3434', address: '청주시 어딘가' },
+  });
+  if (!legacy.ok) throw new Error('이후 검증 불가');
+  await db.collection(COL.orders).doc(legacy.orderId).update({ status: '취소', deleted: false });
+
+  const legacyRead = await getOrder(legacy.orderId);
+  check('예전 취소 주문은 삭제된 것으로 읽힌다', legacyRead?.deleted === true, String(legacyRead?.deleted));
+  check('상태는 목록에 있는 값으로 바뀐다', legacyRead?.status === '입금대기', legacyRead?.status);
+
+  const legacyLookup = await lookupOrders('옛취소', '010-1212-3434');
+  check('예전 취소 주문도 배송조회에서 안 보인다', legacyLookup.length === 0, `${legacyLookup.length}건`);
 
   /* ────────────────────────────────────────────── */
   section('22-2. 입금 기한');

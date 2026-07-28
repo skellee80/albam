@@ -20,12 +20,11 @@ export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
 
   // 끝난 것 — 연하게, 테두리로 형태만
   발송완료: 'bg-slate-tint text-slate ring-1 ring-slate/25',
-  취소: 'bg-line text-ink-soft ring-1 ring-ink-faint/25',
   환불완료: 'bg-berry-tint text-berry ring-1 ring-berry/30',
   교환완료: 'bg-shell-tint text-shell ring-1 ring-shell/25',
 };
 
-/** 목록에서 지워진 주문. 상태와 무관하게 이 색을 쓴다. */
+/** 물러난 주문(기한 지남 · 손님이 무름 · 아버지가 지움). 상태와 무관하게 이 색을 쓴다. */
 export const DELETED_TONE = 'bg-line text-ink-faint ring-1 ring-ink-faint/20';
 
 export function orderStatusTone(status: OrderStatus, deleted = false): string {

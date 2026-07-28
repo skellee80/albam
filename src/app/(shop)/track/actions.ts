@@ -54,7 +54,9 @@ export async function cancelOwnOrder(
       };
     }
 
-    await updateOrder(orderId, { status: '취소' });
+    // 상태가 아니라 삭제로 다룬다. 재고가 돌아가고 손님 조회에서 사라지는 것은
+    // 예전 '취소' 상태와 똑같고, 아버지가 관리자에서 되살릴 수도 있다.
+    await updateOrder(orderId, { deleted: true });
     return { ok: true };
   } catch (err) {
     console.error('[cancelOwnOrder]', err);

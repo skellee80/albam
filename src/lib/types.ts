@@ -79,44 +79,25 @@ export interface Product {
 /**
  * 주문 상태. 화면 표기와 DB 값이 같아 아버지가 콘솔에서 봐도 읽힌다.
  *
- * "환불요청"·"교환요청"은 두지 않는다. 고객이 사이트에서 신청하는 경로가 없고
+ * **"취소" 상태는 없다.** 물러난 주문은 상태가 아니라 `deleted` 로 다룬다.
+ * 예전에는 취소가 따로 있었는데, 결국 삭제와 하는 일이 똑같았다 —
+ * 둘 다 재고를 되돌리고, 둘 다 손님 조회에서 감춰졌다. 값만 두 개라
+ * 관리자 화면 곳곳(상태 목록·필터 칸)에 아무도 고르지 않는 칸이 생겼다.
+ *
+ * 이제 물러나는 길은 하나뿐이다.
+ *  - 입금 기한이 지나면 자동으로 삭제 (expireStaleOrders)
+ *  - 손님이 주문 조회에서 스스로 무르면 삭제 (cancelOwnOrder)
+ *  - 아버지가 주문 화면에서 "주문 삭제"
+ * 셋 다 되살릴 수 있고, 되살리면 재고도 함께 다시 잡힌다.
+ *
+ * "환불요청"·"교환요청"도 두지 않는다. 고객이 사이트에서 신청하는 경로가 없고
  * 전화로 받아 아버지가 직접 처리하므로, 중간 상태를 만들면 아무도 안 쓰는 칸만 늘어난다.
- * 실제로 송금하거나 새로 보낸 뒤 완료 상태로 한 번에 바꾼다.
  */
-export const ORDER_STATUSES = [
-  '입금대기',
-  '발송대기',
-  '발송완료',
-  '취소',
-  '환불완료',
-  '교환완료',
-] as const;
+export const ORDER_STATUSES = ['입금대기', '발송대기', '발송완료', '환불완료', '교환완료'] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-/**
- * 관리자가 주문 화면에서 **직접 고를 수 있는** 상태.
- *
- * `취소`가 빠져 있다. 취소는 아버지가 손으로 정하는 것이 아니라
- * 두 가지 경우에 **저절로** 생긴다.
- *
- *  - 입금 기한이 지나 자동으로 취소될 때 (expireStaleOrders)
- *  - 손님이 주문 조회에서 스스로 취소할 때 (cancelOwnOrder)
- *
- * 아버지가 주문을 물릴 일이 있으면 취소가 아니라 **주문 삭제**를 쓴다.
- * 삭제는 되살릴 수 있지만, 취소는 손님 화면에 "취소됨"으로 나가 되돌리면 혼란스럽다.
- *
- * 이미 취소된 주문을 열었을 때는 목록에 `취소`를 끼워 넣는다 —
- * 없으면 화면이 엉뚱한 상태를 고른 것처럼 보이고, 저장하면 상태가 바뀌어 버린다.
- */
-export const ADMIN_SELECTABLE_STATUSES: readonly OrderStatus[] = ORDER_STATUSES.filter(
-  (s) => s !== '취소',
-);
-
-/** 주문 화면의 상태 목록. 지금 상태가 목록에 없으면 그것만 앞에 붙여 준다. */
-export function adminStatusOptions(current: OrderStatus): OrderStatus[] {
-  if (ADMIN_SELECTABLE_STATUSES.includes(current)) return [...ADMIN_SELECTABLE_STATUSES];
-  return [current, ...ADMIN_SELECTABLE_STATUSES];
-}
+/** 예전 문서에 남아 있는 상태 값. 지금은 삭제로 갈음한다. */
+export const LEGACY_CANCELLED_STATUS = '취소';
 
 /**
  * 입금 기한. 이 시간이 지난 입금대기 주문은 자동으로 취소되고 재고가 돌아간다.
@@ -158,8 +139,10 @@ export function stockNotice(stock: number): string {
  * 복원은 플래그로 추적하지 않고, 주문 상태로부터 "지금 이 주문이 잡고 있어야 할 재고"를
  * 매번 다시 계산해서 그 차이만 적용한다(orders.ts의 reservationOf 참고).
  * 상태를 왔다 갔다 해도 이중 복원/이중 차감이 원리적으로 불가능하다.
+ *
+ * 삭제된 주문(`deleted`)도 같이 놓아준다 — 그쪽은 상태가 아니라 플래그라 여기 없다.
  */
-export const STOCK_RELEASING_STATUSES: readonly OrderStatus[] = ['취소', '환불완료'];
+export const STOCK_RELEASING_STATUSES: readonly OrderStatus[] = ['환불완료'];
 
 /** 고객이 /track 에서 볼 수 있는 상태의 진행 단계 */
 export const TRACK_STEPS: readonly OrderStatus[] = ['입금대기', '발송대기', '발송완료'];

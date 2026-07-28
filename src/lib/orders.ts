@@ -3,6 +3,7 @@ import 'server-only';
 import { COL, db, toMillis, toMillisOr } from './firebase-admin';
 import { kstDateKey, normalizeName, normalizePhone } from './format';
 import {
+  LEGACY_CANCELLED_STATUS,
   PAYMENT_DEADLINE_HOURS,
   PAYMENT_DEADLINE_MS,
   STOCK_RELEASING_STATUSES,
@@ -31,6 +32,9 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
       }))
     : [];
 
+  const rawStatus = data.status ?? '입금대기';
+  const legacyCancelled = rawStatus === LEGACY_CANCELLED_STATUS;
+
   return {
     id,
     orderNo: data.orderNo ?? id,
@@ -47,11 +51,18 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
     sameAsDepositor: Boolean(data.sameAsDepositor),
     items,
     totalAmount: Number(data.totalAmount ?? 0),
-    status: (data.status ?? '입금대기') as OrderStatus,
+    /**
+     * 예전에 '취소'로 저장된 주문은 **삭제된 것으로 읽는다.**
+     *
+     * 취소 상태를 없애면서 남은 문서를 옮기는 일을 따로 돌리지 않고 여기서 흡수한다.
+     * 하는 일이 어차피 같았다 — 재고를 놓아주고 손님 조회에서 감춰지는 것.
+     * 이 주문을 한 번이라도 저장하면 그때 문서도 새 모양으로 다시 쓰인다.
+     */
+    status: (legacyCancelled ? '입금대기' : rawStatus) as OrderStatus,
     trackingNo: data.trackingNo ?? '',
     memo: data.memo ?? '',
     refundAmount: Number(data.refundAmount ?? 0),
-    deleted: Boolean(data.deleted),
+    deleted: Boolean(data.deleted) || legacyCancelled,
     createdAt: toMillisOr(data.createdAt, now),
     updatedAt: toMillisOr(data.updatedAt, now),
     // 예전 문서에는 이 필드가 없다. 그런 건 지금 기한을 적용해 계산한다.
@@ -266,7 +277,7 @@ function syncTimestamps(order: Order, status: OrderStatus, now: number): void {
       if (!order.shippedAt) order.shippedAt = now;
       break;
     default:
-      // 취소·환불완료·교환완료는 진행 시각을 건드리지 않는다.
+      // 환불완료·교환완료는 진행 시각을 건드리지 않는다.
       // 언제 입금됐고 언제 나갔는지는 그대로 남아 있어야 나중에 확인할 수 있다.
       break;
   }
@@ -275,7 +286,7 @@ function syncTimestamps(order: Order, status: OrderStatus, now: number): void {
 /**
  * 주문을 고치고 재고를 맞춘다.
  *
- * 상태 변경이든 수량 변경이든 취소든, 변경 전후의 "잡고 있어야 할 재고"를 비교해
+ * 상태 변경이든 수량 변경이든 삭제든, 변경 전후의 "잡고 있어야 할 재고"를 비교해
  * 차이만 적용하는 한 가지 경로로 처리한다. 경로가 하나뿐이라 빠뜨릴 곳이 없다.
  */
 export async function updateOrder(orderId: string, patch: OrderPatch): Promise<void> {
@@ -391,7 +402,7 @@ export async function listOrders(
 
 /**
  * 고객 배송조회. 입금자명 + 전화번호가 **둘 다 정확히** 일치하는 건만 돌려준다.
- * 취소/삭제 주문은 노출하지 않는다(PRD). 환불·교환은 진행 상태로 그대로 보여준다.
+ * 물러난 주문(deleted)은 노출하지 않는다(PRD). 환불·교환은 진행 상태로 그대로 보여준다.
  *
  * 전화번호는 **입금하신 분 번호와 받는 분 번호 어느 쪽이든** 맞으면 찾아준다.
  * 손님은 자기가 주문서에 적은 번호를 넣을 뿐, 그게 둘 중 어느 칸이었는지 기억하지 못한다.
@@ -421,8 +432,9 @@ export async function lookupOrders(depositorName: string, phone: string): Promis
     if (!found.has(doc.id)) found.set(doc.id, mapOrder(doc.id, doc.data()));
   }
 
+  // 물러난 주문(기한 지남·손님이 무름·아버지가 삭제)은 전부 deleted 하나로 걸러진다
   return [...found.values()]
-    .filter((o) => !o.deleted && o.status !== '취소')
+    .filter((o) => !o.deleted)
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
@@ -432,7 +444,7 @@ export async function listPendingPaymentOrders(limit = 200): Promise<Order[]> {
 }
 
 /* ────────────────────────────────────────────────────────────
- * 입금 기한이 지난 주문 자동 취소
+ * 입금 기한이 지난 주문 자동 정리
  * ──────────────────────────────────────────────────────────── */
 
 /**
@@ -440,15 +452,15 @@ export async function listPendingPaymentOrders(limit = 200): Promise<Order[]> {
  *
  * 이 정리는 화면을 그릴 때 곁다리로 돌기 때문에, 요청마다 조회를 날리면 낭비다.
  * 인스턴스가 여러 개여도 각자 1분에 한 번씩만 도는 정도라 문제되지 않는다
- * (같은 주문을 두 번 취소해도 재고는 상태에서 유도하므로 어긋나지 않는다).
+ * (같은 주문을 두 번 정리해도 재고는 상태에서 유도하므로 어긋나지 않는다).
  */
 const globalForSweep = globalThis as unknown as { __albamLastSweep?: number };
 const SWEEP_INTERVAL_MS = 60_000;
 
 /**
- * 입금 기한(PAYMENT_DEADLINE_HOURS)이 지난 입금대기 주문을 취소한다.
+ * 입금 기한(PAYMENT_DEADLINE_HOURS)이 지난 입금대기 주문을 삭제한다.
  *
- * 취소 처리는 updateOrder를 그대로 쓴다. 재고 복원이 상태에서 유도되므로
+ * 정리는 updateOrder를 그대로 쓴다. 재고 복원이 상태에서 유도되므로
  * 여기서 재고를 따로 건드리지 않아도 정확히 한 번만 돌아간다.
  *
  * 별도의 스케줄러 없이 서버가 화면을 그릴 때 함께 돈다. 손님이 상품 목록을 보거나
@@ -475,8 +487,10 @@ export async function expireStaleOrders({ force = false } = {}): Promise<number>
     if (data.deleted) continue;
     try {
       await updateOrder(doc.id, {
-        status: '취소',
-        // 아버지가 나중에 "왜 취소됐지?" 할 때 볼 단서. 직접 쓴 메모는 덮지 않는다.
+        // 상태를 바꾸지 않고 삭제한다. 물러난 주문을 다루는 길은 이것 하나뿐이다.
+        // 손님 조회에서 감춰지고 재고가 돌아가는 것은 예전 '취소'와 똑같다.
+        deleted: true,
+        // 아버지가 나중에 "왜 없어졌지?" 할 때 볼 단서. 직접 쓴 메모는 덮지 않는다.
         memo: String(data.memo ?? '').trim()
           ? data.memo
           : `입금 기한 ${PAYMENT_DEADLINE_HOURS}시간이 지나 자동으로 취소되었습니다.`,

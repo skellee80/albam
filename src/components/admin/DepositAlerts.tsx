@@ -1,9 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 
-import { ignoreDepositAction, resolveDepositAction } from '@/app/admin/actions';
+import {
+  ignoreDepositAction,
+  resolveDepositAction,
+  updateOrderAction,
+} from '@/app/admin/actions';
 import { formatKRW, formatShortDateTime, normalizeName, normalizePhone } from '@/lib/format';
 import type { DepositStatus } from '@/lib/types';
 
@@ -83,7 +86,6 @@ function DepositCard({
   pendingOrders: CandidateOrder[];
   accountBank: string;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // 확인필요는 서버가 뽑아준 후보가 이미 있으므로 목록을 접어 둔다.
@@ -92,6 +94,8 @@ function DepositCard({
   const [query, setQuery] = useState('');
   /** 확인 창에 올라와 있는 주문. 누르자마자 처리하지 않고 한 번 물어본다. */
   const [confirming, setConfirming] = useState<CandidateOrder | null>(null);
+  /** 이름이 서로 다를 때 어느 쪽을 진짜로 볼 것인가 */
+  const [nameChoice, setNameChoice] = useState<'deposit' | 'order'>('order');
 
   /**
    * 입금대기 주문 전체 목록.
@@ -120,26 +124,39 @@ function DepositCard({
 
   const exactAmountCount = pendingOrders.filter((o) => o.totalAmount === deposit.amount).length;
 
-  /** 입금을 이 주문에 연결하고 발송대기로 넘긴다. */
+  /**
+   * 입금을 이 주문에 연결하고 발송대기로 넘긴다.
+   *
+   * 통장에 찍힌 이름과 주문에 적힌 이름이 다를 때, 아버지가 "통장 쪽이 맞다"고
+   * 고르면 **주문의 입금자명을 먼저 고친 다음** 연결한다. 그래야 이 사람이
+   * 다음에 또 입금했을 때 자동으로 매칭된다 — 안 고치면 매번 이 확인을 하게 된다.
+   */
   function connect(order: CandidateOrder) {
     setError(null);
+    const fixName =
+      nameChoice === 'deposit' &&
+      normalizeName(deposit.depositorName) !== normalizeName(order.depositorName);
     setConfirming(null);
+
     startTransition(async () => {
+      if (fixName) {
+        const fixed = await updateOrderAction(order.id, {
+          depositorName: deposit.depositorName,
+        });
+        if (!fixed.ok) {
+          setError(fixed.error);
+          return;
+        }
+      }
       const result = await resolveDepositAction(deposit.id, order.id);
       if (!result.ok) setError(result.error);
     });
   }
 
-  /**
-   * 입금은 그대로 두고 주문을 고치러 간다.
-   *
-   * 통장에 찍힌 이름·금액과 손님이 적어 넣은 값이 다를 때 쓴다.
-   * **입금 기록은 손대지 않으므로** 고치고 돌아오면 이 입금이 그대로 남아 있고,
-   * 그때 다시 골라서 입금 완료로 넘기면 된다.
-   */
-  function goEdit(order: CandidateOrder) {
-    setConfirming(null);
-    router.push(`/admin/orders/${order.id}`);
+  /** 확인 창을 열 때는 늘 "주문에 적힌 이름이 맞다"에서 시작한다 (아무것도 안 고치는 쪽) */
+  function askAbout(order: CandidateOrder) {
+    setNameChoice('order');
+    setConfirming(order);
   }
 
   function ignore() {
@@ -213,7 +230,7 @@ function DepositCard({
                 order={order}
                 depositAmount={deposit.amount}
                 disabled={pending}
-                onPick={() => setConfirming(order)}
+                onPick={() => askAbout(order)}
               />
             </li>
           ))}
@@ -268,7 +285,7 @@ function DepositCard({
                         order={order}
                         depositAmount={deposit.amount}
                         disabled={pending}
-                        onPick={() => setConfirming(order)}
+                        onPick={() => askAbout(order)}
                       />
                     </li>
                   ))}
@@ -293,22 +310,23 @@ function DepositCard({
         내 입금이 아님 · 목록에서 치우기
       </button>
 
-      {/*
-        두 버튼이 **둘 다 뭔가를 한다.** 그래서 바깥을 눌러 닫는 길(onDismiss)을
-        따로 두어, 잘못 눌렀을 때 아무 일도 일어나지 않게 한다.
-      */}
       <ConfirmDialog
         open={confirming !== null}
-        title="이 주문을 먼저 수정 할까요?"
-        confirmLabel="예, 수정하기"
-        cancelLabel="아니요, 입금 완료"
+        title="이 주문을 입금 완료 처리 할까요?"
+        confirmLabel="예, 입금 완료"
+        cancelLabel="아니요"
         pending={pending}
-        onConfirm={() => goEdit(confirming!)}
-        onCancel={() => connect(confirming!)}
-        onDismiss={() => setConfirming(null)}
+        onConfirm={() => connect(confirming!)}
+        onCancel={() => setConfirming(null)}
       >
         {confirming && (
-          <ResolveSummary deposit={deposit} order={confirming} otherBank={deposit.otherBank} />
+          <ResolveSummary
+            deposit={deposit}
+            order={confirming}
+            otherBank={deposit.otherBank}
+            nameChoice={nameChoice}
+            onNameChoice={setNameChoice}
+          />
         )}
       </ConfirmDialog>
     </article>
@@ -325,10 +343,14 @@ function ResolveSummary({
   deposit,
   order,
   otherBank,
+  nameChoice,
+  onNameChoice,
 }: {
   deposit: AlertDeposit;
   order: CandidateOrder;
   otherBank: boolean;
+  nameChoice: 'deposit' | 'order';
+  onNameChoice: (choice: 'deposit' | 'order') => void;
 }) {
   const amountMatches = deposit.amount === order.totalAmount;
   const nameMatches = normalizeName(deposit.depositorName) === normalizeName(order.depositorName);
@@ -345,22 +367,49 @@ function ResolveSummary({
         <Row label="주문 금액" value={formatKRW(order.totalAmount)} warn={!amountMatches} mono />
       </dl>
 
-      {/* 자동 매칭이 실패한 이유를 짚어 준다 */}
-      {(!amountMatches || !nameMatches) && (
-        <ul className="space-y-1 rounded-xl bg-amber-tint px-3.5 py-3 text-[0.83rem] leading-snug text-amber">
-          {!nameMatches && (
-            <li>
-              입금자명이 다릅니다 — 입금 <b>{deposit.depositorName}</b> / 주문{' '}
-              <b>{order.depositorName}</b>
-            </li>
-          )}
-          {!amountMatches && (
-            <li>
-              금액이 다릅니다 — 입금 <b>{formatKRW(deposit.amount)}</b> / 주문{' '}
-              <b>{formatKRW(order.totalAmount)}</b>
-            </li>
-          )}
-        </ul>
+      {/*
+        이름이 다를 때는 어느 쪽이 맞는지 여기서 정하고 넘어간다.
+        고르지 않고 넘어가면 주문에는 틀린 이름이 남아, 같은 사람이 다음에 입금해도
+        또 자동으로 못 맞추고 아버지가 다시 이 화면을 보게 된다.
+      */}
+      {!nameMatches && (
+        <fieldset className="rounded-xl border-2 border-amber/40 bg-amber-tint px-3.5 py-3">
+          <legend className="px-1 text-[0.85rem] font-bold text-amber">
+            이름이 서로 다릅니다. 어느 쪽이 맞나요?
+          </legend>
+          <div className="mt-1 space-y-1.5">
+            <NameOption
+              checked={nameChoice === 'deposit'}
+              onChange={() => onNameChoice('deposit')}
+              label="통장에 찍힌 이름"
+              value={deposit.depositorName}
+            />
+            <NameOption
+              checked={nameChoice === 'order'}
+              onChange={() => onNameChoice('order')}
+              label="주문에 적힌 이름"
+              value={order.depositorName}
+            />
+          </div>
+          <p className="mt-2 text-[0.8rem] leading-snug text-ink-soft">
+            {nameChoice === 'deposit' ? (
+              <>
+                주문의 입금자명을 <b className="text-ink">{deposit.depositorName}</b> 으로 고친 뒤
+                입금 완료로 넘깁니다.
+              </>
+            ) : (
+              <>주문은 그대로 두고 입금 완료로만 넘깁니다.</>
+            )}
+          </p>
+        </fieldset>
+      )}
+
+      {/* 금액이 다른 것은 여기서 못 고친다 — 주문 화면에서 품목까지 봐야 한다 */}
+      {!amountMatches && (
+        <p className="rounded-xl bg-amber-tint px-3.5 py-3 text-[0.83rem] leading-snug text-amber">
+          금액이 다릅니다 — 입금 <b>{formatKRW(deposit.amount)}</b> / 주문{' '}
+          <b>{formatKRW(order.totalAmount)}</b>
+        </p>
       )}
 
       {otherBank && (
@@ -381,6 +430,39 @@ function ResolveSummary({
         </p>
       </div>
     </div>
+  );
+}
+
+/** 이름 고르기 한 줄. 폰에서 누를 것이라 글자 전체가 누름 영역이 되게 label로 감싼다. */
+function NameOption({
+  checked,
+  onChange,
+  label,
+  value,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  value: string;
+}) {
+  return (
+    <label
+      className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 ${
+        checked ? 'bg-surface ring-1 ring-amber/40' : ''
+      }`}
+    >
+      <input
+        type="radio"
+        name="name-choice"
+        checked={checked}
+        onChange={onChange}
+        className="h-5 w-5 shrink-0 accent-[#c47f14]"
+      />
+      <span className="min-w-0">
+        <span className="block text-[0.75rem] text-ink-faint">{label}</span>
+        <b className="block truncate text-[0.95rem]">{value}</b>
+      </span>
+    </label>
   );
 }
 

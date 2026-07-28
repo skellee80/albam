@@ -11,11 +11,11 @@ import { ORDER_STATUSES, type Order, type OrderStatus } from './types';
  * 순수 함수만 있어서 서버·클라이언트 어디서든 쓸 수 있다.
  */
 
-/** 매출로 잡는 주문: 입금이 확인됐고, 취소·환불되지 않은 것 */
+/** 매출로 잡는 주문: 입금이 확인됐고, 물러나거나 환불되지 않은 것 */
 export function isRevenueOrder(order: Order): boolean {
-  if (order.deleted) return false;
+  if (order.deleted) return false; // 삭제 = 기한 지남 · 손님이 무름 · 아버지가 지움
   if (order.paidAt === null) return false;
-  return order.status !== '취소' && order.status !== '환불완료';
+  return order.status !== '환불완료';
 }
 
 export type DailySales = { date: string; label: string; amount: number; count: number };

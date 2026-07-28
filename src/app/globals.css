@@ -115,6 +115,15 @@ body {
   pointer-events: none;
 }
 
+/*
+ * 같은 가시를 카드 안에서 쓸 때. 물려 있는 색만 카드 바탕(흰색)으로 바꾼다.
+ * 상품 카드에서 사진과 본문이 만나는 자리에 쓴다 — 밤이 밤송이에 물려 있는 모양이
+ * 이 사이트의 표식이고, 사진과 가격이 한 덩어리라는 것을 이 선이 말해 준다.
+ */
+.burr-edge-surface::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12' viewBox='0 0 20 12' preserveAspectRatio='none'%3E%3Cpath d='M0 0 Q5 24 10 0 Q15 24 20 0 L20 12 L0 12 Z' fill='%23FFFFFF'/%3E%3C/svg%3E");
+}
+
 /* ============================================================
    반복해서 쓰는 조각
    ============================================================ */

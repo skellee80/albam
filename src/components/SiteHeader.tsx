@@ -9,10 +9,14 @@ import { BrandTitle } from './BrandTitle';
 export function SiteHeader({ active }: { active: 'shop' | 'track' | null }) {
   return (
     <header className="burr-edge bg-burr text-white">
-      <div className="mx-auto flex w-full max-w-[30rem] flex-col items-center px-5 pt-5 pb-8">
+      {/*
+        아래 여백(pb)은 밤송이 가시(.burr-edge::after, 12px)가 메뉴를 덮지 않을 만큼만 둔다.
+        가게 이름이 작아지면서 예전 여백은 초록 띠만 두껍게 남겼다.
+      */}
+      <div className="mx-auto flex w-full max-w-[30rem] flex-col items-center px-5 pt-3 pb-4">
         <BrandTitle />
 
-        <nav className="mt-3 flex justify-center gap-2" aria-label="주요 메뉴">
+        <nav className="mt-2 flex justify-center gap-2" aria-label="주요 메뉴">
           <NavLink href="/" label="상품" isActive={active === 'shop'} />
           <NavLink href="/track" label="주문 조회" isActive={active === 'track'} />
         </nav>
