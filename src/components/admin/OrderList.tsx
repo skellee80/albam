@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 
 import { formatKRW, formatShortDateTime, normalizeName, normalizePhone } from '@/lib/format';
 import { orderStatusTone } from '@/lib/status-tone';
-import type { OrderStatus } from '@/lib/types';
+import type { OrderSource, OrderStatus } from '@/lib/types';
 
 export type OrderRow = {
   id: string;
@@ -16,6 +16,7 @@ export type OrderRow = {
   itemsSummary: string;
   totalAmount: number;
   status: OrderStatus;
+  source: OrderSource;
   trackingNo: string;
   deleted: boolean;
   createdAt: number;
@@ -96,9 +97,17 @@ export function OrderList({ orders }: { orders: OrderRow[] }) {
                   <span className="tnum shrink-0 font-semibold">{formatKRW(order.totalAmount)}</span>
                 </div>
 
-                <p className="tnum mt-1.5 text-[0.72rem] text-ink-faint">
-                  {order.orderNo} · {formatShortDateTime(order.createdAt)}
-                  {order.trackingNo ? ` · 송장 ${order.trackingNo}` : ''}
+                <p className="mt-1.5 text-[0.72rem] text-ink-faint">
+                  {/* 사이트로 들어온 것과 아버지가 손으로 넣은 것을 한눈에 가른다 */}
+                  {order.source === 'direct' && (
+                    <span className="mr-1.5 rounded-full bg-shell-tint px-1.5 py-0.5 font-bold text-shell">
+                      직접
+                    </span>
+                  )}
+                  <span className="tnum">
+                    {order.orderNo} · {formatShortDateTime(order.createdAt)}
+                    {order.trackingNo ? ` · 송장 ${order.trackingNo}` : ''}
+                  </span>
                 </p>
               </Link>
             </li>

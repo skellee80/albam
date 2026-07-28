@@ -10,6 +10,7 @@ import {
   type CartLine,
   type Order,
   type OrderItem,
+  type OrderSource,
   type OrderStatus,
   type Recipient,
 } from './types';
@@ -38,6 +39,8 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): Order {
   return {
     id,
     orderNo: data.orderNo ?? id,
+    // 예전 문서에는 이 필드가 없다. 그때는 인터넷 주문만 있었다.
+    source: (data.source === 'direct' ? 'direct' : 'online') as OrderSource,
     recipient: {
       name: data.recipient?.name ?? '',
       phone: data.recipient?.phone ?? '',
@@ -102,7 +105,14 @@ export type CreateOrderInput = {
   depositorPhone: string;
   sameAsDepositor: boolean;
   recipient: Recipient;
+  /** 기본은 손님이 사이트에서 넣은 주문 */
+  source?: OrderSource;
+  /** 직접 넣는 주문에서 "이미 돈을 받았다"면 곧바로 발송대기로 시작한다 */
+  paid?: boolean;
 };
+
+/** 재고가 모자라 거절된 경우. 화면에서 "얼마나 모자란지"를 그대로 보여주려고 따로 담는다. */
+export type StockShortage = { productId: string; name: string; stock: number; want: number };
 
 export type CreateOrderResult =
   | {
@@ -115,7 +125,7 @@ export type CreateOrderResult =
       /** 이 시각까지 입금해야 한다. 지나면 자동 취소된다. */
       paymentDueAt: number;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; shortage?: StockShortage };
 
 /**
  * 주문 생성.
@@ -123,8 +133,15 @@ export type CreateOrderResult =
  * 클라이언트가 보낸 가격은 전부 버리고 상품 문서의 가격으로 다시 계산한다.
  * 브라우저에서 금액을 조작해도 서버가 저장하는 총액은 바뀌지 않는다.
  * 재고 확인·차감·주문번호 채번을 한 트랜잭션 안에서 처리해 초과 판매를 막는다.
+ *
+ * 아버지가 전화·방문 판매를 손으로 넣는 주문(`source: 'direct'`)도 **같은 길로 간다.**
+ * 재고 차감과 가격 계산이 갈라지면 어느 한쪽만 어긋났을 때 찾아내기 어렵다.
+ * 다른 것은 입력 검사뿐이다 — 방문 판매에는 주소도 연락처도 없을 수 있다.
  */
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
+  const source: OrderSource = input.source ?? 'online';
+  const isDirect = source === 'direct';
+
   const depositorName = input.depositorName.trim();
   const depositorPhone = input.depositorPhone.trim();
   const recipient: Recipient = {
@@ -133,13 +150,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     address: input.recipient.address.trim(),
   };
 
-  if (!depositorName) return { ok: false, error: '입금자명을 입력해 주세요.' };
-  if (normalizePhone(depositorPhone).length < 9)
-    return { ok: false, error: '입금하시는 분 연락처를 정확히 입력해 주세요.' };
-  if (!recipient.name) return { ok: false, error: '받는 분 이름을 입력해 주세요.' };
-  if (normalizePhone(recipient.phone).length < 9)
-    return { ok: false, error: '받는 분 연락처를 정확히 입력해 주세요.' };
-  if (!recipient.address) return { ok: false, error: '받는 분 주소를 입력해 주세요.' };
+  if (isDirect) {
+    // 손으로 넣는 주문은 이름 하나만 받는다. 방문 판매는 주소도 연락처도 없다.
+    if (!recipient.name) return { ok: false, error: '손님 이름을 입력해 주세요.' };
+  } else {
+    if (!depositorName) return { ok: false, error: '입금자명을 입력해 주세요.' };
+    if (normalizePhone(depositorPhone).length < 9)
+      return { ok: false, error: '입금하시는 분 연락처를 정확히 입력해 주세요.' };
+    if (!recipient.name) return { ok: false, error: '받는 분 이름을 입력해 주세요.' };
+    if (normalizePhone(recipient.phone).length < 9)
+      return { ok: false, error: '받는 분 연락처를 정확히 입력해 주세요.' };
+    if (!recipient.address) return { ok: false, error: '받는 분 주소를 입력해 주세요.' };
+  }
 
   // 같은 상품이 여러 줄로 들어와도 한 줄로 합친다 (트랜잭션에서 같은 문서를 두 번 읽지 않도록)
   const merged = new Map<string, number>();
@@ -172,9 +194,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       if (data.hidden) return { ok: false, error: `${data.name}은(는) 현재 판매하지 않습니다.` };
 
       const stock = Number(data.stock ?? 0);
-      if (stock <= 0) return { ok: false, error: `${data.name}이(가) 품절되었습니다.` };
-      if (stock < qty)
-        return { ok: false, error: `${data.name}의 재고가 ${stock}개 남았습니다.` };
+      const name = data.name ?? '';
+      if (stock < qty) {
+        return {
+          ok: false,
+          error:
+            stock <= 0
+              ? `${name}이(가) 품절되었습니다.`
+              : `${name}의 재고가 ${stock}개 남았습니다.`,
+          shortage: { productId, name, stock, want: qty },
+        };
+      }
 
       const price = Number(data.price ?? 0); // ← 서버 가격만 사용
       items.push({
@@ -200,9 +230,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     for (const w of stockWrites) t.update(w.ref, { stock: w.stock, updatedAt: now });
     t.set(counterRef, { dateKey, seq });
 
+    /**
+     * 직접 넣은 주문에서 "이미 받았다"면 곧바로 발송대기로 시작한다.
+     * paidAt 이 있어야 매출로 잡히고, 입금 기한이 지나도 자동으로 지워지지 않는다
+     * (기한 정리는 입금대기만 훑는다).
+     */
+    const paidNow = isDirect && input.paid !== false;
+    const status: OrderStatus = paidNow ? '발송대기' : '입금대기';
+
     const orderRef = db.collection(COL.orders).doc();
     t.set(orderRef, {
       orderNo,
+      source,
       recipient,
       phoneNorm: normalizePhone(recipient.phone),
       depositorName,
@@ -212,7 +251,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       sameAsDepositor: Boolean(input.sameAsDepositor),
       items,
       totalAmount,
-      status: '입금대기' satisfies OrderStatus,
+      status,
       trackingNo: '',
       memo: '',
       refundAmount: 0,
@@ -220,7 +259,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       createdAt: now,
       updatedAt: now,
       paymentDueAt: now + PAYMENT_DEADLINE_MS,
-      paidAt: null,
+      paidAt: paidNow ? now : null,
       shippedAt: null,
     });
 

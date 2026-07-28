@@ -11,6 +11,9 @@ import {
 import { formatDateTime, formatKRW } from '@/lib/format';
 import { ORDER_STATUSES, type OrderItem, type OrderStatus } from '@/lib/types';
 
+import { ConfirmDialog } from './ConfirmDialog';
+import { NoticeDialog } from './NoticeDialog';
+
 export type EditableOrder = {
   id: string;
   orderNo: string;
@@ -47,6 +50,9 @@ export function OrderEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  /** 저장이 끝났다고 알리는 창. 작은 글씨 한 줄이면 아버지가 못 보고 또 누른다. */
+  const [saved, setSaved] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const [name, setName] = useState(order.recipient.name);
   const [phone, setPhone] = useState(order.recipient.phone);
@@ -93,17 +99,17 @@ export function OrderEditor({
         memo,
         refundAmount: Number(refundAmount.replace(/[^\d]/g, '')) || 0,
       });
-      setMessage(
-        result.ok
-          ? { kind: 'ok', text: '저장했습니다.' }
-          : { kind: 'error', text: result.error },
-      );
-      if (result.ok) router.refresh();
+      if (!result.ok) {
+        setMessage({ kind: 'error', text: result.error });
+        return;
+      }
+      setSaved(true);
+      router.refresh();
     });
   }
 
   function remove() {
-    if (!window.confirm('이 주문을 삭제할까요?\n고객 주문 조회에서 사라지고, 재고는 되돌아갑니다.')) return;
+    setConfirmingDelete(false);
     startTransition(async () => {
       const result = await deleteOrderAction(order.id);
       if (result.ok) router.push('/admin/orders');
@@ -354,11 +360,44 @@ export function OrderEditor({
           {pending ? '저장 중…' : '저장하기'}
         </button>
         {!order.deleted && (
-          <button type="button" onClick={remove} disabled={pending} className="btn btn-danger mt-2 w-full min-h-11 text-[0.9rem]">
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            disabled={pending}
+            className="btn btn-danger mt-2 w-full min-h-11 text-[0.9rem]"
+          >
             주문 삭제
           </button>
         )}
       </div>
+
+      <NoticeDialog open={saved} title="저장했습니다" onClose={() => setSaved(false)}>
+        <p>
+          <b className="text-ink">{name || '이 주문'}</b> 의 내용을 바꿨습니다.
+        </p>
+      </NoticeDialog>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="이 주문을 삭제할까요?"
+        confirmLabel="예, 삭제"
+        cancelLabel="아니요"
+        tone="danger"
+        pending={pending}
+        onConfirm={remove}
+        onCancel={() => setConfirmingDelete(false)}
+      >
+        <div className="space-y-2 text-[0.87rem] leading-relaxed text-ink-soft">
+          <p>
+            <b className="text-ink">{name || '이 주문'}</b> ·{' '}
+            <b className="tnum text-ink">{formatKRW(total)}</b>
+          </p>
+          <p>손님 주문 조회에서 사라지고, 재고는 되돌아갑니다.</p>
+          <p className="text-[0.83rem] text-ink-faint">
+            지운 뒤에도 주문관리의 <b>삭제됨</b> 에서 찾아 되살릴 수 있습니다.
+          </p>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

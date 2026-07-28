@@ -855,6 +855,111 @@ async function main() {
   check('시간과 밀리초가 어긋나지 않는다', ms === hours * 60 * 60 * 1000);
 
   /* ────────────────────────────────────────────── */
+  section('22-4. 직접 넣은 주문 (전화·방문 판매)');
+
+  const { sourceTotals, dailySales: daily, productSales: byProduct } = await import(
+    '../src/lib/stats'
+  );
+
+  const stockBeforeDirect = (await listProducts()).find((p) => p.id === okgwangLarge.id)!.stock;
+
+  // 방문 판매: 주소도 연락처도 없이 이름만 있다
+  const direct = await createOrder({
+    lines: [{ productId: okgwangLarge.id, qty: 2 }],
+    source: 'direct',
+    paid: true,
+    depositorName: '장터손님',
+    depositorPhone: '',
+    sameAsDepositor: true,
+    recipient: { name: '장터손님', phone: '', address: '' },
+  });
+  check('주소·연락처가 없어도 넣을 수 있다', direct.ok, JSON.stringify(direct));
+  if (!direct.ok) throw new Error('이후 검증 불가');
+
+  const directOrder = await getOrder(direct.orderId);
+  check('직접 넣은 주문으로 표시된다', directOrder?.source === 'direct', directOrder?.source);
+  check('이미 받았으면 발송대기로 시작한다', directOrder?.status === '발송대기', directOrder?.status);
+  check('입금 시각이 찍혀 매출에 잡힌다', directOrder?.paidAt !== null);
+
+  const stockAfterDirect = (await listProducts()).find((p) => p.id === okgwangLarge.id)!.stock;
+  check(
+    '직접 넣은 주문도 재고에서 빠진다',
+    stockAfterDirect === stockBeforeDirect - 2,
+    `${stockBeforeDirect} → ${stockAfterDirect}`,
+  );
+
+  // 재고보다 많이 넣으려 하면 막고, 얼마나 모자란지 알려준다
+  const tooMany = await createOrder({
+    lines: [{ productId: okgwangLarge.id, qty: stockAfterDirect + 5 }],
+    source: 'direct',
+    paid: true,
+    depositorName: '과다',
+    depositorPhone: '',
+    sameAsDepositor: true,
+    recipient: { name: '과다', phone: '', address: '' },
+  });
+  check('재고보다 많이 넣으면 막힌다', !tooMany.ok);
+  check(
+    '얼마나 모자란지 함께 돌려준다',
+    !tooMany.ok && tooMany.shortage?.stock === stockAfterDirect,
+    JSON.stringify(!tooMany.ok ? tooMany.shortage : null),
+  );
+
+  // 안 받았다고 하면 입금대기로 들어간다
+  const unpaidDirect = await createOrder({
+    lines: [{ productId: okgwangLarge.id, qty: 1 }],
+    source: 'direct',
+    paid: false,
+    depositorName: '나중결제',
+    depositorPhone: '',
+    sameAsDepositor: true,
+    recipient: { name: '나중결제', phone: '', address: '' },
+  });
+  const unpaidOrder = unpaidDirect.ok ? await getOrder(unpaidDirect.orderId) : null;
+  check('아직 안 받았으면 입금대기로 들어간다', unpaidOrder?.status === '입금대기', unpaidOrder?.status);
+
+  // 인터넷 주문은 예전 그대로여야 한다
+  const online = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '인터넷손님',
+    sameAsDepositor: true,
+    depositorPhone: '010-2222-3333',
+    recipient: { name: '인터넷손님', phone: '010-2222-3333', address: '천안시 어딘가' },
+  });
+  const onlineOrder = online.ok ? await getOrder(online.orderId) : null;
+  check('사이트 주문은 인터넷으로 잡힌다', onlineOrder?.source === 'online', onlineOrder?.source);
+  check('사이트 주문은 여전히 주소를 요구한다', !(await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 1 }],
+    depositorName: '주소없음',
+    sameAsDepositor: true,
+    depositorPhone: '010-2222-3333',
+    recipient: { name: '주소없음', phone: '010-2222-3333', address: '' },
+  })).ok);
+
+  const allOrders = await listOrders({ limit: 1000 });
+  const bySource = sourceTotals(allOrders);
+  check(
+    '판매 현황이 인터넷과 직접을 나눠 센다',
+    bySource.direct > 0 && bySource.online > 0,
+    `인터넷 ${bySource.online} / 직접 ${bySource.direct}`,
+  );
+
+  const todayRow = daily(allOrders, 7).at(-1)!;
+  check(
+    '일별 매출도 둘로 나뉜다',
+    todayRow.online + todayRow.direct === todayRow.amount,
+    `${todayRow.online} + ${todayRow.direct} vs ${todayRow.amount}`,
+  );
+
+  // 상품별 판매는 금액이 큰 순으로 줄 세운다 (개수 순이 아니다)
+  const ranked = byProduct(allOrders);
+  check(
+    '상품별 판매가 금액 큰 순이다',
+    ranked.every((r, i) => i === 0 || ranked[i - 1].amount >= r.amount),
+    ranked.map((r) => `${r.name} ${r.amount}`).join(' / '),
+  );
+
+  /* ────────────────────────────────────────────── */
   // 상품을 지웠다가 다시 넣으므로 반드시 마지막에 둔다.
   section('23. 기본 상품 넣기 — 비어 있을 때 한 번만');
 

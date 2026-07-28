@@ -18,9 +18,23 @@ export function isRevenueOrder(order: Order): boolean {
   return order.status !== '환불완료';
 }
 
-export type DailySales = { date: string; label: string; amount: number; count: number };
+export type DailySales = {
+  date: string;
+  label: string;
+  /** 손님이 사이트에서 주문한 금액 */
+  online: number;
+  /** 아버지가 전화·방문 판매로 직접 넣은 금액 */
+  direct: number;
+  amount: number;
+  count: number;
+};
 
-/** 최근 N일 매출 (KST 기준, 주문이 없는 날도 0으로 채워 넣는다) */
+/**
+ * 최근 N일 매출 (KST 기준, 주문이 없는 날도 0으로 채워 넣는다).
+ *
+ * 인터넷 주문과 직접 넣은 주문을 나눠서 담는다. 합계만 보면 사이트가 실제로
+ * 얼마나 일하고 있는지 알 수 없다 — 아버지가 전화로 받아 넣은 것까지 섞이기 때문이다.
+ */
 export function dailySales(orders: Order[], days = 7): DailySales[] {
   const buckets = new Map<string, DailySales>();
   const today = Date.now();
@@ -28,7 +42,7 @@ export function dailySales(orders: Order[], days = 7): DailySales[] {
   for (let i = days - 1; i >= 0; i--) {
     const at = today - i * 24 * 60 * 60 * 1000;
     const key = kstDateKey(at);
-    buckets.set(key, { date: key, label: kstDayLabel(at), amount: 0, count: 0 });
+    buckets.set(key, { date: key, label: kstDayLabel(at), online: 0, direct: 0, amount: 0, count: 0 });
   }
 
   for (const order of orders) {
@@ -36,6 +50,8 @@ export function dailySales(orders: Order[], days = 7): DailySales[] {
     const key = kstDateKey(order.paidAt ?? order.createdAt);
     const bucket = buckets.get(key);
     if (!bucket) continue; // 기간 밖
+    if (order.source === 'direct') bucket.direct += order.totalAmount;
+    else bucket.online += order.totalAmount;
     bucket.amount += order.totalAmount;
     bucket.count += 1;
   }
@@ -45,7 +61,12 @@ export function dailySales(orders: Order[], days = 7): DailySales[] {
 
 export type ProductSales = { name: string; qty: number; amount: number };
 
-/** 상품별 판매량 (많이 팔린 순) */
+/**
+ * 상품별 판매 (많이 판 순).
+ *
+ * **금액 기준으로 줄 세운다.** 개수로 세우면 싸고 가벼운 4kg이 늘 위로 올라와
+ * "무엇이 돈이 되는가"가 안 보인다. 개수도 함께 적어 두므로 둘 다 읽을 수 있다.
+ */
 export function productSales(orders: Order[]): ProductSales[] {
   const byName = new Map<string, ProductSales>();
 
@@ -59,7 +80,25 @@ export function productSales(orders: Order[]): ProductSales[] {
     }
   }
 
-  return [...byName.values()].sort((a, b) => b.qty - a.qty);
+  return [...byName.values()].sort((a, b) => b.amount - a.amount);
+}
+
+export type SourceTotals = { online: number; direct: number; onlineCount: number; directCount: number };
+
+/** 인터넷 주문 / 직접 넣은 주문 합계 */
+export function sourceTotals(orders: Order[]): SourceTotals {
+  const t: SourceTotals = { online: 0, direct: 0, onlineCount: 0, directCount: 0 };
+  for (const order of orders) {
+    if (!isRevenueOrder(order)) continue;
+    if (order.source === 'direct') {
+      t.direct += order.totalAmount;
+      t.directCount += 1;
+    } else {
+      t.online += order.totalAmount;
+      t.onlineCount += 1;
+    }
+  }
+  return t;
 }
 
 export type StatusCount = { status: OrderStatus; count: number };

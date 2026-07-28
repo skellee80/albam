@@ -36,6 +36,7 @@ export default async function AdminOrdersPage({
     itemsSummary: summarizeItems(o.items),
     totalAmount: o.totalAmount,
     status: o.status,
+    source: o.source,
     trackingNo: o.trackingNo,
     deleted: o.deleted,
     createdAt: o.createdAt,
@@ -43,7 +44,13 @@ export default async function AdminOrdersPage({
 
   return (
     <div>
-      <h1 className="px-1 font-display text-[1.4rem]">주문</h1>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h1 className="font-display text-[1.4rem]">주문</h1>
+        {/* 전화·방문 판매도 재고에서 빠져야 하므로 여기서 넣는다 */}
+        <Link href="/admin/orders/new" className="btn btn-primary min-h-11 shrink-0 px-4 text-[0.88rem]">
+          직접 넣기
+        </Link>
+      </div>
 
       <nav className="mt-3 -mx-4 overflow-x-auto px-4" aria-label="상태로 거르기">
         <div className="flex gap-1.5">

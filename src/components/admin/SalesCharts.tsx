@@ -14,11 +14,12 @@ import { formatKRW } from '@/lib/format';
 import type { DailySales, ProductSales } from '@/lib/stats';
 
 /**
- * 두 차트 모두 계열이 하나뿐인 "크기" 표현이라 색을 하나만 쓴다.
- * 품목마다 다른 색을 칠하면 정체성을 나타내는 것처럼 보이지만 실제로는 크기 비교라 방해만 된다.
- * (globals.css 의 --color-burr / --color-line 과 같은 값)
+ * 색은 두 가지만 쓴다 — 주문이 **어디서 왔는지**가 유일하게 나눌 값이기 때문이다.
+ * 초록은 사이트가 스스로 받아온 것, 갈색은 아버지가 손으로 넣은 것.
+ * (globals.css 의 --color-burr / --color-shell 과 같은 값)
  */
-const BAR = '#6F9A57';
+const ONLINE = '#6F9A57';
+const DIRECT = '#8C5A34';
 const GRID = '#ECE2D2';
 const AXIS_TEXT = '#A89887';
 
@@ -39,6 +40,16 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
   return (
     <section className="card px-4 py-4">
       <h3 className="font-display text-[1.1rem]">최근 7일 매출</h3>
+
+      {/*
+        범례를 recharts <Legend> 대신 직접 그린다.
+        기본 범례는 글씨가 작고 위치를 맞추기 번거로운데, 여기서는 이 두 줄이
+        차트에서 가장 먼저 읽혀야 하는 정보라 제목 바로 아래 크게 둔다.
+      */}
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[0.82rem]">
+        <LegendKey color={ONLINE} label="인터넷 주문" />
+        <LegendKey color={DIRECT} label="직접 넣은 주문" />
+      </div>
 
       {!hasSales ? (
         <p className="py-8 text-center text-[0.9rem] text-ink-soft">
@@ -73,12 +84,30 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
                       <div className="rounded-xl border border-line bg-surface px-3 py-2 shadow-md">
                         <p className="text-[0.78rem] text-ink-soft">{label}</p>
                         <p className="tnum text-[0.95rem] font-bold">{formatKRW(row.amount)}</p>
-                        <p className="tnum text-[0.75rem] text-ink-faint">주문 {row.count}건</p>
+                        <dl className="mt-1 space-y-0.5 text-[0.75rem]">
+                          <TipRow color={ONLINE} label="인터넷" value={row.online} />
+                          <TipRow color={DIRECT} label="직접" value={row.direct} />
+                        </dl>
+                        <p className="tnum mt-1 text-[0.72rem] text-ink-faint">
+                          주문 {row.count}건
+                        </p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="amount" fill={BAR} radius={[4, 4, 0, 0]} maxBarSize={38} />
+                {/*
+                  같은 stackId 를 줘서 하루치가 한 막대로 쌓인다.
+                  나란히 두면 막대가 14개가 되어 폰 폭에서 서로 붙어 버린다.
+                  둥근 모서리는 맨 위 조각에만 준다 — 아래 조각에도 주면 사이가 갈라져 보인다.
+                */}
+                <Bar dataKey="online" stackId="sales" fill={ONLINE} maxBarSize={38} />
+                <Bar
+                  dataKey="direct"
+                  stackId="sales"
+                  fill={DIRECT}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={38}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -89,7 +118,9 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
             <thead>
               <tr>
                 <th>날짜</th>
-                <th>매출</th>
+                <th>인터넷 주문</th>
+                <th>직접 넣은 주문</th>
+                <th>합계</th>
                 <th>주문 건수</th>
               </tr>
             </thead>
@@ -97,6 +128,8 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
               {data.map((d) => (
                 <tr key={d.date}>
                   <td>{d.label}</td>
+                  <td>{formatKRW(d.online)}</td>
+                  <td>{formatKRW(d.direct)}</td>
                   <td>{formatKRW(d.amount)}</td>
                   <td>{d.count}건</td>
                 </tr>
@@ -106,6 +139,33 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
         </>
       )}
     </section>
+  );
+}
+
+function LegendKey({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        aria-hidden="true"
+        className="h-3 w-3 shrink-0 rounded-[3px]"
+        style={{ background: color }}
+      />
+      <span className="text-ink-soft">{label}</span>
+    </span>
+  );
+}
+
+function TipRow({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span
+        aria-hidden="true"
+        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+        style={{ background: color }}
+      />
+      <dt className="text-ink-soft">{label}</dt>
+      <dd className="tnum ml-auto font-semibold">{formatKRW(value)}</dd>
+    </div>
   );
 }
 
@@ -119,11 +179,13 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
  * ──────────────────────────────────────────────────────────── */
 
 export function ProductSalesBars({ data }: { data: ProductSales[] }) {
-  const max = Math.max(...data.map((d) => d.qty), 1);
+  // 막대 길이와 줄 순서 모두 **금액** 기준이다.
+  // 개수로 재면 싸고 가벼운 4kg이 늘 맨 위로 올라와, 무엇이 돈이 되는지가 가려진다.
+  const max = Math.max(...data.map((d) => d.amount), 1);
 
   return (
     <section className="card px-4 py-4">
-      <h3 className="font-display text-[1.1rem]">상품별 판매량</h3>
+      <h3 className="font-display text-[1.1rem]">상품별 판매 금액</h3>
 
       {data.length === 0 ? (
         <p className="py-8 text-center text-[0.9rem] text-ink-soft">아직 팔린 상품이 없습니다.</p>
@@ -133,14 +195,15 @@ export function ProductSalesBars({ data }: { data: ProductSales[] }) {
             <li key={row.name}>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-[0.9rem] font-semibold">{row.name}</span>
-                <span className="tnum text-[0.85rem] text-ink-soft">
-                  {row.qty}개 · {formatKRW(row.amount)}
+                <span className="tnum shrink-0 text-[0.85rem]">
+                  <b>{formatKRW(row.amount)}</b>
+                  <span className="ml-1.5 text-ink-faint">{row.qty}개</span>
                 </span>
               </div>
               <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-burr-tint">
                 <div
                   className="h-full rounded-full bg-burr"
-                  style={{ width: `${Math.max(4, (row.qty / max) * 100)}%` }}
+                  style={{ width: `${Math.max(4, (row.amount / max) * 100)}%` }}
                 />
               </div>
             </li>

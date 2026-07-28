@@ -161,9 +161,28 @@ export interface Recipient {
   address: string;
 }
 
+/**
+ * 이 주문이 어디서 들어왔나.
+ *
+ *  - `online` 손님이 사이트에서 직접 주문 (기본값)
+ *  - `direct` 아버지가 전화·방문 판매를 관리자에서 손으로 넣음
+ *
+ * 판매 현황에서 둘을 나눠 보기 위한 값이다. 합쳐서만 보면 사이트가 실제로
+ * 얼마나 일하고 있는지 알 수 없다. 재고 차감과 매출 집계는 둘이 똑같이 한다.
+ */
+export const ORDER_SOURCES = ['online', 'direct'] as const;
+export type OrderSource = (typeof ORDER_SOURCES)[number];
+
+export const ORDER_SOURCE_LABEL: Record<OrderSource, string> = {
+  online: '인터넷 주문',
+  direct: '직접 넣은 주문',
+};
+
 export interface Order {
   id: string;
   orderNo: string; // "20260726-0001"
+  /** 예전 문서에는 없다. 없으면 인터넷 주문으로 본다. */
+  source: OrderSource;
   recipient: Recipient;
   phoneNorm: string; // 받는 분 전화번호, 숫자만 (조회용)
   depositorName: string;

@@ -48,31 +48,101 @@ function namePreview(name: string): string {
   return `손님 화면에서 "${group}" 묶음 안에 "${size}" 로 나옵니다.`;
 }
 
+/**
+ * 상품을 그룹(품종)으로 묶는다.
+ *
+ * 그룹 이름은 따로 저장하지 않고 **상품 이름 앞부분에서 읽어낸다.**
+ * "대보 중 4kg" 의 그룹은 "대보". 그룹을 별도 필드로 두면 이름과 그룹이 어긋난
+ * 상품이 생기고, 그때 손님 화면과 관리자 화면이 서로 다른 말을 하게 된다.
+ * 이름 하나만 고치면 그룹도 따라 움직이는 편이 틀릴 자리가 없다.
+ */
+function groupByVariety(products: ManagedProduct[]) {
+  const groups: { name: string; items: ManagedProduct[] }[] = [];
+
+  for (const product of products) {
+    const variety = parseProductName(product.name).variety || product.name || '이름 없음';
+    let group = groups.find((g) => g.name === variety);
+    if (!group) {
+      group = { name: variety, items: [] };
+      groups.push(group);
+    }
+    group.items.push(product);
+  }
+
+  return groups;
+}
+
 export function ProductManager({ products }: { products: ManagedProduct[] }) {
-  const [creating, setCreating] = useState(false);
+  /** 무엇을 새로 만들고 있나. 그룹 이름이 들어 있으면 그 그룹에 넣는 중. */
+  const [creating, setCreating] = useState<{ group: string } | null>(null);
+
+  const groups = groupByVariety(products);
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="mt-3 space-y-4">
       {products.length === 0 && !creating && <EmptyState />}
 
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+      {groups.map((group) => (
+        <section key={group.name} className="card overflow-hidden">
+          <header className="flex items-baseline justify-between gap-3 bg-flesh/45 px-4 py-2.5">
+            <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
+            <span className="tnum shrink-0 text-[0.78rem] text-ink-soft">
+              {group.items.length}가지
+            </span>
+          </header>
+
+          <div className="divide-y divide-line">
+            {group.items.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+
+          {creating?.group === group.name ? (
+            <div className="border-t-2 border-line px-4 py-4">
+              <h3 className="mb-3 font-display text-[1.05rem]">{group.name} 에 상품 추가</h3>
+              <ProductForm
+                initial={{ ...EMPTY_DRAFT, name: `${group.name} ` }}
+                productId={null}
+                onDone={() => setCreating(null)}
+                onCancel={() => setCreating(null)}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreating({ group: group.name })}
+              className="w-full border-t border-line px-4 py-3 text-[0.88rem] font-semibold text-burr-deep"
+            >
+              + {group.name} 에 상품 추가
+            </button>
+          )}
+        </section>
       ))}
 
-      {creating ? (
+      {creating && creating.group === '' ? (
         <div className="card px-4 py-4">
-          <h2 className="mb-3 font-display text-[1.1rem]">새 상품</h2>
+          <h2 className="mb-1 font-display text-[1.1rem]">새 그룹</h2>
+          <p className="mb-3 text-[0.82rem] leading-snug text-ink-soft">
+            이름의 <b>맨 앞 낱말이 그룹</b>이 됩니다. &ldquo;청실 중 4kg&rdquo; 이라고 적으면
+            &ldquo;청실&rdquo; 그룹이 새로 생깁니다.
+          </p>
           <ProductForm
             initial={EMPTY_DRAFT}
             productId={null}
-            onDone={() => setCreating(false)}
-            onCancel={() => setCreating(false)}
+            onDone={() => setCreating(null)}
+            onCancel={() => setCreating(null)}
           />
         </div>
       ) : (
-        <button type="button" onClick={() => setCreating(true)} className="btn btn-outline w-full">
-          상품 추가
-        </button>
+        !creating && (
+          <button
+            type="button"
+            onClick={() => setCreating({ group: '' })}
+            className="btn btn-outline w-full"
+          >
+            새 그룹 만들기
+          </button>
+        )
       )}
     </div>
   );
@@ -153,9 +223,18 @@ function ProductCard({ product }: { product: ManagedProduct }) {
   }
 
   return (
+    /*
+      그룹 카드 안의 한 줄이라 스스로 카드가 되지 않는다.
+      대신 왼쪽에 색 띠를 세워 매진·부족을 표시한다 — 테두리로 감싸면 카드 안에
+      카드가 겹쳐 보이고, 그룹 묶음이 흐려진다.
+    */
     <article
-      className={`card px-4 py-4 ${product.hidden ? 'opacity-60' : ''} ${
-        soldOut ? 'border-2 border-berry/35' : lowStock ? 'border-2 border-amber/40' : ''
+      className={`px-4 py-4 ${product.hidden ? 'opacity-60' : ''} ${
+        soldOut
+          ? 'border-l-4 border-l-berry'
+          : lowStock
+            ? 'border-l-4 border-l-amber'
+            : 'border-l-4 border-l-transparent'
       }`}
     >
       <div className="flex items-start justify-between gap-3">

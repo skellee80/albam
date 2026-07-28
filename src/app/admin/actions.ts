@@ -13,11 +13,13 @@ import {
   type DepositResult,
 } from '@/lib/deposits';
 import {
+  createOrder,
   markShipped,
   restoreOrder,
   softDeleteOrder,
   updateOrder,
   type OrderPatch,
+  type StockShortage,
 } from '@/lib/orders';
 import {
   createProduct,
@@ -71,6 +73,64 @@ export async function markShippedAction(
   trackingNo: string,
 ): Promise<ActionResult> {
   return run(() => markShipped(orderId, trackingNo), ['/admin', '/admin/orders']);
+}
+
+/* ── 직접 주문 추가 (전화·방문 판매) ── */
+
+export type DirectOrderResult =
+  | { ok: true; orderId: string; orderNo: string; totalAmount: number }
+  | { ok: false; error: string; shortage?: StockShortage };
+
+/**
+ * 아버지가 전화·방문 판매를 손으로 넣는다.
+ *
+ * 손님 주문과 **같은 createOrder 를 쓴다.** 재고 차감과 가격 재계산이 갈라지면
+ * 어느 한쪽만 어긋났을 때 찾을 방법이 없다. 여기서 넣은 것도 재고에서 빠진다.
+ *
+ * 재고가 모자라면 `shortage` 로 얼마나 모자란지 돌려준다 —
+ * 화면이 "재고관리에서 먼저 채우세요"를 상품 이름과 함께 알려줄 수 있도록.
+ */
+export async function createDirectOrderAction(input: {
+  customerName: string;
+  phone: string;
+  address: string;
+  lines: { productId: string; qty: number }[];
+  paid: boolean;
+  memo: string;
+}): Promise<DirectOrderResult> {
+  try {
+    await requireAdmin();
+
+    const name = input.customerName.trim();
+    const result = await createOrder({
+      lines: input.lines,
+      source: 'direct',
+      paid: input.paid,
+      // 직접 판매는 "입금자 = 손님" 하나뿐이다. 따로 받을 이유가 없다.
+      depositorName: name,
+      depositorPhone: input.phone.trim(),
+      sameAsDepositor: true,
+      recipient: { name, phone: input.phone.trim(), address: input.address.trim() },
+    });
+
+    if (!result.ok) return { ok: false, error: result.error, shortage: result.shortage };
+
+    // 어디서 온 주문인지 아버지가 나중에 알아볼 수 있게 메모를 남긴다
+    const memo = input.memo.trim();
+    if (memo) await updateOrder(result.orderId, { memo });
+
+    for (const path of ['/admin', '/admin/orders', '/admin/sales', '/']) revalidatePath(path);
+
+    return {
+      ok: true,
+      orderId: result.orderId,
+      orderNo: result.orderNo,
+      totalAmount: result.totalAmount,
+    };
+  } catch (err) {
+    console.error('[createDirectOrderAction]', err);
+    return { ok: false, error: err instanceof Error ? err.message : '넣지 못했습니다.' };
+  }
 }
 
 /* ── 주문 수정 ── */
