@@ -187,6 +187,12 @@ export function ProductSalesBars({ data }: { data: ProductSales[] }) {
     <section className="card px-4 py-4">
       <h3 className="font-display text-[1.1rem]">상품별 판매 금액</h3>
 
+      {/* 최근 7일 매출과 같은 색·같은 범례를 쓴다. 두 차트가 같은 이야기를 한다는 표시다. */}
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[0.82rem]">
+        <LegendKey color={ONLINE} label="인터넷 주문" />
+        <LegendKey color={DIRECT} label="직접 넣은 주문" />
+      </div>
+
       {data.length === 0 ? (
         <p className="py-8 text-center text-[0.9rem] text-ink-soft">아직 팔린 상품이 없습니다.</p>
       ) : (
@@ -200,15 +206,61 @@ export function ProductSalesBars({ data }: { data: ProductSales[] }) {
                   <span className="ml-1.5 text-ink-faint">{row.qty}개</span>
                 </span>
               </div>
-              <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-burr-tint">
+
+              {/*
+                한 막대 안에 두 조각을 이어 붙인다. 전체 길이는 이 상품의 총액이고,
+                그 안에서 인터넷과 직접이 갈린다 — 위 일별 매출 막대와 읽는 법이 같다.
+                막대 폭은 가장 많이 판 상품을 100%로 잡는다.
+              */}
+              <div
+                className="mt-1 flex h-2.5 overflow-hidden rounded-full bg-burr-tint"
+                title={`인터넷 ${formatKRW(row.online)} · 직접 ${formatKRW(row.direct)}`}
+              >
                 <div
-                  className="h-full rounded-full bg-burr"
-                  style={{ width: `${Math.max(4, (row.amount / max) * 100)}%` }}
+                  className="h-full"
+                  style={{
+                    width: `${(row.online / max) * 100}%`,
+                    background: ONLINE,
+                  }}
+                />
+                <div
+                  className="h-full"
+                  style={{
+                    width: `${(row.direct / max) * 100}%`,
+                    background: DIRECT,
+                  }}
                 />
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {/* 색을 못 가리는 경우에도 값이 전해지도록 */}
+      {data.length > 0 && (
+        <table className="sr-only">
+          <caption>상품별 판매 금액</caption>
+          <thead>
+            <tr>
+              <th>상품</th>
+              <th>인터넷 주문</th>
+              <th>직접 넣은 주문</th>
+              <th>합계</th>
+              <th>수량</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row) => (
+              <tr key={row.name}>
+                <td>{row.name}</td>
+                <td>{formatKRW(row.online)}</td>
+                <td>{formatKRW(row.direct)}</td>
+                <td>{formatKRW(row.amount)}</td>
+                <td>{row.qty}개</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   );

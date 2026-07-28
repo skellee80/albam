@@ -151,8 +151,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   };
 
   if (isDirect) {
-    // 손으로 넣는 주문은 이름 하나만 받는다. 방문 판매는 주소도 연락처도 없다.
-    if (!recipient.name) return { ok: false, error: '손님 이름을 입력해 주세요.' };
+    // 손으로 넣는 주문은 입금자 이름 하나만 꼭 받는다.
+    // 방문 판매에는 주소도 연락처도 없고, 받는 분이 따로 없는 일이 대부분이다.
+    if (!depositorName) return { ok: false, error: '입금자 이름을 입력해 주세요.' };
   } else {
     if (!depositorName) return { ok: false, error: '입금자명을 입력해 주세요.' };
     if (normalizePhone(depositorPhone).length < 9)
@@ -163,12 +164,24 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     if (!recipient.address) return { ok: false, error: '받는 분 주소를 입력해 주세요.' };
   }
 
-  // 같은 상품이 여러 줄로 들어와도 한 줄로 합친다 (트랜잭션에서 같은 문서를 두 번 읽지 않도록)
-  const merged = new Map<string, number>();
+  /**
+   * 같은 상품이 여러 줄로 들어와도 한 줄로 합친다
+   * (트랜잭션에서 같은 문서를 두 번 읽지 않도록).
+   *
+   * 단가는 **직접 넣는 주문에서만** 받는다. 손님 주문에서 넘어온 price 는 여기서 버려지고,
+   * 아래에서 상품 문서의 가격으로 다시 계산된다.
+   */
+  const merged = new Map<string, { qty: number; price?: number }>();
   for (const line of input.lines) {
     const qty = Math.floor(Number(line.qty));
     if (!line.productId || !Number.isFinite(qty) || qty <= 0) continue;
-    merged.set(line.productId, (merged.get(line.productId) ?? 0) + qty);
+
+    const custom = isDirect ? Math.floor(Number(line.price)) : NaN;
+    const price = Number.isFinite(custom) && custom >= 0 ? custom : undefined;
+
+    const found = merged.get(line.productId);
+    // 같은 상품이 두 줄로 오면 나중 줄의 단가를 쓴다. 두 값을 섞을 방법이 없다.
+    merged.set(line.productId, { qty: (found?.qty ?? 0) + qty, price: price ?? found?.price });
   }
   if (merged.size === 0) return { ok: false, error: '주문할 상품이 없습니다.' };
 
@@ -186,7 +199,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     const stockWrites: { ref: FirebaseFirestore.DocumentReference; stock: number }[] = [];
 
     for (let i = 0; i < entries.length; i++) {
-      const [productId, qty] = entries[i];
+      const [productId, { qty, price: customPrice }] = entries[i];
       const snap = productSnaps[i];
       if (!snap.exists) return { ok: false, error: '판매하지 않는 상품이 포함되어 있습니다.' };
 
@@ -206,10 +219,14 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         };
       }
 
-      const price = Number(data.price ?? 0); // ← 서버 가격만 사용
+      /**
+       * 손님 주문은 **상품 문서의 가격만** 쓴다. 브라우저에서 보낸 값은 위에서 이미 버렸다.
+       * 직접 넣는 주문에서만 아버지가 적은 단가를 그대로 쓴다(깎아 판 경우).
+       */
+      const price = customPrice ?? Number(data.price ?? 0);
       items.push({
         productId,
-        name: data.name ?? '',
+        name,
         price,
         qty,
         subtotal: price * qty,

@@ -2,12 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import { createDirectOrderAction } from '@/app/admin/actions';
 import { formatKRW } from '@/lib/format';
 
 import { NoticeDialog } from './NoticeDialog';
+import { QtyStepper } from './QtyStepper';
 
 export type SellableProduct = {
   id: string;
@@ -16,7 +17,8 @@ export type SellableProduct = {
   stock: number;
 };
 
-type Line = { productId: string; qty: number };
+/** 단가는 상품의 기본값에서 시작하되 고칠 수 있다 — 장터에서 깎아 파는 일이 있다. */
+type Line = { productId: string; qty: number; price: number };
 
 /** 모자란 재고를 알릴 때 쓰는 값 */
 type Shortage = { name: string; stock: number; want: number };
@@ -33,37 +35,54 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [customerName, setCustomerName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [depositorName, setDepositorName] = useState('');
+  const [depositorPhone, setDepositorPhone] = useState('');
+  // 손님 주문서와 같은 규칙으로 기본은 꺼둔다. 켠 채로 두면 확인 없이 넘어가
+  // 엉뚱한 사람 이름으로 저장되기 쉽다.
+  const [sameAsDepositor, setSameAsDepositor] = useState(false);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
   const [address, setAddress] = useState('');
   const [memo, setMemo] = useState('');
   const [paid, setPaid] = useState(true);
   const [lines, setLines] = useState<Line[]>(() =>
-    products[0] ? [{ productId: products[0].id, qty: 1 }] : [],
+    products[0] ? [{ productId: products[0].id, qty: 1, price: products[0].price }] : [],
   );
 
   const [error, setError] = useState<string | null>(null);
   const [shortage, setShortage] = useState<Shortage | null>(null);
   const [done, setDone] = useState<{ orderNo: string; totalAmount: number } | null>(null);
 
-  const priceOf = (id: string) => products.find((p) => p.id === id)?.price ?? 0;
-  const total = lines.reduce((sum, l) => sum + priceOf(l.productId) * l.qty, 0);
+  // "받는 분이 입금하는 분과 같습니다"가 켜져 있으면 이름과 연락처를 그대로 따라간다.
+  useEffect(() => {
+    if (!sameAsDepositor) return;
+    setRecipientName(depositorName);
+    setRecipientPhone(depositorPhone);
+  }, [sameAsDepositor, depositorName, depositorPhone]);
+
+  const total = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
 
   function setLine(index: number, patch: Partial<Line>) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
 
+  /** 상품을 바꾸면 단가도 그 상품의 기본값으로 따라간다 */
+  function changeProduct(index: number, productId: string) {
+    const product = products.find((p) => p.id === productId);
+    setLine(index, { productId, price: product?.price ?? 0 });
+  }
+
   function addLine() {
     const first = products[0];
     if (!first) return;
-    setLines((prev) => [...prev, { productId: first.id, qty: 1 }]);
+    setLines((prev) => [...prev, { productId: first.id, qty: 1, price: first.price }]);
   }
 
   function submit() {
     setError(null);
 
-    if (!customerName.trim()) {
-      setError('손님 이름을 넣어 주세요.');
+    if (!depositorName.trim()) {
+      setError('입금자 이름을 넣어 주세요.');
       return;
     }
     if (lines.length === 0 || lines.every((l) => l.qty <= 0)) {
@@ -73,8 +92,11 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
 
     startTransition(async () => {
       const result = await createDirectOrderAction({
-        customerName,
-        phone,
+        depositorName,
+        depositorPhone,
+        sameAsDepositor,
+        recipientName,
+        recipientPhone,
         address,
         memo,
         paid,
@@ -108,12 +130,14 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
         <div className="mt-3 space-y-3">
           {lines.map((line, index) => {
             const product = products.find((p) => p.id === line.productId);
+            const discounted = product ? line.price !== product.price : false;
+
             return (
               <div key={index} className="rounded-xl border border-line px-3 py-3">
                 <select
                   className="field"
                   value={line.productId}
-                  onChange={(e) => setLine(index, { productId: e.target.value })}
+                  onChange={(e) => changeProduct(index, e.target.value)}
                   aria-label={`${index + 1}번째 상품`}
                 >
                   {products.map((p) => (
@@ -123,30 +147,60 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
                   ))}
                 </select>
 
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="w-28">
-                    <label className="label text-[0.78rem]">수량</label>
+                <div className="mt-2.5">
+                  <label className="label text-[0.78rem]">수량</label>
+                  <QtyStepper
+                    value={line.qty}
+                    max={product?.stock}
+                    onChange={(qty) => setLine(index, { qty })}
+                    label={`${product?.name ?? ''} 수량`}
+                  />
+                </div>
+
+                <div className="mt-2.5">
+                  <label className="label text-[0.78rem]">
+                    단가 <span className="font-normal text-ink-faint">(깎아 팔았으면 고치세요)</span>
+                  </label>
+                  <div className="flex items-center gap-2">
                     <input
-                      className="field tnum"
-                      value={line.qty}
+                      className="field tnum flex-1"
+                      value={line.price}
                       onChange={(e) =>
-                        setLine(index, { qty: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })
+                        setLine(index, {
+                          price: Number(e.target.value.replace(/[^\d]/g, '')) || 0,
+                        })
                       }
                       inputMode="numeric"
+                      aria-label={`${product?.name ?? ''} 단가`}
                     />
+                    {discounted && product && (
+                      <button
+                        type="button"
+                        onClick={() => setLine(index, { price: product.price })}
+                        className="shrink-0 text-[0.8rem] text-burr-deep underline underline-offset-2"
+                      >
+                        원래대로
+                      </button>
+                    )}
                   </div>
-                  <div className="flex-1 pt-6 text-right">
-                    <span className="tnum text-[0.95rem] font-semibold">
-                      {formatKRW(priceOf(line.productId) * line.qty)}
-                    </span>
-                  </div>
+                  {discounted && product && (
+                    <p className="tnum mt-1 text-[0.78rem] text-ink-soft">
+                      정가 {formatKRW(product.price)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between border-t border-line pt-2.5">
+                  <span className="tnum text-[0.95rem] font-semibold">
+                    {formatKRW(line.price * line.qty)}
+                  </span>
                   {lines.length > 1 && (
                     <button
                       type="button"
                       onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))}
-                      className="mt-6 shrink-0 text-[0.82rem] text-berry underline underline-offset-2"
+                      className="shrink-0 text-[0.82rem] text-berry underline underline-offset-2"
                     >
-                      빼기
+                      이 상품 빼기
                     </button>
                   )}
                 </div>
@@ -172,44 +226,88 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
       </section>
 
       <section className="card px-4 py-4">
-        <h2 className="font-display text-[1.1rem]">손님</h2>
+        <h2 className="font-display text-[1.1rem]">돈 낸 분</h2>
         <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
-          이름만 있으면 됩니다. 택배로 보낼 것이면 연락처와 주소도 적어 주세요.
+          이름만 있으면 됩니다. 나머지는 비워 두어도 됩니다.
         </p>
 
         <div className="mt-3.5">
-          <label className="label" htmlFor="customerName">
-            이름
+          <label className="label" htmlFor="depositorName">
+            입금자 이름
           </label>
           <input
-            id="customerName"
+            id="depositorName"
             className="field"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
+            value={depositorName}
+            onChange={(e) => setDepositorName(e.target.value)}
             placeholder="예: 김순자"
           />
         </div>
 
-        <label className="label mt-4" htmlFor="phone">
-          연락처 <span className="font-normal text-ink-faint">(없어도 됩니다)</span>
+        <label className="label mt-4" htmlFor="depositorPhone">
+          입금자 연락처 <span className="font-normal text-ink-faint">(없어도 됩니다)</span>
         </label>
         <input
-          id="phone"
+          id="depositorPhone"
           className="field tnum"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          value={depositorPhone}
+          onChange={(e) => setDepositorPhone(e.target.value)}
           inputMode="tel"
           placeholder="010-0000-0000"
         />
+      </section>
+
+      <section className="card px-4 py-4">
+        <h2 className="font-display text-[1.1rem]">택배 받는 분</h2>
+        <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
+          만나서 바로 드렸으면 비워 두세요.
+        </p>
+
+        {/* 손님 주문서와 같은 자리, 같은 문구를 쓴다 — 두 화면이 같은 동작을 하도록 */}
+        <label className="mt-3.5 flex cursor-pointer items-center gap-3 rounded-xl bg-burr-tint px-3.5 py-3">
+          <input
+            type="checkbox"
+            checked={sameAsDepositor}
+            onChange={(e) => setSameAsDepositor(e.target.checked)}
+            className="h-5 w-5 accent-[#6F9A57]"
+          />
+          <span className="text-[0.9rem] font-semibold text-burr-deep">
+            받는 분이 입금하는 분과 같습니다
+          </span>
+        </label>
+
+        <label className="label mt-4" htmlFor="recipientName">
+          받는 분 이름
+        </label>
+        <input
+          id="recipientName"
+          className="field"
+          value={recipientName}
+          onChange={(e) => setRecipientName(e.target.value)}
+          disabled={sameAsDepositor}
+        />
+
+        <label className="label mt-4" htmlFor="recipientPhone">
+          받는 분 연락처
+        </label>
+        <input
+          id="recipientPhone"
+          className="field tnum"
+          value={recipientPhone}
+          onChange={(e) => setRecipientPhone(e.target.value)}
+          inputMode="tel"
+          disabled={sameAsDepositor}
+        />
 
         <label className="label mt-4" htmlFor="address">
-          주소 <span className="font-normal text-ink-faint">(방문 판매면 비워 두세요)</span>
+          받는 곳 주소
         </label>
         <textarea
           id="address"
           className="field min-h-20 resize-none"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
+          placeholder="택배로 보낼 것이면 적어 주세요"
         />
 
         <label className="label mt-4" htmlFor="memo">
@@ -298,7 +396,7 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
         {done && (
           <div className="space-y-1.5">
             <p>
-              <b className="text-ink">{customerName}</b> ·{' '}
+              <b className="text-ink">{depositorName}</b> ·{' '}
               <b className="tnum text-ink">{formatKRW(done.totalAmount)}</b>
             </p>
             <p className="tnum text-[0.83rem] text-ink-faint">주문번호 {done.orderNo}</p>

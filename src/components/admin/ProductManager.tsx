@@ -120,19 +120,11 @@ export function ProductManager({ products }: { products: ManagedProduct[] }) {
       ))}
 
       {creating && creating.group === '' ? (
-        <div className="card px-4 py-4">
-          <h2 className="mb-1 font-display text-[1.1rem]">새 그룹</h2>
-          <p className="mb-3 text-[0.82rem] leading-snug text-ink-soft">
-            이름의 <b>맨 앞 낱말이 그룹</b>이 됩니다. &ldquo;청실 중 4kg&rdquo; 이라고 적으면
-            &ldquo;청실&rdquo; 그룹이 새로 생깁니다.
-          </p>
-          <ProductForm
-            initial={EMPTY_DRAFT}
-            productId={null}
-            onDone={() => setCreating(null)}
-            onCancel={() => setCreating(null)}
-          />
-        </div>
+        <NewGroup
+          existing={groups.map((g) => g.name)}
+          onCancel={() => setCreating(null)}
+          onDone={() => setCreating(null)}
+        />
       ) : (
         !creating && (
           <button
@@ -144,6 +136,103 @@ export function ProductManager({ products }: { products: ManagedProduct[] }) {
           </button>
         )
       )}
+    </div>
+  );
+}
+
+/**
+ * 새 그룹 만들기.
+ *
+ * 그룹 이름을 **먼저 묻고**, 그다음 그 그룹의 첫 상품을 받는다.
+ * 예전에는 "이름 맨 앞 낱말이 그룹이 됩니다" 라고 설명만 하고 상품 이름 한 칸을
+ * 내줬는데, 그러면 그룹을 만든다는 감각이 없고 앞 낱말을 잘못 띄우면 엉뚱한 그룹이 생긴다.
+ *
+ * 저장할 때는 결국 "그룹 + 나머지" 를 붙인 이름 하나로 들어간다.
+ * 그룹을 따로 저장하지 않는 이유는 groupByVariety 주석 참고.
+ */
+function NewGroup({
+  existing,
+  onCancel,
+  onDone,
+}: {
+  existing: string[];
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const [group, setGroup] = useState('');
+  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const name = group.trim();
+
+  function next() {
+    if (!name) {
+      setError('그룹 이름을 넣어 주세요.');
+      return;
+    }
+    if (name.includes(' ')) {
+      setError('그룹 이름은 띄어쓰기 없이 한 낱말로 넣어 주세요. (예: 대보)');
+      return;
+    }
+    if (existing.includes(name)) {
+      setError(`"${name}" 그룹은 이미 있습니다. 그 그룹 아래에서 상품을 추가하세요.`);
+      return;
+    }
+    setError(null);
+    setConfirmed(name);
+  }
+
+  if (confirmed) {
+    return (
+      <div className="card px-4 py-4">
+        <h2 className="mb-1 font-display text-[1.1rem]">{confirmed} — 첫 상품</h2>
+        <p className="mb-3 text-[0.82rem] leading-snug text-ink-soft">
+          이름 뒤에 크기와 무게를 이어 적어 주세요. 예: <b>{confirmed} 중 4kg</b>
+        </p>
+        <ProductForm
+          initial={{ ...EMPTY_DRAFT, name: `${confirmed} ` }}
+          productId={null}
+          onDone={onDone}
+          onCancel={onCancel}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="card px-4 py-4">
+      <h2 className="font-display text-[1.1rem]">새 그룹</h2>
+      <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
+        품종 이름을 넣어 주세요. 손님 화면에서 이 이름으로 묶입니다.
+      </p>
+
+      <input
+        className="field mt-3"
+        value={group}
+        onChange={(e) => setGroup(e.target.value)}
+        placeholder="예: 청실"
+        aria-label="새 그룹 이름"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') next();
+        }}
+      />
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-2 rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="mt-3 flex gap-2">
+        <button type="button" onClick={next} className="btn btn-primary flex-1">
+          다음
+        </button>
+        <button type="button" onClick={onCancel} className="btn btn-outline px-5">
+          취소
+        </button>
+      </div>
     </div>
   );
 }

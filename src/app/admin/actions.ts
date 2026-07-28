@@ -91,26 +91,38 @@ export type DirectOrderResult =
  * 화면이 "재고관리에서 먼저 채우세요"를 상품 이름과 함께 알려줄 수 있도록.
  */
 export async function createDirectOrderAction(input: {
-  customerName: string;
-  phone: string;
+  depositorName: string;
+  depositorPhone: string;
+  sameAsDepositor: boolean;
+  recipientName: string;
+  recipientPhone: string;
   address: string;
-  lines: { productId: string; qty: number }[];
+  lines: { productId: string; qty: number; price?: number }[];
   paid: boolean;
   memo: string;
 }): Promise<DirectOrderResult> {
   try {
     await requireAdmin();
 
-    const name = input.customerName.trim();
+    const depositorName = input.depositorName.trim();
+    const depositorPhone = input.depositorPhone.trim();
+
+    // 체크가 켜져 있으면 받는 분을 입금자로 채운다. 손님 주문서와 같은 규칙이다.
+    const recipientName = input.sameAsDepositor ? depositorName : input.recipientName.trim();
+    const recipientPhone = input.sameAsDepositor ? depositorPhone : input.recipientPhone.trim();
+
     const result = await createOrder({
       lines: input.lines,
       source: 'direct',
       paid: input.paid,
-      // 직접 판매는 "입금자 = 손님" 하나뿐이다. 따로 받을 이유가 없다.
-      depositorName: name,
-      depositorPhone: input.phone.trim(),
-      sameAsDepositor: true,
-      recipient: { name, phone: input.phone.trim(), address: input.address.trim() },
+      depositorName,
+      depositorPhone,
+      sameAsDepositor: input.sameAsDepositor,
+      recipient: {
+        name: recipientName || depositorName,
+        phone: recipientPhone,
+        address: input.address.trim(),
+      },
     });
 
     if (!result.ok) return { ok: false, error: result.error, shortage: result.shortage };

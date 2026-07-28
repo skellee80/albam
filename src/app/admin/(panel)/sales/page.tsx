@@ -1,7 +1,7 @@
 import { DailySalesChart, ProductSalesBars } from '@/components/admin/SalesCharts';
 import { formatKRW } from '@/lib/format';
 import { listOrders } from '@/lib/orders';
-import { dailySales, productSales, sourceTotals, statusCounts, totals } from '@/lib/stats';
+import { dailySales, productSales, statusCounts, totals } from '@/lib/stats';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,6 @@ export default async function AdminSalesPage() {
 
   const summary = totals(orders);
   const statuses = statusCounts(orders);
-  const bySource = sourceTotals(orders);
 
   return (
     <div>
@@ -31,27 +30,6 @@ export default async function AdminSalesPage() {
         <StatTile label="전체 매출" value={formatKRW(summary.revenue)} />
       </div>
 
-      {/* 전체 매출을 어디서 벌었나 — 사이트가 실제로 얼마나 일하고 있는지 */}
-      {summary.revenue > 0 && (
-        <div className="card mt-2 px-4 py-3.5">
-          <dl className="space-y-2">
-            <SourceRow
-              swatch="bg-burr"
-              label="인터넷 주문"
-              amount={bySource.online}
-              count={bySource.onlineCount}
-              total={summary.revenue}
-            />
-            <SourceRow
-              swatch="bg-shell"
-              label="직접 넣은 주문"
-              amount={bySource.direct}
-              count={bySource.directCount}
-              total={summary.revenue}
-            />
-          </dl>
-        </div>
-      )}
 
       {statuses.length > 0 && (
         <ul className="mt-2.5 flex flex-wrap gap-1.5">
@@ -69,39 +47,6 @@ export default async function AdminSalesPage() {
       <div className="mt-3 space-y-3">
         <DailySalesChart data={dailySales(orders, 7)} />
         <ProductSalesBars data={productSales(orders)} />
-      </div>
-    </div>
-  );
-}
-
-/** 차트의 범례와 같은 색을 써서, 위아래가 같은 이야기를 한다는 것이 보이게 한다. */
-function SourceRow({
-  swatch,
-  label,
-  amount,
-  count,
-  total,
-}: {
-  swatch: string;
-  label: string;
-  amount: number;
-  count: number;
-  total: number;
-}) {
-  const percent = total > 0 ? Math.round((amount / total) * 100) : 0;
-
-  return (
-    <div>
-      <div className="flex items-baseline gap-2">
-        <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-[3px] ${swatch}`} />
-        <dt className="text-[0.88rem] font-semibold">{label}</dt>
-        <dd className="tnum ml-auto text-[0.88rem]">
-          <b>{formatKRW(amount)}</b>
-          <span className="ml-1.5 text-ink-faint">{count}건</span>
-        </dd>
-      </div>
-      <div className="mt-1 ml-5 h-2 overflow-hidden rounded-full bg-line">
-        <div className={`h-full rounded-full ${swatch}`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );

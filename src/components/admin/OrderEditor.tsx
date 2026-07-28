@@ -13,6 +13,7 @@ import { ORDER_STATUSES, type OrderItem, type OrderStatus } from '@/lib/types';
 
 import { ConfirmDialog } from './ConfirmDialog';
 import { NoticeDialog } from './NoticeDialog';
+import { QtyStepper } from './QtyStepper';
 
 export type EditableOrder = {
   id: string;
@@ -211,29 +212,27 @@ export function OrderEditor({
                 ))}
               </select>
 
-              <div className="mt-2 flex gap-2">
-                <div className="flex-1">
-                  <label className="label text-[0.78rem]">단가</label>
-                  <input
-                    className="field tnum"
-                    value={item.price}
-                    onChange={(e) =>
-                      updateItem(index, { price: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })
-                    }
-                    inputMode="numeric"
-                  />
-                </div>
-                <div className="w-24">
-                  <label className="label text-[0.78rem]">수량</label>
-                  <input
-                    className="field tnum"
-                    value={item.qty}
-                    onChange={(e) =>
-                      updateItem(index, { qty: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })
-                    }
-                    inputMode="numeric"
-                  />
-                </div>
+              <div className="mt-2">
+                <label className="label text-[0.78rem]">단가</label>
+                <input
+                  className="field tnum"
+                  value={item.price}
+                  onChange={(e) =>
+                    updateItem(index, { price: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })
+                  }
+                  inputMode="numeric"
+                  aria-label={`${item.name} 단가`}
+                />
+              </div>
+
+              <div className="mt-2.5">
+                <label className="label text-[0.78rem]">수량</label>
+                {/* 폰에서 자판을 띄우지 않고 눌러서 맞출 수 있게 한다 */}
+                <QtyStepper
+                  value={item.qty}
+                  onChange={(qty) => updateItem(index, { qty })}
+                  label={`${item.name} 수량`}
+                />
               </div>
 
               <div className="mt-2 flex items-center justify-between">

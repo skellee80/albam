@@ -857,9 +857,7 @@ async function main() {
   /* ────────────────────────────────────────────── */
   section('22-4. 직접 넣은 주문 (전화·방문 판매)');
 
-  const { sourceTotals, dailySales: daily, productSales: byProduct } = await import(
-    '../src/lib/stats'
-  );
+  const { dailySales: daily, productSales: byProduct } = await import('../src/lib/stats');
 
   const stockBeforeDirect = (await listProducts()).find((p) => p.id === okgwangLarge.id)!.stock;
 
@@ -918,6 +916,40 @@ async function main() {
   const unpaidOrder = unpaidDirect.ok ? await getOrder(unpaidDirect.orderId) : null;
   check('아직 안 받았으면 입금대기로 들어간다', unpaidOrder?.status === '입금대기', unpaidOrder?.status);
 
+  /*
+    단가 조절 — 직접 넣는 주문에서만 열려 있어야 한다.
+    이 사이트의 핵심 방어가 "서버가 가격을 다시 계산한다"이므로,
+    그 예외가 손님 쪽으로 새지 않는지 여기서 못박는다.
+  */
+  const cheap = await createOrder({
+    lines: [{ productId: daeboMid.id, qty: 2, price: 1000 }],
+    source: 'direct',
+    paid: true,
+    depositorName: '깎아줌',
+    depositorPhone: '',
+    sameAsDepositor: true,
+    recipient: { name: '깎아줌', phone: '', address: '' },
+  });
+  check('직접 주문은 적어 넣은 단가를 쓴다', cheap.ok && cheap.totalAmount === 2000, JSON.stringify(cheap));
+  check(
+    '주문 품목에도 그 단가가 남는다',
+    cheap.ok && cheap.items[0].price === 1000 && cheap.items[0].subtotal === 2000,
+  );
+
+  const forged = await createOrder({
+    // 손님 화면에서는 가격을 보내지 않지만, 보내더라도 서버가 버려야 한다
+    lines: [{ productId: daeboMid.id, qty: 1, price: 10 }],
+    depositorName: '가격조작',
+    sameAsDepositor: true,
+    depositorPhone: '010-2222-3333',
+    recipient: { name: '가격조작', phone: '010-2222-3333', address: '서울시 어딘가' },
+  });
+  check(
+    '손님 주문에서 보낸 단가는 버려진다',
+    forged.ok && forged.totalAmount === daeboMid.price,
+    forged.ok ? `${forged.totalAmount} (정가 ${daeboMid.price})` : JSON.stringify(forged),
+  );
+
   // 인터넷 주문은 예전 그대로여야 한다
   const online = await createOrder({
     lines: [{ productId: daeboMid.id, qty: 1 }],
@@ -937,12 +969,6 @@ async function main() {
   })).ok);
 
   const allOrders = await listOrders({ limit: 1000 });
-  const bySource = sourceTotals(allOrders);
-  check(
-    '판매 현황이 인터넷과 직접을 나눠 센다',
-    bySource.direct > 0 && bySource.online > 0,
-    `인터넷 ${bySource.online} / 직접 ${bySource.direct}`,
-  );
 
   const todayRow = daily(allOrders, 7).at(-1)!;
   check(
@@ -957,6 +983,22 @@ async function main() {
     '상품별 판매가 금액 큰 순이다',
     ranked.every((r, i) => i === 0 || ranked[i - 1].amount >= r.amount),
     ranked.map((r) => `${r.name} ${r.amount}`).join(' / '),
+  );
+  check(
+    '상품별 판매도 인터넷과 직접으로 나뉜다',
+    ranked.every((r) => r.online + r.direct === r.amount),
+    ranked.map((r) => `${r.name} ${r.online}+${r.direct}=${r.amount}`).join(' / '),
+  );
+  // 상품별로 나눈 직접 판매액의 합이 직접 주문 총액과 맞아야 한다.
+  // (한 상품이 인터넷과 직접 양쪽으로 팔릴 수 있어 상품 하나만 봐서는 알 수 없다)
+  const directFromProducts = ranked.reduce((sum, r) => sum + r.direct, 0);
+  const directFromOrders = allOrders
+    .filter((o) => o.source === 'direct' && !o.deleted && o.paidAt !== null && o.status !== '환불완료')
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+  check(
+    '상품별 직접 판매액의 합이 직접 주문 총액과 같다',
+    directFromProducts > 0 && directFromProducts === directFromOrders,
+    `상품 합 ${directFromProducts} / 주문 합 ${directFromOrders}`,
   );
 
   /* ────────────────────────────────────────────── */

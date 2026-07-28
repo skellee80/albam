@@ -118,49 +118,61 @@ export default async function ShopPage() {
             아직 등록된 상품이 없습니다.
           </p>
         ) : (
-          <div className="mt-7 space-y-6">
-            {groups.map((group) => (
-              /*
-                품종 하나 = 카드 하나. 사진·이름·가격 줄이 **한 테두리 안에** 들어간다.
-                예전에는 사진과 이름이 카드 밖에 떠 있어서, 사진 따로 가격표 따로
-                두 덩어리로 보였다. 손님이 고르는 단위는 품종이므로 그 단위로 묶는다.
-              */
-              <section key={group.variety} className="card overflow-hidden">
-                {group.image ? (
-                  // 사진이 카드의 머리다. 아래 가시 선이 사진과 본문을 물어 준다.
-                  // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
-                  <div className="burr-edge burr-edge-surface relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={group.image}
-                      alt=""
-                      className="block aspect-[5/3] w-full bg-flesh/40 object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                ) : null}
+          /*
+            묶음 사이를 넉넉히 벌리고 가운데에 표시를 하나 둔다.
+            사진 밑 이름을 뺐기 때문에 "여기서 다음 품종이 시작된다"를 알려줄 것이
+            간격밖에 없다. 간격만으로는 스크롤 중에 이어져 보인다.
+          */
+          <div className="mt-7 space-y-11">
+            {groups.map((group, groupIndex) => (
+              <div key={group.variety}>
+                {groupIndex > 0 && <GroupBreak />}
 
-                <h2 className="px-4 pt-3 pb-2.5 text-center font-display text-[1.5rem] leading-tight">
-                  {group.variety}
-                </h2>
+                {/*
+                  품종 하나 = 카드 하나. 사진과 가격 줄이 **한 테두리 안에** 들어간다.
+                  손님이 고르는 단위는 품종이므로 그 단위로 묶는다.
 
-                <div className="divide-y-2 divide-line border-t border-line">
-                  {group.sizes.map((sizeGroup) => (
-                    <div key={sizeGroup.size || '_'}>
-                      {sizeGroup.size ? (
-                        <p className="bg-flesh/45 px-4 py-2 text-[0.9rem] font-bold text-shell">
-                          {sizeGroup.size}
-                        </p>
-                      ) : null}
-                      <div className="divide-y divide-line/70">
-                        {sizeGroup.items.map((p) => (
-                          <ProductRow key={p.id} product={toShopProduct(p)} />
-                        ))}
-                      </div>
+                  품종 이름은 글자로 쓰지 않고 사진이 대신한다. 화면 낭독기에는
+                  aria-label 로 알려 주므로 눈으로 안 보여도 어느 품종인지 전해진다.
+                */}
+                <section className="card overflow-hidden" aria-label={group.variety}>
+                  {group.image ? (
+                    // 사진이 카드의 머리다. 아래 가시 선이 사진과 본문을 물어 준다.
+                    // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
+                    <div className="burr-edge burr-edge-surface relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={group.image}
+                        alt={group.variety}
+                        className="block aspect-[5/3] w-full bg-flesh/40 object-cover"
+                        loading="lazy"
+                      />
                     </div>
-                  ))}
-                </div>
-              </section>
+                  ) : (
+                    // 사진이 없으면 이름이라도 있어야 무엇인지 알 수 있다
+                    <h2 className="bg-flesh/45 px-4 py-3 text-center font-display text-[1.4rem] text-shell">
+                      {group.variety}
+                    </h2>
+                  )}
+
+                  <div className="divide-y-2 divide-line">
+                    {group.sizes.map((sizeGroup) => (
+                      <div key={sizeGroup.size || '_'}>
+                        {sizeGroup.size ? (
+                          <p className="bg-flesh/45 px-4 py-2 text-[0.9rem] font-bold text-shell">
+                            {sizeGroup.size}
+                          </p>
+                        ) : null}
+                        <div className="divide-y divide-line/70">
+                          {sizeGroup.items.map((p) => (
+                            <ProductRow key={p.id} product={toShopProduct(p)} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
             ))}
           </div>
         )}
@@ -186,6 +198,23 @@ export default async function ShopPage() {
 
       <CartBar />
     </>
+  );
+}
+
+/**
+ * 품종과 품종 사이를 끊는 표시.
+ *
+ * 사진 밑 이름을 뺀 뒤로는 "여기서 다음 품종이 시작된다"를 알려줄 것이 여백뿐인데,
+ * 폰에서 스크롤하면 여백만으로는 한 묶음이 이어지는 것처럼 보인다.
+ * 장식이 아니라 경계를 읽게 하는 표시라 가운데에 하나만 둔다.
+ */
+function GroupBreak() {
+  return (
+    <div aria-hidden="true" className="flex items-center gap-3 pb-11">
+      <span className="h-px flex-1 bg-line" />
+      <span className="h-1.5 w-1.5 rotate-45 rounded-[1px] bg-burr/50" />
+      <span className="h-px flex-1 bg-line" />
+    </div>
   );
 }
 

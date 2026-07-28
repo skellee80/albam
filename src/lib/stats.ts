@@ -59,13 +59,24 @@ export function dailySales(orders: Order[], days = 7): DailySales[] {
   return [...buckets.values()];
 }
 
-export type ProductSales = { name: string; qty: number; amount: number };
+export type ProductSales = {
+  name: string;
+  qty: number;
+  amount: number;
+  /** 손님이 사이트에서 산 금액 */
+  online: number;
+  /** 아버지가 전화·방문 판매로 직접 넣은 금액 */
+  direct: number;
+};
 
 /**
  * 상품별 판매 (많이 판 순).
  *
  * **금액 기준으로 줄 세운다.** 개수로 세우면 싸고 가벼운 4kg이 늘 위로 올라와
  * "무엇이 돈이 되는가"가 안 보인다. 개수도 함께 적어 두므로 둘 다 읽을 수 있다.
+ *
+ * 일별 매출과 똑같이 인터넷/직접을 나눠 담는다. 어떤 상품이 전화로만 나가고
+ * 어떤 상품이 사이트에서 팔리는지는 상품마다 다르다.
  */
 export function productSales(orders: Order[]): ProductSales[] {
   const byName = new Map<string, ProductSales>();
@@ -73,32 +84,17 @@ export function productSales(orders: Order[]): ProductSales[] {
   for (const order of orders) {
     if (!isRevenueOrder(order)) continue;
     for (const item of order.items) {
-      const entry = byName.get(item.name) ?? { name: item.name, qty: 0, amount: 0 };
+      const entry =
+        byName.get(item.name) ?? { name: item.name, qty: 0, amount: 0, online: 0, direct: 0 };
       entry.qty += item.qty;
       entry.amount += item.subtotal;
+      if (order.source === 'direct') entry.direct += item.subtotal;
+      else entry.online += item.subtotal;
       byName.set(item.name, entry);
     }
   }
 
   return [...byName.values()].sort((a, b) => b.amount - a.amount);
-}
-
-export type SourceTotals = { online: number; direct: number; onlineCount: number; directCount: number };
-
-/** 인터넷 주문 / 직접 넣은 주문 합계 */
-export function sourceTotals(orders: Order[]): SourceTotals {
-  const t: SourceTotals = { online: 0, direct: 0, onlineCount: 0, directCount: 0 };
-  for (const order of orders) {
-    if (!isRevenueOrder(order)) continue;
-    if (order.source === 'direct') {
-      t.direct += order.totalAmount;
-      t.directCount += 1;
-    } else {
-      t.online += order.totalAmount;
-      t.onlineCount += 1;
-    }
-  }
-  return t;
 }
 
 export type StatusCount = { status: OrderStatus; count: number };
