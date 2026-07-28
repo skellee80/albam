@@ -9,7 +9,7 @@ import {
   updateOrderAction,
 } from '@/app/admin/actions';
 import { formatDateTime, formatKRW } from '@/lib/format';
-import { ORDER_STATUSES, type OrderItem, type OrderStatus } from '@/lib/types';
+import { adminStatusOptions, type OrderItem, type OrderStatus } from '@/lib/types';
 
 export type EditableOrder = {
   id: string;
@@ -151,14 +151,15 @@ export function OrderEditor({
           value={status}
           onChange={(e) => setStatus(e.target.value as OrderStatus)}
         >
-          {ORDER_STATUSES.map((s) => (
+          {adminStatusOptions(order.status).map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </select>
         <p className="mt-1.5 text-[0.8rem] leading-snug text-ink-soft">
-          취소·환불완료로 바꾸면 재고가 자동으로 되돌아갑니다. 다시 되돌리면 재고도 함께 돌아갑니다.
+          환불완료로 바꾸면 재고가 자동으로 되돌아갑니다. 다시 되돌리면 재고도 함께 돌아갑니다.
+          주문을 물리시려면 맨 아래 <b>주문 삭제</b>를 쓰세요.
         </p>
 
         <label className="label mt-4" htmlFor="trackingNo">

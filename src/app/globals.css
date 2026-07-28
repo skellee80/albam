@@ -175,9 +175,15 @@ body {
   border: 1px solid var(--color-line);
 }
 
+/*
+ * 테두리를 두는 이유: 이 버튼은 연분홍 배경(bg-berry-tint) 위에 놓이는 일이 있는데,
+ * 채움색이 배경과 같아 버튼인지 그냥 글씨인지 구별이 안 됐다.
+ * btn-outline 과 마찬가지로 테두리로 형태를 잡아 어디에 놓여도 버튼으로 보이게 한다.
+ */
 .btn-danger {
   background: var(--color-berry-tint);
   color: #a83450;
+  border: 1px solid rgb(216 96 122 / 0.45);
 }
 
 .field {

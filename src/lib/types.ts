@@ -94,6 +94,31 @@ export const ORDER_STATUSES = [
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /**
+ * 관리자가 주문 화면에서 **직접 고를 수 있는** 상태.
+ *
+ * `취소`가 빠져 있다. 취소는 아버지가 손으로 정하는 것이 아니라
+ * 두 가지 경우에 **저절로** 생긴다.
+ *
+ *  - 입금 기한이 지나 자동으로 취소될 때 (expireStaleOrders)
+ *  - 손님이 주문 조회에서 스스로 취소할 때 (cancelOwnOrder)
+ *
+ * 아버지가 주문을 물릴 일이 있으면 취소가 아니라 **주문 삭제**를 쓴다.
+ * 삭제는 되살릴 수 있지만, 취소는 손님 화면에 "취소됨"으로 나가 되돌리면 혼란스럽다.
+ *
+ * 이미 취소된 주문을 열었을 때는 목록에 `취소`를 끼워 넣는다 —
+ * 없으면 화면이 엉뚱한 상태를 고른 것처럼 보이고, 저장하면 상태가 바뀌어 버린다.
+ */
+export const ADMIN_SELECTABLE_STATUSES: readonly OrderStatus[] = ORDER_STATUSES.filter(
+  (s) => s !== '취소',
+);
+
+/** 주문 화면의 상태 목록. 지금 상태가 목록에 없으면 그것만 앞에 붙여 준다. */
+export function adminStatusOptions(current: OrderStatus): OrderStatus[] {
+  if (ADMIN_SELECTABLE_STATUSES.includes(current)) return [...ADMIN_SELECTABLE_STATUSES];
+  return [current, ...ADMIN_SELECTABLE_STATUSES];
+}
+
+/**
  * 입금 기한. 이 시간이 지난 입금대기 주문은 자동으로 취소되고 재고가 돌아간다.
  *
  * 무통장이라 주문 시점에 재고를 선점하는데, 입금하지 않은 주문이 재고를 계속

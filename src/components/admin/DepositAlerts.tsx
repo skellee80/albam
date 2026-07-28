@@ -49,74 +49,28 @@ export function DepositAlerts({
   pendingOrders: CandidateOrder[];
   accountBank: string;
 }) {
-  const router = useRouter();
-  /**
-   * 입금을 확정한 직후 "주문도 고칠까요?" 하고 물어볼 주문.
-   *
-   * **이 state가 여기 있는 이유**: 확정하면 그 입금이 목록에서 빠지면서
-   * 아래 DepositCard가 화면에서 사라진다. 후속 질문을 카드 안에 두면
-   * 물어보기도 전에 같이 사라진다. 목록이 비어도 이 컴포넌트는 남으므로
-   * 확인 창은 여기서 띄운다.
-   */
-  const [editPrompt, setEditPrompt] = useState<CandidateOrder | null>(null);
-
-  function goEdit() {
-    const order = editPrompt;
-    setEditPrompt(null);
-    if (order) router.push(`/admin/orders/${order.id}`);
-  }
+  if (deposits.length === 0) return null;
 
   return (
-    <>
-      {deposits.length > 0 && (
-        <section className="rounded-card border-2 border-berry/35 bg-berry-tint px-4 py-4">
-          <h2 className="flex items-center gap-2 font-display text-[1.2rem] text-berry">
-            확인이 필요한 입금 {deposits.length}건
-          </h2>
-          <p className="mt-1 text-[0.85rem] leading-snug text-ink-soft">
-            돈은 들어왔는데 어느 주문인지 정해지지 않았습니다. 아래에서 주문을 골라 주세요.
-          </p>
+    <section className="rounded-card border-2 border-berry/35 bg-berry-tint px-4 py-4">
+      <h2 className="flex items-center gap-2 font-display text-[1.2rem] text-berry">
+        확인이 필요한 입금 {deposits.length}건
+      </h2>
+      <p className="mt-1 text-[0.85rem] leading-snug text-ink-soft">
+        돈은 들어왔는데 어느 주문인지 정해지지 않았습니다. 아래에서 주문을 골라 주세요.
+      </p>
 
-          <div className="mt-3.5 space-y-3">
-            {deposits.map((deposit) => (
-              <DepositCard
-                key={deposit.id}
-                deposit={deposit}
-                pendingOrders={pendingOrders}
-                accountBank={accountBank}
-                onResolved={setEditPrompt}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <ConfirmDialog
-        open={editPrompt !== null}
-        title="주문을 수정할까요?"
-        confirmLabel="예, 수정하기"
-        cancelLabel="아니요, 됐습니다"
-        onConfirm={goEdit}
-        onCancel={() => setEditPrompt(null)}
-      >
-        {editPrompt && (
-          <div className="space-y-2.5 text-[0.87rem] leading-relaxed text-ink-soft">
-            <p>
-              <b className="text-ink">{editPrompt.recipientName}</b> 님의 주문을{' '}
-              <b className="text-burr-deep">발송대기</b>로 바꿨습니다.
-            </p>
-            <p>
-              전화로 확인하면서 <b className="text-ink">입금자명·금액·주소</b>가 실제와 다른 것을
-              찾으셨다면 지금 고쳐 두세요. 그대로 두면 다음 입금 때 또 같은 확인을 하게 됩니다.
-            </p>
-            <p className="text-[0.83rem] text-ink-faint">
-              고칠 것이 없으면 &ldquo;아니요&rdquo;를 누르셔도 됩니다. 입금 완료 처리는 이미
-              끝났습니다.
-            </p>
-          </div>
-        )}
-      </ConfirmDialog>
-    </>
+      <div className="mt-3.5 space-y-3">
+        {deposits.map((deposit) => (
+          <DepositCard
+            key={deposit.id}
+            deposit={deposit}
+            pendingOrders={pendingOrders}
+            accountBank={accountBank}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -124,14 +78,12 @@ function DepositCard({
   deposit,
   pendingOrders,
   accountBank,
-  onResolved,
 }: {
   deposit: AlertDeposit;
   pendingOrders: CandidateOrder[];
   accountBank: string;
-  /** 확정에 성공했을 때 부모에게 알린다. 이 카드는 곧 화면에서 사라진다. */
-  onResolved: (order: CandidateOrder) => void;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // 확인필요는 서버가 뽑아준 후보가 이미 있으므로 목록을 접어 둔다.
@@ -168,17 +120,26 @@ function DepositCard({
 
   const exactAmountCount = pendingOrders.filter((o) => o.totalAmount === deposit.amount).length;
 
+  /** 입금을 이 주문에 연결하고 발송대기로 넘긴다. */
   function connect(order: CandidateOrder) {
     setError(null);
     setConfirming(null);
     startTransition(async () => {
       const result = await resolveDepositAction(deposit.id, order.id);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      onResolved(order);
+      if (!result.ok) setError(result.error);
     });
+  }
+
+  /**
+   * 입금은 그대로 두고 주문을 고치러 간다.
+   *
+   * 통장에 찍힌 이름·금액과 손님이 적어 넣은 값이 다를 때 쓴다.
+   * **입금 기록은 손대지 않으므로** 고치고 돌아오면 이 입금이 그대로 남아 있고,
+   * 그때 다시 골라서 입금 완료로 넘기면 된다.
+   */
+  function goEdit(order: CandidateOrder) {
+    setConfirming(null);
+    router.push(`/admin/orders/${order.id}`);
   }
 
   function ignore() {
@@ -332,14 +293,19 @@ function DepositCard({
         내 입금이 아님 · 목록에서 치우기
       </button>
 
+      {/*
+        두 버튼이 **둘 다 뭔가를 한다.** 그래서 바깥을 눌러 닫는 길(onDismiss)을
+        따로 두어, 잘못 눌렀을 때 아무 일도 일어나지 않게 한다.
+      */}
       <ConfirmDialog
         open={confirming !== null}
-        title="이 주문을 입금 완료로 처리할까요?"
-        confirmLabel="예, 입금 완료"
-        cancelLabel="아니요"
+        title="이 주문을 먼저 수정 할까요?"
+        confirmLabel="예, 수정하기"
+        cancelLabel="아니요, 입금 완료"
         pending={pending}
-        onConfirm={() => connect(confirming!)}
-        onCancel={() => setConfirming(null)}
+        onConfirm={() => goEdit(confirming!)}
+        onCancel={() => connect(confirming!)}
+        onDismiss={() => setConfirming(null)}
       >
         {confirming && (
           <ResolveSummary deposit={deposit} order={confirming} otherBank={deposit.otherBank} />
@@ -411,8 +377,7 @@ function ResolveSummary({
           <b>돈을 받지 않고 물건을 보내게 됩니다.</b>
         </p>
         <p className="mt-2 border-t border-berry/25 pt-2 text-[0.83rem] leading-relaxed text-ink-soft">
-          이 주문이 맞다면, <b>주문 화면에서 내용을 실제와 맞게 고쳐 두세요.</b> 입금자명이나
-          금액이 다른 채로 두면 다음에 또 같은 확인을 하게 됩니다.
+          통장에 실제 입금된 이름/금액과 인터넷에 입력된 이름/금액을 확인하고 맞게 수정하세요
         </p>
       </div>
     </div>

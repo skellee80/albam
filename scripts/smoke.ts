@@ -807,6 +807,33 @@ async function main() {
   );
 
   /* ────────────────────────────────────────────── */
+  section('22-3. 취소는 관리자가 직접 고를 수 없다');
+
+  // 취소는 기한이 지나거나 손님이 스스로 취소할 때만 생긴다.
+  // 아버지가 주문을 물릴 때는 되살릴 수 있는 "주문 삭제"를 쓴다.
+  const { ADMIN_SELECTABLE_STATUSES, adminStatusOptions } = await import('../src/lib/types');
+
+  check(
+    '관리자 상태 목록에 취소가 없다',
+    !ADMIN_SELECTABLE_STATUSES.includes('취소'),
+    ADMIN_SELECTABLE_STATUSES.join(', '),
+  );
+  check('발송대기·환불완료는 남아 있다', ADMIN_SELECTABLE_STATUSES.includes('발송대기') && ADMIN_SELECTABLE_STATUSES.includes('환불완료'));
+  check(
+    '이미 취소된 주문을 열면 취소가 목록에 끼어든다',
+    adminStatusOptions('취소')[0] === '취소',
+    adminStatusOptions('취소').join(', '),
+  );
+  check(
+    '취소가 아닌 주문에는 취소가 안 보인다',
+    !adminStatusOptions('발송대기').includes('취소'),
+  );
+
+  // 그래도 자동 취소와 손님 취소는 계속 동작해야 한다 (15번·17-1번에서 확인됨)
+  const { STOCK_RELEASING_STATUSES } = await import('../src/lib/types');
+  check('취소는 여전히 재고를 되돌리는 상태다', STOCK_RELEASING_STATUSES.includes('취소'));
+
+  /* ────────────────────────────────────────────── */
   section('22-2. 입금 기한');
 
   const { PAYMENT_DEADLINE_HOURS: hours, PAYMENT_DEADLINE_MS: ms } = await import(

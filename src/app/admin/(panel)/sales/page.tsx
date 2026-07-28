@@ -25,10 +25,9 @@ export default async function AdminSalesPage() {
         매출은 <b>입금이 확인된 주문</b>만 셉니다. 입금대기와 취소는 빠집니다.
       </p>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <StatTile label="최근 7일" value={formatKRW(summary.last7Revenue)} />
         <StatTile label="전체 매출" value={formatKRW(summary.revenue)} />
-        <StatTile label="입금된 주문" value={`${summary.orderCount}건`} />
       </div>
 
       {statuses.length > 0 && (

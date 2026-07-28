@@ -87,8 +87,8 @@ export default async function ShopPage() {
           여섯 줄을 차지했고, 정작 팔 상품이 첫 화면에서 밀려났다.
         */}
         <section className="mt-5 overflow-hidden rounded-card border border-line bg-surface">
-          <h2 className="bg-flesh/45 px-4 py-2.5 font-display text-[1rem] text-shell">
-            어떤 자리에 놓을 밤인가요
+          <h2 className="bg-flesh/45 px-4 py-2.5 text-center font-display text-[1rem] text-shell">
+            밤 사이즈
           </h2>
           <dl className="divide-y divide-line/70">
             {SIZE_GUIDE.map((guide) => (
@@ -98,9 +98,15 @@ export default async function ShopPage() {
                 >
                   {guide.size}
                 </dt>
-                <dd className="min-w-0 flex-1 text-[0.83rem] leading-snug">
-                  <b className={SIZE_TONE[guide.tone].label}>{guide.tag}</b>
-                  <span className="text-ink-soft"> · {guide.note}</span>
+                {/* 이름표와 설명을 같은 색으로 두고 굵기로만 나눈다 — 한 줄이 한 등급이라는 게 보인다 */}
+                <dd
+                  className={`min-w-0 flex-1 text-[0.83rem] leading-snug ${SIZE_TONE[guide.tone].label}`}
+                >
+                  <b>{guide.tag}</b>
+                  <span aria-hidden="true" className="px-1 opacity-70">
+                    →
+                  </span>
+                  <span className="font-normal">{guide.note}</span>
                 </dd>
               </div>
             ))}
@@ -115,18 +121,24 @@ export default async function ShopPage() {
           <div className="mt-7 space-y-8">
             {groups.map((group) => (
               <section key={group.variety}>
-                <div className="flex items-center gap-3.5 px-1">
+                {/*
+                  사진이 커져 이름과 나란히 두면 한 줄에 안 들어간다.
+                  사진을 위에 크게 놓고 이름을 그 아래 가운데에 둔다.
+                */}
+                <div className="flex flex-col items-center px-1">
                   {group.image ? (
                     // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={group.image}
                       alt=""
-                      className="h-[4.5rem] w-[4.5rem] shrink-0 rounded-2xl border border-line object-cover"
+                      className="h-[13.5rem] w-[13.5rem] max-w-full rounded-3xl border border-line object-cover"
                       loading="lazy"
                     />
                   ) : null}
-                  <h2 className="font-display text-[1.4rem] leading-tight">{group.variety}</h2>
+                  <h2 className="mt-2.5 font-display text-[1.4rem] leading-tight">
+                    {group.variety}
+                  </h2>
                 </div>
 
                 <div className="card mt-3 divide-y-2 divide-line overflow-hidden">

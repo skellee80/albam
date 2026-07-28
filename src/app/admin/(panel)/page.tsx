@@ -7,11 +7,10 @@ import {
 } from '@/components/admin/DepositAlerts';
 import { ShipQueue, type ShipItem } from '@/components/admin/ShipQueue';
 import { banksMatch, listUnresolvedDeposits } from '@/lib/deposits';
-import { formatKRW, summarizeItems } from '@/lib/format';
+import { summarizeItems } from '@/lib/format';
 import { expireStaleOrders, getOrders, listOrders } from '@/lib/orders';
 import { isSoldOut, listProducts } from '@/lib/products';
 import { getSettings } from '@/lib/settings';
-import { totals } from '@/lib/stats';
 import type { Order } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -77,8 +76,6 @@ export default async function AdminDashboardPage() {
 
   const soldOut = products.filter((p) => !p.hidden && isSoldOut(p));
 
-  const summary = totals(orders);
-
   return (
     <div className="space-y-6">
       {/* 1. 가장 급한 것 — 돈은 들어왔는데 주문이 안 움직이는 건 */}
@@ -111,26 +108,14 @@ export default async function AdminDashboardPage() {
         </section>
       )}
 
-      {/* 3. 오늘 보낼 것 */}
-      <ShipQueue orders={shipQueue} />
-
       {/*
+        3. 오늘 보낼 것.
+
         매출은 여기 두지 않는다. 이 화면은 "지금 손대야 하는 것"만 보는 곳이라,
-        아래에 차트가 길게 붙으면 정작 급한 입금 알림이 화면 밖으로 밀려난다.
-        궁금할 때 건너갈 수 있게 한 줄만 남긴다.
+        아래에 뭔가 더 붙으면 정작 급한 입금 알림이 화면 밖으로 밀려난다.
+        매출은 위 메뉴의 판매현황에서 본다.
       */}
-      <Link
-        href="/admin/sales"
-        className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3.5"
-      >
-        <span>
-          <span className="block text-[0.92rem] font-semibold">판매 현황 보기</span>
-          <span className="tnum mt-0.5 block text-[0.8rem] text-ink-soft">
-            최근 7일 {formatKRW(summary.last7Revenue)}
-          </span>
-        </span>
-        <span className="shrink-0 text-ink-faint">›</span>
-      </Link>
+      <ShipQueue orders={shipQueue} />
     </div>
   );
 }

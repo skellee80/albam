@@ -65,7 +65,8 @@ export function BrandTitle() {
       // 손님에게는 그냥 제목이라 버튼처럼 보이지 않게 둔다
       className="block cursor-default text-center select-none"
     >
-      <span className="block font-display text-[1.7rem] leading-tight tracking-tight">
+      {/* 1.7rem 의 70% */}
+      <span className="block font-display text-[1.19rem] leading-tight tracking-tight">
         {BRAND.full}
       </span>
     </button>

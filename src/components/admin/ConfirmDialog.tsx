@@ -19,6 +19,7 @@ export function ConfirmDialog({
   pending = false,
   onConfirm,
   onCancel,
+  onDismiss,
 }: {
   open: boolean;
   title: string;
@@ -29,8 +30,17 @@ export function ConfirmDialog({
   pending?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * ESC를 누르거나 바깥을 눌러 닫을 때. 기본은 onCancel과 같다.
+   *
+   * **두 버튼이 모두 뭔가를 하는 창에서는 반드시 따로 넘겨야 한다.**
+   * 그런 창에서 바깥을 잘못 눌렀다가 "아니요" 쪽 동작이 실행되면,
+   * 아버지는 아무것도 안 한 줄 알고 있는데 주문이 발송대기로 넘어가 있게 된다.
+   */
+  onDismiss?: () => void;
 }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const dismiss = onDismiss ?? onCancel;
 
   // 열릴 때 확인 버튼으로 초점을 옮기고, ESC로 닫히게 한다
   useEffect(() => {
@@ -38,7 +48,7 @@ export function ConfirmDialog({
     confirmRef.current?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape') dismiss();
     };
     document.addEventListener('keydown', onKey);
 
@@ -50,7 +60,7 @@ export function ConfirmDialog({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onCancel]);
+  }, [open, dismiss]);
 
   if (!open) return null;
 
@@ -59,7 +69,7 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 backdrop-blur-[2px] sm:items-center"
       role="presentation"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
+        if (e.target === e.currentTarget) dismiss();
       }}
     >
       <div
