@@ -130,7 +130,9 @@ export function OrderForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <h1 className="px-1 font-display text-[1.5rem]">주문하기</h1>
+
       {/* ── 담은 밤 ── */}
       <section>
         <h2 className="mb-2.5 px-1 font-display text-[1.15rem]">담은 밤</h2>
@@ -363,7 +365,7 @@ function OrderComplete({ completed, settings }: { completed: Completed; settings
     <div className="mt-6 space-y-5">
       <div className="card px-5 py-6 text-center">
         <p className="text-[2rem] leading-none">🌰</p>
-        <h2 className="mt-3 font-display text-[1.35rem]">주문이 접수되었습니다</h2>
+        <h1 className="mt-3 font-display text-[1.35rem]">주문이 접수되었습니다</h1>
         <p className="tnum mt-1.5 text-[0.9rem] text-ink-soft">주문번호 {completed.orderNo}</p>
       </div>
 

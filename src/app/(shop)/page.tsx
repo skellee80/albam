@@ -19,40 +19,35 @@ const SIZE_TONE = {
 } as const;
 
 /**
- * 품종 → 크기 → 무게 순으로 두 겹으로 묶는다.
+ * 품종(그룹)으로만 묶는다.
  *
- *   대보
- *     중    4kg / 10kg
- *     대    4kg / 10kg
- *     특    4kg / 10kg
+ *   대보                    ← 그룹 이름
+ *     대보 중 4kg   28,000원
+ *     대보 중 10kg  62,000원
+ *     대보 대 4kg   35,000원
  *
- * 무게를 바깥 묶음으로 올리면 "대보 4kg", "대보 10kg" 처럼 같은 품종이 두 번 나온다.
- * 손님은 품종을 먼저 고르고 그다음 크기와 양을 정하므로, 고르는 순서대로 겹쳐 둔다.
+ * 크기로 한 겹 더 묶지 않는다. 크기 띠에 "중"만 덩그러니 뜨는데, 사진 밑 이름을 뺀
+ * 뒤로는 그 띠가 화면에서 유일한 제목 자리라 정작 품종 이름이 어디에도 안 나왔다.
+ * 줄에도 무게만 적으면 "4kg"이 무엇의 4kg인지 알 수 없다. 각 줄에 상품 이름을
+ * 통째로 적으면 두 문제가 한꺼번에 없어지고, 크기 뜻은 위의 "밤 사이즈" 안내가 맡는다.
  *
  * 미리 정해둔 목록을 훑지 않고 **실제 상품에 있는 값**을 순서대로 모은다.
  * 관리자가 새 이름의 상품을 넣어도 목록에서 조용히 사라지지 않는다.
  */
 function groupProducts(products: Product[]) {
-  const groups: {
-    variety: string;
-    image: string;
-    sizes: { size: string; items: Product[] }[];
-  }[] = [];
+  const groups: { variety: string; image: string; items: Product[] }[] = [];
 
   for (const product of products) {
-    let group = groups.find((g) => g.variety === product.variety);
+    // 이름에서 품종을 못 읽어내면 이름 전체를 그룹으로 쓴다 — 목록에서 빠지는 것보다 낫다
+    const variety = product.variety || product.name;
+
+    let group = groups.find((g) => g.variety === variety);
     if (!group) {
-      group = { variety: product.variety, image: product.imageUrl, sizes: [] };
+      group = { variety, image: product.imageUrl, items: [] };
       groups.push(group);
     }
     if (!group.image) group.image = product.imageUrl;
-
-    let sizeGroup = group.sizes.find((s) => s.size === product.size);
-    if (!sizeGroup) {
-      sizeGroup = { size: product.size, items: [] };
-      group.sizes.push(sizeGroup);
-    }
-    sizeGroup.items.push(product);
+    group.items.push(product);
   }
 
   return groups;
@@ -72,10 +67,8 @@ export default async function ShopPage() {
       <SiteHeader active="shop" />
 
       <main className="mx-auto w-full max-w-[30rem] px-4 pt-6 pb-32">
-        <p className="px-1 text-[0.95rem] leading-relaxed text-ink-soft">
+        <p className="px-1 text-center font-display text-[1.15rem] leading-relaxed text-burr-deep">
           올해 딴 햇밤을 밭에서 바로 보냅니다.
-          <br />
-          품종과 크기를 고르고 수량만 담아 주세요.
         </p>
 
         {/*
@@ -148,27 +141,16 @@ export default async function ShopPage() {
                         loading="lazy"
                       />
                     </div>
-                  ) : (
-                    // 사진이 없으면 이름이라도 있어야 무엇인지 알 수 있다
-                    <h2 className="bg-flesh/45 px-4 py-3 text-center font-display text-[1.4rem] text-shell">
-                      {group.variety}
-                    </h2>
-                  )}
+                  ) : null}
 
-                  <div className="divide-y-2 divide-line">
-                    {group.sizes.map((sizeGroup) => (
-                      <div key={sizeGroup.size || '_'}>
-                        {sizeGroup.size ? (
-                          <p className="bg-flesh/45 px-4 py-2 text-[0.9rem] font-bold text-shell">
-                            {sizeGroup.size}
-                          </p>
-                        ) : null}
-                        <div className="divide-y divide-line/70">
-                          {sizeGroup.items.map((p) => (
-                            <ProductRow key={p.id} product={toShopProduct(p)} />
-                          ))}
-                        </div>
-                      </div>
+                  {/* 그룹 이름. 사진이 있든 없든 늘 나온다 — 여기가 품종 이름의 자리다. */}
+                  <h2 className="bg-flesh/45 px-4 py-2.5 text-center font-display text-[1.2rem] text-shell">
+                    {group.variety}
+                  </h2>
+
+                  <div className="divide-y divide-line/70">
+                    {group.items.map((p) => (
+                      <ProductRow key={p.id} product={toShopProduct(p)} />
                     ))}
                   </div>
                 </section>
@@ -222,9 +204,9 @@ function toShopProduct(p: Product): ShopProduct {
   return {
     id: p.id,
     name: p.name,
-    // 크기는 위 소제목이 말해 주므로, 각 줄은 무게를 이름표로 쓴다.
-    // 무게가 없는 이름이면 크기, 그것도 없으면 이름 전체로 물러선다.
-    label: p.weight || p.size || p.name,
+    // 줄에는 상품 이름을 통째로 적는다. "4kg" 만 적으면 무엇의 4kg인지 알 수 없고,
+    // 장바구니·주문서에 남는 이름과도 달라 손님이 맞게 담았는지 확인할 수 없다.
+    label: p.name,
     price: p.price,
     stock: p.stock,
   };

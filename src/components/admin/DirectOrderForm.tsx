@@ -226,7 +226,7 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
       </section>
 
       <section className="card px-4 py-4">
-        <h2 className="font-display text-[1.1rem]">돈 낸 분</h2>
+        <h2 className="font-display text-[1.1rem]">주문자</h2>
         <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
           이름만 있으면 됩니다. 나머지는 비워 두어도 됩니다.
         </p>
@@ -400,7 +400,7 @@ export function DirectOrderForm({ products }: { products: SellableProduct[] }) {
               <b className="tnum text-ink">{formatKRW(done.totalAmount)}</b>
             </p>
             <p className="tnum text-[0.83rem] text-ink-faint">주문번호 {done.orderNo}</p>
-            <p>재고에서 빠졌고, 판매 현황에 &ldquo;직접 넣은 주문&rdquo;으로 잡힙니다.</p>
+            <p>재고에서 빠졌고, 판매 현황에 &ldquo;직접 판매&rdquo;로 잡힙니다.</p>
           </div>
         )}
       </NoticeDialog>

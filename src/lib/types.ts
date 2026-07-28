@@ -174,8 +174,8 @@ export const ORDER_SOURCES = ['online', 'direct'] as const;
 export type OrderSource = (typeof ORDER_SOURCES)[number];
 
 export const ORDER_SOURCE_LABEL: Record<OrderSource, string> = {
-  online: '인터넷 주문',
-  direct: '직접 넣은 주문',
+  online: '인터넷 판매',
+  direct: '직접 판매',
 };
 
 export interface Order {

@@ -34,8 +34,12 @@ export default async function OrderPage() {
   return (
     <>
       <SiteHeader active={null} />
+      {/*
+        제목은 OrderForm 안에 있다. 주문을 마치면 이 화면이 "주문이 접수되었습니다"로
+        통째로 바뀌는데, 제목을 여기 두면 그 위에 "주문하기"가 남아 무엇을 보고 있는지
+        헷갈린다. 화면이 바뀔 때 제목도 같이 바뀌어야 한다.
+      */}
       <main className="mx-auto w-full max-w-[30rem] px-4 pt-6 pb-10">
-        <h1 className="px-1 font-display text-[1.5rem]">주문하기</h1>
         <OrderForm products={orderProducts} settings={settings} />
       </main>
     </>

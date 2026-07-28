@@ -47,8 +47,8 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
         차트에서 가장 먼저 읽혀야 하는 정보라 제목 바로 아래 크게 둔다.
       */}
       <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[0.82rem]">
-        <LegendKey color={ONLINE} label="인터넷 주문" />
-        <LegendKey color={DIRECT} label="직접 넣은 주문" />
+        <LegendKey color={ONLINE} label="인터넷 판매" />
+        <LegendKey color={DIRECT} label="직접 판매" />
       </div>
 
       {!hasSales ? (
@@ -85,8 +85,8 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
                         <p className="text-[0.78rem] text-ink-soft">{label}</p>
                         <p className="tnum text-[0.95rem] font-bold">{formatKRW(row.amount)}</p>
                         <dl className="mt-1 space-y-0.5 text-[0.75rem]">
-                          <TipRow color={ONLINE} label="인터넷" value={row.online} />
-                          <TipRow color={DIRECT} label="직접" value={row.direct} />
+                          <TipRow color={ONLINE} label="인터넷 판매" value={row.online} />
+                          <TipRow color={DIRECT} label="직접 판매" value={row.direct} />
                         </dl>
                         <p className="tnum mt-1 text-[0.72rem] text-ink-faint">
                           주문 {row.count}건
@@ -118,8 +118,8 @@ export function DailySalesChart({ data }: { data: DailySales[] }) {
             <thead>
               <tr>
                 <th>날짜</th>
-                <th>인터넷 주문</th>
-                <th>직접 넣은 주문</th>
+                <th>인터넷 판매</th>
+                <th>직접 판매</th>
                 <th>합계</th>
                 <th>주문 건수</th>
               </tr>
@@ -189,8 +189,8 @@ export function ProductSalesBars({ data }: { data: ProductSales[] }) {
 
       {/* 최근 7일 매출과 같은 색·같은 범례를 쓴다. 두 차트가 같은 이야기를 한다는 표시다. */}
       <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[0.82rem]">
-        <LegendKey color={ONLINE} label="인터넷 주문" />
-        <LegendKey color={DIRECT} label="직접 넣은 주문" />
+        <LegendKey color={ONLINE} label="인터넷 판매" />
+        <LegendKey color={DIRECT} label="직접 판매" />
       </div>
 
       {data.length === 0 ? (
@@ -214,7 +214,7 @@ export function ProductSalesBars({ data }: { data: ProductSales[] }) {
               */}
               <div
                 className="mt-1 flex h-2.5 overflow-hidden rounded-full bg-burr-tint"
-                title={`인터넷 ${formatKRW(row.online)} · 직접 ${formatKRW(row.direct)}`}
+                title={`인터넷 판매 ${formatKRW(row.online)} · 직접 판매 ${formatKRW(row.direct)}`}
               >
                 <div
                   className="h-full"
@@ -243,8 +243,8 @@ export function ProductSalesBars({ data }: { data: ProductSales[] }) {
           <thead>
             <tr>
               <th>상품</th>
-              <th>인터넷 주문</th>
-              <th>직접 넣은 주문</th>
+              <th>인터넷 판매</th>
+              <th>직접 판매</th>
               <th>합계</th>
               <th>수량</th>
             </tr>

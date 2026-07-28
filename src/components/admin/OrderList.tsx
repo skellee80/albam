@@ -98,10 +98,18 @@ export function OrderList({ orders }: { orders: OrderRow[] }) {
                 </div>
 
                 <p className="mt-1.5 text-[0.72rem] text-ink-faint">
-                  {/* 사이트로 들어온 것과 아버지가 손으로 넣은 것을 한눈에 가른다 */}
-                  {order.source === 'direct' && (
+                  {/*
+                    사이트로 들어온 것과 아버지가 손으로 넣은 것을 한눈에 가른다.
+                    한쪽에만 표를 달면 표가 없는 줄이 "아직 분류가 안 된 것"처럼 보인다.
+                    둘 다 달아야 표가 없는 상태가 없어진다.
+                  */}
+                  {order.source === 'direct' ? (
                     <span className="mr-1.5 rounded-full bg-shell-tint px-1.5 py-0.5 font-bold text-shell">
                       직접
+                    </span>
+                  ) : (
+                    <span className="mr-1.5 rounded-full bg-burr-tint px-1.5 py-0.5 font-bold text-burr-deep">
+                      인터넷
                     </span>
                   )}
                   <span className="tnum">

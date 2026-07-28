@@ -23,6 +23,13 @@
   --color-burr: #6f9a57;
   --color-burr-deep: #547940;
   --color-burr-tint: #e9f2e1;
+  /*
+   * 머리띠용 연한 파스텔 초록.
+   * 진한 초록에 흰 글씨로 두면 첫 화면의 절반이 무거운 색 덩어리가 된다.
+   * 연하게 깔고 글씨를 어두운 색으로 바꾸면 같은 자리가 훨씬 가볍다.
+   * (burr-tint 보다 조금 진해서 종이 바탕과 확실히 갈라진다)
+   */
+  --color-burr-pale: #d8ecca;
 
   /* 밤 껍질 갈색 — 포인트 */
   --color-shell: #8c5a34;
@@ -222,4 +229,45 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-ink-soft);
+}
+
+/* ============================================================
+   인쇄 — 발송 주소 목록 (/admin/print/shipping)
+
+   화면용 장식은 종이에서 전부 걷어낸다. 잉크를 아끼려는 것이 아니라,
+   아버지가 주소를 옮겨 적을 때 눈이 딴 데로 가지 않게 하려는 것이다.
+   ============================================================ */
+
+@media print {
+  /* 관리자 머리띠·메뉴, 되돌아가기 링크, 인쇄 버튼은 종이에 필요 없다 */
+  header.sticky,
+  .print-hide {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  .print-page {
+    max-width: none;
+    padding: 0;
+    color: #000;
+  }
+
+  /* 카드 그림자와 배경을 빼고 얇은 선만 남긴다 */
+  .print-row {
+    border: 1px solid #999 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    /* 한 건이 두 장에 걸쳐 잘리면 주소를 잘못 읽는다 */
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 12mm;
+  }
 }

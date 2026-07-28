@@ -24,9 +24,23 @@ export type ShipItem = {
 export function ShipQueue({ orders }: { orders: ShipItem[] }) {
   return (
     <section>
-      <h2 className="px-1 font-display text-[1.2rem]">
-        보낼 주문 <span className="tnum text-burr">{orders.length}</span>건
-      </h2>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h2 className="font-display text-[1.2rem]">
+          보낼 주문 <span className="tnum text-burr">{orders.length}</span>건
+        </h2>
+
+        {/* 택배를 부칠 때는 주소를 종이로 놓고 하는 편이 빠르고 덜 틀린다 */}
+        {orders.length > 0 && (
+          <Link
+            href="/admin/print/shipping"
+            aria-label="보낼 주문 주소 인쇄"
+            title="주소 인쇄"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink-soft"
+          >
+            <PrinterIcon />
+          </Link>
+        )}
+      </div>
 
       {orders.length === 0 ? (
         <p className="card mt-2.5 px-5 py-8 text-center text-ink-soft">
@@ -40,6 +54,26 @@ export function ShipQueue({ orders }: { orders: ShipItem[] }) {
         </ul>
       )}
     </section>
+  );
+}
+
+function PrinterIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" rx="1" />
+    </svg>
   );
 }
 

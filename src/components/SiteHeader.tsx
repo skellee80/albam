@@ -8,7 +8,7 @@ import { BrandTitle } from './BrandTitle';
  */
 export function SiteHeader({ active }: { active: 'shop' | 'track' | null }) {
   return (
-    <header className="burr-edge bg-burr text-white">
+    <header className="burr-edge bg-burr-pale text-ink">
       {/*
         아래 여백(pb)은 밤송이 가시(.burr-edge::after, 12px)가 메뉴를 덮지 않을 만큼만 둔다.
         가게 이름이 작아지면서 예전 여백은 초록 띠만 두껍게 남겼다.
@@ -30,8 +30,12 @@ function NavLink({ href, label, isActive }: { href: string; label: string; isAct
     <Link
       href={href}
       aria-current={isActive ? 'page' : undefined}
+      // 바탕이 연해졌으므로 고른 칸은 진한 초록으로 채워야 눈에 든다.
+      // 흰 배경으로 두면 종이색과 섞여 무엇이 골라졌는지 안 보인다.
       className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-        isActive ? 'bg-white text-burr-deep' : 'bg-white/15 text-white hover:bg-white/25'
+        isActive
+          ? 'bg-burr-deep text-white'
+          : 'bg-white/70 text-burr-deep hover:bg-white'
       }`}
     >
       {label}
