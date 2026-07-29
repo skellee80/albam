@@ -8,8 +8,8 @@
 
 | | |
 |---|---|
-| 배포 주소 | `https://albam.web.app` (짧은 주소 · 302로 아래로 넘긴다) |
-| 실제 주소 | `https://albam--albam-416fd.asia-east1.hosted.app` |
+| 배포 주소 | `https://albam.web.app` |
+| (같은 사이트) | `https://albam--albam-416fd.asia-east1.hosted.app` |
 | 호스팅 | Firebase App Hosting (Blaze) — GitHub push 시 자동 빌드 |
 | 저장소 | Firestore (프로덕션 모드) |
 | 프레임워크 | Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 |

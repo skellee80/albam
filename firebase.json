@@ -11,16 +11,13 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "redirects": [
+    "rewrites": [
       {
-        "source": "/",
-        "destination": "https://albam--albam-416fd.asia-east1.hosted.app/",
-        "type": 302
-      },
-      {
-        "source": "/:path*",
-        "destination": "https://albam--albam-416fd.asia-east1.hosted.app/:path*",
-        "type": 302
+        "source": "**",
+        "run": {
+          "serviceId": "albam",
+          "region": "asia-east1"
+        }
       }
     ]
   },
