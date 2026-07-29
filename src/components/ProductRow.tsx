@@ -10,10 +10,12 @@ import { useCart } from './CartProvider';
 /** 상품 목록에 필요한 것만 추린 모양. 서버에서 클라이언트로 넘기는 값이라 최소로 유지한다. */
 export type ShopProduct = {
   id: string;
-  /** 장바구니·주문에 남는 정식 이름 ("대보 중") */
+  /** 장바구니·주문에 남는 정식 이름 ("대보 중 4kg") */
   name: string;
-  /** 묶음 안에서 이 줄에 보일 짧은 이름표 ("중") */
-  label: string;
+  /** 크기 ("중"). 이름에서 뽑는다. 못 뽑으면 빈 칸. */
+  size: string;
+  /** 무게 ("4kg"). 이름에서 뽑는다. 못 뽑으면 빈 칸. */
+  weight: string;
   price: number;
   stock: number;
 };
@@ -59,9 +61,27 @@ export function ProductRow({ product }: { product: ShopProduct }) {
 
   return (
     <div className={`px-4 py-3.5 ${soldOut ? 'opacity-55' : ''}`}>
+      {/*
+        묶음 제목이 품종을 이미 말해 주므로 줄에는 **크기와 무게만** 적는다.
+        크기는 값이 몇 개뿐이라 알약 모양으로 떼어 두면 눈이 세로로 훑기 쉽다.
+        둘 다 못 읽는 이름이면 이름을 통째로 적는다 — 빈 줄이 되면 안 된다.
+      */}
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[1.05rem] font-semibold">{product.label}</span>
-        <span className="tnum text-[1.05rem] font-bold">{formatKRW(product.price)}</span>
+        <span className="flex min-w-0 items-baseline gap-2">
+          {product.size ? (
+            <>
+              <span className="shrink-0 rounded-full bg-flesh/60 px-2 py-0.5 text-[0.82rem] font-bold text-shell">
+                {product.size}
+              </span>
+              <span className="text-[1.05rem] font-semibold">
+                {product.weight || product.name}
+              </span>
+            </>
+          ) : (
+            <span className="text-[1.05rem] font-semibold">{product.name}</span>
+          )}
+        </span>
+        <span className="tnum shrink-0 text-[1.05rem] font-bold">{formatKRW(product.price)}</span>
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-3">

@@ -1,5 +1,6 @@
 import { CartBar } from '@/components/CartBar';
-import { ProductRow, type ShopProduct } from '@/components/ProductRow';
+import { ProductGroup } from '@/components/ProductGroup';
+import { type ShopProduct } from '@/components/ProductRow';
 import { SiteHeader } from '@/components/SiteHeader';
 import { expireStaleOrders } from '@/lib/orders';
 import { listProducts } from '@/lib/products';
@@ -112,52 +113,27 @@ export default async function ShopPage() {
           </p>
         ) : (
           /*
-            묶음 사이를 넉넉히 벌리고 가운데에 표시를 하나 둔다.
-            사진 밑 이름을 뺐기 때문에 "여기서 다음 품종이 시작된다"를 알려줄 것이
-            간격밖에 없다. 간격만으로는 스크롤 중에 이어져 보인다.
+            묶음 사이를 벌리고 가운데에 표시를 하나 둔다.
+            카드가 접혀 있을 때는 서로 비슷하게 생겨서, 간격만으로는 어디서
+            다음 품종이 시작되는지 스크롤 중에 놓치기 쉽다.
           */
-          <div className="mt-7 space-y-11">
+          <div className="mt-7 space-y-8">
             {groups.map((group, groupIndex) => (
               <div key={group.variety}>
                 {groupIndex > 0 && <GroupBreak />}
 
                 {/*
-                  품종 하나 = 카드 하나. 사진과 가격 줄이 **한 테두리 안에** 들어간다.
-                  손님이 고르는 단위는 품종이므로 그 단위로 묶는다.
-
-                  품종 이름은 글자로 쓰지 않고 사진이 대신한다. 화면 낭독기에는
-                  aria-label 로 알려 주므로 눈으로 안 보여도 어느 품종인지 전해진다.
+                  품종이 하나뿐이면 펼쳐 둔다. 접을 것이 없는데 접혀 있으면
+                  손님이 빈 화면을 보고 파는 게 없다고 생각한다.
                 */}
-                <section className="card overflow-hidden" aria-label={group.variety}>
-                  {group.image ? (
-                    // 사진이 카드의 머리다. 아래 가시 선이 사진과 본문을 물어 준다.
-                    // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다.
-                    <div className="burr-edge burr-edge-surface relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={group.image}
-                        alt={group.variety}
-                        className="block aspect-[5/3] w-full bg-flesh/40 object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : (
-                    /*
-                      사진이 있으면 이름 띠를 두지 않는다 — 아래 줄마다 "대보 중 4kg" 처럼
-                      품종이 이미 들어 있어 같은 말이 두 번 나온다.
-                      사진이 없을 때만 무엇인지 알려 줄 것이 필요하다.
-                    */
-                    <h2 className="bg-flesh/45 px-4 py-2.5 text-center font-display text-[1.2rem] text-shell">
-                      {group.variety}
-                    </h2>
-                  )}
-
-                  <div className="divide-y divide-line/70">
-                    {group.items.map((p) => (
-                      <ProductRow key={p.id} product={toShopProduct(p)} />
-                    ))}
-                  </div>
-                </section>
+                <ProductGroup
+                  group={{
+                    variety: group.variety,
+                    image: group.image,
+                    items: group.items.map(toShopProduct),
+                  }}
+                  defaultOpen={groups.length === 1}
+                />
               </div>
             ))}
           </div>
@@ -248,10 +224,11 @@ function GroupBreak() {
 function toShopProduct(p: Product): ShopProduct {
   return {
     id: p.id,
+    // 장바구니와 주문서에는 늘 정식 이름이 남는다. 화면에서 크기·무게로 나눠 보여도
+    // 주문 확인 문자에는 "대보 중 4kg" 으로 나와야 손님이 맞게 담았는지 알 수 있다.
     name: p.name,
-    // 줄에는 상품 이름을 통째로 적는다. "4kg" 만 적으면 무엇의 4kg인지 알 수 없고,
-    // 장바구니·주문서에 남는 이름과도 달라 손님이 맞게 담았는지 확인할 수 없다.
-    label: p.name,
+    size: p.size,
+    weight: p.weight,
     price: p.price,
     stock: p.stock,
   };

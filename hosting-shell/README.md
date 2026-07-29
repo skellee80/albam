@@ -19,39 +19,40 @@ albam.web.app/track   →(튕김)→  albam--...hosted.app/track      ← 경로
 > (배포는 되고 설정도 올라가는데 서빙에서 안 먹는다)
 > `/:path*` 처럼 세그먼트 캡처를 쓸 것. 루트(`/`)는 그 규칙에 안 걸려 따로 한 줄 더 둔다.
 
-## 주소를 짧게 유지하려면 (한 번만 하면 된다)
+## 주소를 짧게 유지하려면
 
-주소창에도 `albam.web.app` 이 남게 하려면 튕기지 말고 **뒤에서 받아와야** 한다.
-그러려면 App Hosting 의 Cloud Run 서비스가 바깥에서 불릴 수 있어야 하는데,
-기본값은 막혀 있다(그래서 rewrite 로 두면 403 이 난다).
+주소창에도 `albam.web.app` 이 남게 하려면 튕기지 말고 **뒤에서 받아와야** 한다(rewrite).
+그러려면 App Hosting 의 Cloud Run 서비스가 바깥에서 불릴 수 있어야 하는데 기본값은 막혀 있다.
+그대로 rewrite 로 두면 403 이 난다.
 
-**Firebase 콘솔에서 도메인을 붙이는 것이 정석이다.**
+> ❌ **App Hosting 의 "커스텀 도메인 추가" 로는 안 된다.**
+> 그 칸은 `.com` 처럼 **직접 소유한 도메인**만 받는다. `.web.app` 은 구글 것이라
+> 소유 확인(DNS)을 할 수 없어 "유효한 서픽스가 있어야 합니다" 로 거절된다.
 
-1. https://console.firebase.google.com/project/albam-416fd/apphosting
-2. 백엔드 `albam` → **도메인 추가 / Add custom domain**
-3. `albam.web.app` 을 고른다 (같은 프로젝트의 Hosting 사이트라 DNS 설정이 필요 없다)
+### 방법 1. Cloud Run 을 공개로 열기
 
-> ⚠️ 콘솔에서 도메인을 붙인 뒤에는 **`firebase deploy --only hosting` 을 다시 돌리지 말 것.**
-> 이 폴더의 설정(위 redirects)이 콘솔이 잡아 둔 것을 덮어써 버린다.
-> 그때는 firebase.json 의 `hosting` 부분을 지우는 편이 낫다.
+**Google Cloud 콘솔** (Firebase 콘솔이 아니다) 에서 한 번만 하면 된다.
 
-<details>
-<summary>gcloud 가 있다면 이렇게도 된다</summary>
-
-Cloud Run 서비스를 누구나 부를 수 있게 열고, firebase.json 의 `redirects` 를
-아래 `rewrites` 로 바꿔 `firebase deploy --only hosting`.
-
-```bash
-gcloud run services add-iam-policy-binding albam \
-  --region=asia-east1 --project=albam-416fd \
-  --member=allUsers --role=roles/run.invoker
-```
+1. https://console.cloud.google.com/run?project=albam-416fd
+2. 서비스 목록에서 **albam** 을 누른다
+3. 위쪽 **보안** 탭 → **인증** → **인증되지 않은 호출 허용** 을 고르고 저장
+   (탭이 안 보이면 **권한** → **주 구성원 추가** → 새 주 구성원 `allUsers`,
+   역할 **Cloud Run 호출자** → 저장)
+4. firebase.json 의 `redirects` 를 아래 `rewrites` 로 바꾸고 `firebase deploy --only hosting`
 
 ```json
 "rewrites": [{ "source": "**", "run": { "serviceId": "albam", "region": "asia-east1" } }]
 ```
 
-이렇게 하면 Cloud Run 주소(`*.run.app`)도 공개된다. 어차피 공개 사이트라
-새로 새는 정보는 없지만, 같은 사이트로 가는 주소가 하나 더 생긴다는 것은 알아 둘 것.
+Cloud Run 주소(`*.run.app`)도 함께 공개된다. 어차피 공개 사이트라 새로 새는 정보는
+없지만, 같은 사이트로 가는 주소가 하나 더 생긴다는 것은 알아 둘 것.
+배포를 몇 번 한 뒤 이 설정이 그대로인지 한 번 확인해 보는 것이 좋다.
 
-</details>
+### 방법 2. 진짜 도메인을 사기
+
+`chilgapbam.com` 같은 도메인을 사면(연 1만원대) App Hosting 의 **커스텀 도메인 추가**가
+정상으로 동작하고, 주소창도 그대로 유지된다. 가게 이름을 알리기에도 이쪽이 낫다.
+
+> ⚠️ 어느 쪽이든, 콘솔에서 도메인을 붙인 뒤에는 **`firebase deploy --only hosting` 을
+> 다시 돌리지 말 것.** 이 폴더의 설정이 콘솔이 잡아 둔 것을 덮어쓴다.
+> 그때는 firebase.json 의 `hosting` 부분을 지우는 편이 낫다.
