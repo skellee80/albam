@@ -58,22 +58,41 @@ function namePreview(name: string): string {
  * 상품이 생기고, 그때 손님 화면과 관리자 화면이 서로 다른 말을 하게 된다.
  * 이름 하나만 고치면 그룹도 따라 움직이는 편이 틀릴 자리가 없다.
  */
-function groupByVariety(products: ManagedProduct[]) {
-  const groups: { name: string; image: string; items: ManagedProduct[] }[] = [];
+type SizeGroup = { size: string; items: ManagedProduct[] };
+type VarietyGroup = { name: string; image: string; sizes: SizeGroup[] };
+
+function groupByVariety(products: ManagedProduct[]): VarietyGroup[] {
+  const groups: VarietyGroup[] = [];
 
   for (const product of products) {
-    const variety = parseProductName(product.name).variety || product.name || '이름 없음';
+    const parsed = parseProductName(product.name);
+    const variety = parsed.variety || product.name || '이름 없음';
+
     let group = groups.find((g) => g.name === variety);
     if (!group) {
-      group = { name: variety, image: product.imageUrl, items: [] };
+      group = { name: variety, image: product.imageUrl, sizes: [] };
       groups.push(group);
     }
     // 그룹 사진은 하나다. 상품마다 달라져 있으면 먼저 걸린 것을 대표로 보여준다.
     if (!group.image) group.image = product.imageUrl;
-    group.items.push(product);
+
+    // 크기가 안 읽히는 이름("꿀밤 선물세트")은 빈 칸 묶음에 담아 크기 띠 없이 바로 보여준다
+    let size = group.sizes.find((s) => s.size === parsed.size);
+    if (!size) {
+      size = { size: parsed.size, items: [] };
+      group.sizes.push(size);
+    }
+    size.items.push(product);
   }
 
   return groups;
+}
+
+/** 줄에 쓸 짧은 이름. 크기 묶음 안에서는 무게만 남기면 "대보 중" 이 세 번 반복되지 않는다. */
+function shortLabel(product: ManagedProduct, size: string): string {
+  if (!size) return product.name;
+  const parsed = parseProductName(product.name);
+  return parsed.weight || product.name;
 }
 
 export function ProductManager({
@@ -83,8 +102,14 @@ export function ProductManager({
   products: ManagedProduct[];
   images: ProductImageOption[];
 }) {
-  /** 무엇을 새로 만들고 있나. 그룹 이름이 들어 있으면 그 그룹에 넣는 중. */
-  const [creating, setCreating] = useState<{ group: string } | null>(null);
+  /**
+   * 지금 무엇을 새로 만들고 있나.
+   *  - `null`                     아무것도 안 만드는 중
+   *  - `{ group: '' }`            새 품종 그룹
+   *  - `{ group: '대보' }`         대보 안에 새 크기 묶음
+   *  - `{ group: '대보', size: '중' }`  대보 > 중 안에 상품
+   */
+  const [creating, setCreating] = useState<{ group: string; size?: string } | null>(null);
 
   const groups = groupByVariety(products);
 
@@ -102,30 +127,84 @@ export function ProductManager({
         <section key={group.name} className="card overflow-hidden">
           <GroupHeader group={group} images={images} />
 
-          <div className="divide-y divide-line">
-            {group.items.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {/*
+            품종 아래 크기로 한 겹 더 묶는다.
+              대보
+                중        ← 크기 묶음
+                  4kg
+                  10kg
+            크기가 안 읽히는 이름은 띠 없이 바로 줄로 나온다.
+          */}
+          {group.sizes.map((sizeGroup) => (
+            <div key={sizeGroup.size || '_'} className="border-t-2 border-line">
+              {sizeGroup.size && (
+                <div className="flex items-baseline justify-between gap-3 bg-flesh/20 px-4 py-2">
+                  <h3 className="font-display text-[1rem] text-shell">{sizeGroup.size}</h3>
+                  <span className="tnum shrink-0 text-[0.75rem] text-ink-faint">
+                    {sizeGroup.items.length}가지
+                  </span>
+                </div>
+              )}
 
-          {creating?.group === group.name ? (
-            <div className="border-t-2 border-line px-4 py-4">
-              <h3 className="mb-3 font-display text-[1.05rem]">{group.name} 에 상품 추가</h3>
-              <ProductForm
-                // 사진은 그룹 것을 그대로 물려받는다 — 상품마다 고를 일이 없다
-                initial={{ ...EMPTY_DRAFT, name: `${group.name} `, imageUrl: group.image }}
-                productId={null}
-                onDone={() => setCreating(null)}
-                onCancel={() => setCreating(null)}
-              />
+              <div className="divide-y divide-line">
+                {sizeGroup.items.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    label={shortLabel(product, sizeGroup.size)}
+                  />
+                ))}
+              </div>
+
+              {sizeGroup.size &&
+                (creating?.group === group.name && creating.size === sizeGroup.size ? (
+                  <div className="border-t border-line px-4 py-4">
+                    <h4 className="mb-3 font-display text-[1rem]">
+                      {group.name} {sizeGroup.size} 에 상품 추가
+                    </h4>
+                    <p className="mb-3 text-[0.8rem] leading-snug text-ink-soft">
+                      이름 뒤에 무게를 이어 적어 주세요. 예:{' '}
+                      <b>
+                        {group.name} {sizeGroup.size} 10kg
+                      </b>
+                    </p>
+                    <ProductForm
+                      // 사진은 그룹 것을 그대로 물려받는다 — 상품마다 고를 일이 없다
+                      initial={{
+                        ...EMPTY_DRAFT,
+                        name: `${group.name} ${sizeGroup.size} `,
+                        imageUrl: group.image,
+                      }}
+                      productId={null}
+                      onDone={() => setCreating(null)}
+                      onCancel={() => setCreating(null)}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCreating({ group: group.name, size: sizeGroup.size })}
+                    className="w-full border-t border-line px-4 py-2.5 text-left text-[0.84rem] font-semibold text-burr-deep"
+                  >
+                    + {sizeGroup.size} 에 상품 추가
+                  </button>
+                ))}
             </div>
+          ))}
+
+          {creating?.group === group.name && creating.size === undefined ? (
+            <NewSize
+              group={group}
+              onCancel={() => setCreating(null)}
+              onDone={() => setCreating(null)}
+            />
           ) : (
             <button
               type="button"
               onClick={() => setCreating({ group: group.name })}
-              className="w-full border-t border-line px-4 py-3 text-[0.88rem] font-semibold text-burr-deep"
+              className="w-full border-t-2 border-line px-4 py-3 text-[0.88rem] font-semibold text-burr-deep"
             >
-              + {group.name} 에 상품 추가
+              + {group.name} 에 크기 추가
             </button>
           )}
         </section>
@@ -153,6 +232,112 @@ export function ProductManager({
 }
 
 /**
+ * 그룹 안에 크기 묶음을 새로 만든다.
+ *
+ * 크기도 따로 저장하지 않는다. 이름을 "대보 중 4kg" 처럼 적으면 가운데 낱말이 크기가 된다
+ * (parseProductName). 그래서 여기서 하는 일은 **크기 이름을 받아 두고, 첫 상품 이름을
+ * "대보 중 " 까지 채워 주는 것**뿐이다.
+ */
+function NewSize({
+  group,
+  onCancel,
+  onDone,
+}: {
+  group: VarietyGroup;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const [size, setSize] = useState('');
+  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const name = size.trim();
+  const existing = group.sizes.map((s) => s.size).filter(Boolean);
+
+  function next() {
+    if (!name) {
+      setError('크기 이름을 넣어 주세요.');
+      return;
+    }
+    if (name.includes(' ')) {
+      setError('크기 이름은 띄어쓰기 없이 한 낱말로 넣어 주세요. (예: 중)');
+      return;
+    }
+    if (existing.includes(name)) {
+      setError(`"${name}" 은(는) 이미 있습니다. 그 아래에서 상품을 추가하세요.`);
+      return;
+    }
+    setError(null);
+    setConfirmed(name);
+  }
+
+  if (confirmed) {
+    return (
+      <div className="border-t-2 border-line px-4 py-4">
+        <h3 className="mb-1 font-display text-[1.05rem]">
+          {group.name} {confirmed} — 첫 상품
+        </h3>
+        <p className="mb-3 text-[0.8rem] leading-snug text-ink-soft">
+          이름 뒤에 무게를 이어 적어 주세요. 예:{' '}
+          <b>
+            {group.name} {confirmed} 4kg
+          </b>
+        </p>
+        <ProductForm
+          initial={{
+            ...EMPTY_DRAFT,
+            name: `${group.name} ${confirmed} `,
+            imageUrl: group.image,
+          }}
+          productId={null}
+          onDone={onDone}
+          onCancel={onCancel}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t-2 border-line px-4 py-4">
+      <h3 className="font-display text-[1.05rem]">{group.name} 에 크기 추가</h3>
+      <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
+        중 · 대 · 특 처럼 크기 이름을 넣어 주세요.
+        {existing.length > 0 && <> 지금은 {existing.join(' · ')} 이(가) 있습니다.</>}
+      </p>
+
+      <input
+        className="field mt-3"
+        value={size}
+        onChange={(e) => setSize(e.target.value)}
+        placeholder="예: 특"
+        aria-label={`${group.name} 의 새 크기 이름`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') next();
+        }}
+      />
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-2 rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={next} className="btn btn-primary">
+          다음
+        </button>
+        <button type="button" onClick={onCancel} className="btn btn-outline">
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 그룹 머리 — 이름, 상품 수, 그리고 **그룹 사진**.
  *
  * 사진을 상품마다 두지 않는 이유: 같은 품종이면 사진이 어차피 같은데 상품마다 두면
@@ -165,13 +350,15 @@ function GroupHeader({
   group,
   images,
 }: {
-  group: { name: string; image: string; items: ManagedProduct[] };
+  group: VarietyGroup;
   images: ProductImageOption[];
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const itemCount = group.sizes.reduce((n, s) => n + s.items.length, 0);
 
   function choose(url: string) {
     setError(null);
@@ -209,7 +396,7 @@ function GroupHeader({
 
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
-          <p className="tnum text-[0.78rem] text-ink-soft">{group.items.length}가지</p>
+          <p className="tnum text-[0.78rem] text-ink-soft">{itemCount}가지</p>
         </div>
 
         <button
@@ -224,7 +411,7 @@ function GroupHeader({
       {picking && (
         <div className="border-t border-shell/15 px-4 pt-3 pb-4">
           <p className="text-[0.82rem] leading-snug text-ink-soft">
-            고른 사진이 <b>{group.name}</b> 상품 {group.items.length}가지에 모두 걸립니다.
+            고른 사진이 <b>{group.name}</b> 상품 {itemCount}가지에 모두 걸립니다.
           </p>
 
           {images.length === 0 ? (
@@ -375,7 +562,7 @@ function NewGroup({
   );
 }
 
-function ProductCard({ product }: { product: ManagedProduct }) {
+function ProductCard({ product, label }: { product: ManagedProduct; label?: string }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [restock, setRestock] = useState('');
@@ -413,7 +600,8 @@ function ProductCard({ product }: { product: ManagedProduct }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[1.08rem] font-bold">
-            {product.name}
+            {/* 크기 묶음 안에서는 무게만 — "대보 중" 이 줄마다 반복되지 않게 */}
+            {label ?? product.name}
             {product.hidden && (
               <span className="ml-2 rounded-full bg-line px-2 py-0.5 text-[0.7rem] font-semibold text-ink-soft">
                 숨김
