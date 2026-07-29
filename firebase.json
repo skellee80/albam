@@ -3,6 +3,27 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "hosting": {
+    "site": "albam",
+    "public": "hosting-shell",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://albam--albam-416fd.asia-east1.hosted.app/",
+        "type": 302
+      },
+      {
+        "source": "/:path*",
+        "destination": "https://albam--albam-416fd.asia-east1.hosted.app/:path*",
+        "type": 302
+      }
+    ]
+  },
   "emulators": {
     "firestore": {
       "port": 8080
