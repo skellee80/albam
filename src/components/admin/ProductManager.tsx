@@ -7,7 +7,6 @@ import {
   deleteProductAction,
   restockProductAction,
   saveProductAction,
-  seedProductsAction,
   setGroupImageAction,
 } from '@/app/admin/actions';
 import { formatKRW, parseProductName } from '@/lib/format';
@@ -91,7 +90,13 @@ export function ProductManager({
 
   return (
     <div className="mt-3 space-y-4">
-      {products.length === 0 && !creating && <EmptyState />}
+      {products.length === 0 && !creating && (
+        <p className="card px-5 py-10 text-center text-[0.92rem] leading-relaxed text-ink-soft">
+          아직 상품이 없습니다.
+          <br />
+          아래 <b>새 그룹 만들기</b> 로 품종부터 만들어 주세요.
+        </p>
+      )}
 
       {groups.map((group) => (
         <section key={group.name} className="card overflow-hidden">
@@ -358,68 +363,14 @@ function NewGroup({
         </p>
       )}
 
-      <div className="mt-3 flex gap-2">
-        <button type="button" onClick={next} className="btn btn-primary flex-1">
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={next} className="btn btn-primary">
           다음
         </button>
-        <button type="button" onClick={onCancel} className="btn btn-outline px-5">
+        <button type="button" onClick={onCancel} className="btn btn-outline">
           취소
         </button>
       </div>
-    </div>
-  );
-}
-
-/**
- * 상품이 하나도 없을 때만 나온다.
- *
- * 배포 직후에는 Firestore가 비어 있어 손님 화면에 아무것도 안 보인다.
- * 18종을 손으로 넣게 하는 대신 버튼 하나로 채우고, 가격과 재고를 고치게 한다.
- * 넣고 나면 이 영역은 사라지므로 실수로 다시 누를 일이 없다.
- */
-function EmptyState() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function seed() {
-    setError(null);
-    startTransition(async () => {
-      const result = await seedProductsAction();
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  return (
-    <div className="card px-4 py-5 text-center">
-      <p className="font-display text-[1.1rem]">아직 상품이 없습니다</p>
-      <p className="mt-1.5 text-[0.88rem] leading-relaxed text-ink-soft">
-        품종 3가지 × 크기 3가지 × 4kg·10kg,
-        <br />
-        모두 <b>18가지</b>를 한 번에 넣어 드립니다.
-        <br />
-        가격과 재고는 넣은 뒤 바로 고칠 수 있습니다.
-      </p>
-
-      {error && (
-        <p
-          role="alert"
-          className="mt-3 rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry"
-        >
-          {error}
-        </p>
-      )}
-
-      <button type="button" onClick={seed} disabled={pending} className="btn btn-primary mt-4 w-full">
-        {pending ? '넣는 중…' : '기본 상품 18가지 넣기'}
-      </button>
-      <p className="mt-2 text-[0.78rem] text-ink-soft">
-        가격은 임시 값입니다. 넣은 뒤 꼭 확인해 주세요.
-      </p>
     </div>
   );
 }
@@ -651,11 +602,12 @@ function ProductForm({
         </p>
       )}
 
-      <div className="flex gap-2">
-        <button type="button" onClick={save} disabled={pending} className="btn btn-primary flex-1">
+      {/* 둘 다 같은 폭. 저장만 길면 화면에서 저장이 유일한 선택지처럼 보인다. */}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={save} disabled={pending} className="btn btn-primary">
           {pending ? '저장 중…' : '저장'}
         </button>
-        <button type="button" onClick={onCancel} className="btn btn-outline px-5">
+        <button type="button" onClick={onCancel} className="btn btn-outline">
           취소
         </button>
       </div>
