@@ -16,16 +16,22 @@ export function isSoldOut(p: Pick<Product, 'stock'>): boolean {
 }
 
 /**
- * 처음에 넣어 둔 임시 밤 그림 → 실제 사진.
+ * 지워진 사진 주소 → 지금 있는 파일.
  *
- * 그림 파일은 지웠는데 저장된 상품은 아직 그 주소를 가리키고 있다.
- * 그대로 두면 손님 화면에 깨진 그림이 뜨므로 읽을 때 바꿔 준다.
- * 상품을 한 번이라도 저장하면 문서에도 새 주소가 들어간다.
+ * 파일을 바꿀 때마다 저장된 상품이 옛 주소를 가리킨 채로 남는다.
+ * 그대로 두면 손님 화면에 깨진 그림이 뜨므로 **읽을 때** 옮겨 준다.
+ * 상품을 한 번이라도 저장하면 문서에도 새 주소가 들어가고, 그러면 이 표에서 빼도 된다.
+ *
+ * 두 번 갈아탔다: 임시로 그린 밤 그림(svg) → 실제 사진(jpg) → webp.
  */
 const RETIRED_IMAGES: Record<string, string> = {
-  '/products/daebo.svg': '/products/대보.jpg',
-  '/products/poredan.svg': '/products/포르단.jpg',
-  '/products/okgwang.svg': '/products/옥광.jpg',
+  '/products/daebo.svg': '/products/대보.webp',
+  '/products/poredan.svg': '/products/포르단.webp',
+  '/products/okgwang.svg': '/products/옥광.webp',
+  '/products/대보.jpg': '/products/대보.webp',
+  '/products/포르단.jpg': '/products/포르단.webp',
+  '/products/옥광.jpg': '/products/옥광.webp',
+  '/products/축파.jpg': '/products/축파.webp',
 };
 
 function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {

@@ -20,7 +20,7 @@ const PRODUCTS_DIR = path.join(process.cwd(), 'public', 'products');
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.avif']);
 
 export type ProductImage = {
-  /** 화면에 쓰는 주소 ("/products/대보.jpg") */
+  /** 화면에 쓰는 주소 ("/products/대보.webp") */
   url: string;
   /** 아버지가 알아볼 이름 ("대보") */
   label: string;

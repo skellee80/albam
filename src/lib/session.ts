@@ -10,7 +10,18 @@ import { jwtVerify } from 'jose/jwt/verify';
  * 이 파일은 Node 전용 API(node:crypto 등)를 쓰지 않는다.
  */
 
-export const SESSION_COOKIE = 'albam_admin';
+/**
+ * 쿠키 이름은 반드시 `__session` 이어야 한다. **바꾸면 로그인이 유지되지 않는다.**
+ *
+ * 손님이 쓰는 짧은 주소(albam.web.app)는 Firebase Hosting 이 앞에 서서 요청을
+ * App Hosting 으로 넘기는데, Hosting 은 **`__session` 이라는 이름의 쿠키 하나만**
+ * 뒤로 전달하고 나머지는 전부 떼어 버린다.
+ *
+ * 예전 이름(`albam_admin`)일 때는 로그인은 되는데(브라우저는 쿠키를 받는다)
+ * 다음 요청에서 그 쿠키가 서버까지 오지 않아, 새로고침만 해도 로그인 화면으로 돌아갔다.
+ * 긴 주소에서는 멀쩡해서 원인이 더 안 보였다.
+ */
+export const SESSION_COOKIE = '__session';
 
 /**
  * 180일. 아버지 폰에서 한 번 로그인하면 계속 유지되어야 한다(PRD).

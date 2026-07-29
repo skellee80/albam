@@ -148,7 +148,7 @@ export default async function ShopPage() {
           {/* 사진 안에 제목과 설명이 다 들어 있어 옆에 글을 덧붙이지 않는다 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/products/밤품종.png"
+            src="/products/밤품종.webp"
             alt="축파(일반밤) · 포르단 · 옥광 · 대보 네 품종의 특징 안내"
             className="w-full rounded-card border border-line"
             loading="lazy"
@@ -165,7 +165,7 @@ export default async function ShopPage() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/products/4kg박스.jpg"
+            src="/products/4kg박스.webp"
             alt="4kg 전용 상자에 담긴 밤"
             className="w-full object-contain"
             loading="lazy"

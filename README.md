@@ -446,7 +446,8 @@ curl -X POST https://albam--albam-416fd.asia-east1.hosted.app/api/deposit \
 똑같이 맞추면 **관리자 화면을 한 번도 손대지 않고** 사진만 갈린다.
 
 1. 밤 사진을 찍어 컴퓨터로 옮긴다. 정사각형으로 자르고 가로 800px 정도로 줄인다.
-2. `public/products/` 폴더에 넣는다. **파일 이름은 한글로 둬도 된다** (`대보.jpg`).
+2. **webp 로 바꿔서** `public/products/` 폴더에 넣는다 (아래 명령 참고).
+   파일 이름은 한글로 둬도 된다 (`대보.webp`).
 3. 배포한다.
 
 ```bash
@@ -467,18 +468,26 @@ npx firebase apphosting:rollouts:create albam -b main --project albam-416fd
 > 그 주소를 가리키는 상품이 아직 남아 있어도 읽을 때 실제 사진으로 바꿔 주므로
 > 깨진 그림이 뜨지 않는다(`src/lib/products.ts` 의 `RETIRED_IMAGES`).
 
-### 사진은 작게 넣어야 한다
+### 사진은 작게, webp 로
 
 `public/` 에 넣은 파일은 **줄이지 않고 그대로** 손님 폰으로 내려간다.
 폰 카메라 사진은 한 장에 5~10MB라, 그대로 두면 첫 화면이 열리는 데 몇 초씩 걸린다.
 
-가로 1000px 정도로 줄여서 넣는다. 한 장이 **200KB를 넘지 않게** 하면 넉넉하다.
+가로 1000px 정도로 줄이고 **webp** 로 담는다. 한 장이 **200KB를 넘지 않게** 하면 넉넉하다.
+(`sharp` 는 Next.js 가 이미 받아 두므로 따로 설치하지 않아도 된다)
+
+**밤 사진** — 손실 압축이 낫다. 같은 화질에 jpg 의 절반쯤 된다.
 
 ```bash
-node -e "require('sharp')('원본.png').resize(1000).png({compressionLevel:9,palette:true,colors:128}).toFile('public/products/이름.png')"
+node -e "require('sharp')('원본.jpg').resize(1000).webp({quality:82}).toFile('public/products/이름.webp')"
 ```
 
-(`sharp` 는 Next.js 가 이미 받아 두므로 따로 설치하지 않아도 된다)
+**글자가 들어간 안내 그림** — 무손실로 담는다. 손실로 담으면 글자 가장자리가 번지고,
+색이 몇 개 없는 그림이라 오히려 파일이 커진다(실제로 106KB → 195KB 가 됐다).
+
+```bash
+node -e "require('sharp')('원본.png').resize(1000).webp({lossless:true}).toFile('public/products/이름.webp')"
+```
 
 #### 인터넷에 올라간 사진 주소를 붙여넣기
 

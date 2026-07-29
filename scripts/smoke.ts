@@ -1041,11 +1041,13 @@ async function main() {
   check('이름이 겹치지 않는다', new Set(seedList.map((p) => p.name)).size === seedList.length);
   check('모든 상품에 가격이 있다', seedList.every((p) => p.price > 0));
   check('sortOrder가 0부터 빠짐없이 이어진다', seedList.every((p, i) => p.sortOrder === i));
-  check(
-    '사진이 지워진 그림이 아니라 실제 파일을 가리킨다',
-    seedList.every((p) => /\.(jpg|png)$/.test(p.imageUrl)),
-    [...new Set(seedList.map((p) => p.imageUrl))].join(' / '),
+  // 파일 이름을 바꿔 놓고 여기를 안 고치면 손님 화면에 깨진 그림이 뜬다.
+  // 확장자만 보지 말고 **public/ 에 실제로 있는지** 확인한다.
+  const { existsSync } = await import('node:fs');
+  const missing = [...new Set(seedList.map((p) => p.imageUrl))].filter(
+    (url) => !existsSync(`public${url}`),
   );
+  check('사진이 public/ 에 실제로 있는 파일을 가리킨다', missing.length === 0, missing.join(' / '));
 
   /* ────────────────────────────────────────────── */
   console.log(`\n${'─'.repeat(50)}`);
