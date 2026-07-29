@@ -8,8 +8,10 @@ import {
   restockProductAction,
   saveProductAction,
   seedProductsAction,
+  setGroupImageAction,
 } from '@/app/admin/actions';
 import { formatKRW, parseProductName } from '@/lib/format';
+import type { ProductImage as ProductImageOption } from '@/lib/product-images';
 import { LOW_STOCK_NOTICE_THRESHOLD } from '@/lib/types';
 
 export type ManagedProduct = {
@@ -25,10 +27,11 @@ export type ManagedProduct = {
 type Draft = Omit<ManagedProduct, 'id'>;
 
 
+/** 새 상품의 기본값. 사진은 그룹에서 물려받으므로 비워 둔다. */
 const EMPTY_DRAFT: Draft = {
   name: '',
   price: 0,
-  imageUrl: '/products/대보.jpg',
+  imageUrl: '',
   stock: 0,
   hidden: false,
   sortOrder: 99,
@@ -57,22 +60,30 @@ function namePreview(name: string): string {
  * 이름 하나만 고치면 그룹도 따라 움직이는 편이 틀릴 자리가 없다.
  */
 function groupByVariety(products: ManagedProduct[]) {
-  const groups: { name: string; items: ManagedProduct[] }[] = [];
+  const groups: { name: string; image: string; items: ManagedProduct[] }[] = [];
 
   for (const product of products) {
     const variety = parseProductName(product.name).variety || product.name || '이름 없음';
     let group = groups.find((g) => g.name === variety);
     if (!group) {
-      group = { name: variety, items: [] };
+      group = { name: variety, image: product.imageUrl, items: [] };
       groups.push(group);
     }
+    // 그룹 사진은 하나다. 상품마다 달라져 있으면 먼저 걸린 것을 대표로 보여준다.
+    if (!group.image) group.image = product.imageUrl;
     group.items.push(product);
   }
 
   return groups;
 }
 
-export function ProductManager({ products }: { products: ManagedProduct[] }) {
+export function ProductManager({
+  products,
+  images,
+}: {
+  products: ManagedProduct[];
+  images: ProductImageOption[];
+}) {
   /** 무엇을 새로 만들고 있나. 그룹 이름이 들어 있으면 그 그룹에 넣는 중. */
   const [creating, setCreating] = useState<{ group: string } | null>(null);
 
@@ -84,12 +95,7 @@ export function ProductManager({ products }: { products: ManagedProduct[] }) {
 
       {groups.map((group) => (
         <section key={group.name} className="card overflow-hidden">
-          <header className="flex items-baseline justify-between gap-3 bg-flesh/45 px-4 py-2.5">
-            <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
-            <span className="tnum shrink-0 text-[0.78rem] text-ink-soft">
-              {group.items.length}가지
-            </span>
-          </header>
+          <GroupHeader group={group} images={images} />
 
           <div className="divide-y divide-line">
             {group.items.map((product) => (
@@ -101,7 +107,8 @@ export function ProductManager({ products }: { products: ManagedProduct[] }) {
             <div className="border-t-2 border-line px-4 py-4">
               <h3 className="mb-3 font-display text-[1.05rem]">{group.name} 에 상품 추가</h3>
               <ProductForm
-                initial={{ ...EMPTY_DRAFT, name: `${group.name} ` }}
+                // 사진은 그룹 것을 그대로 물려받는다 — 상품마다 고를 일이 없다
+                initial={{ ...EMPTY_DRAFT, name: `${group.name} `, imageUrl: group.image }}
                 productId={null}
                 onDone={() => setCreating(null)}
                 onCancel={() => setCreating(null)}
@@ -137,6 +144,132 @@ export function ProductManager({ products }: { products: ManagedProduct[] }) {
         )
       )}
     </div>
+  );
+}
+
+/**
+ * 그룹 머리 — 이름, 상품 수, 그리고 **그룹 사진**.
+ *
+ * 사진을 상품마다 두지 않는 이유: 같은 품종이면 사진이 어차피 같은데 상품마다 두면
+ * 여섯 군데를 똑같이 고쳐야 하고, 한 곳만 빠뜨리면 손님 화면에서 사진이 갈린다.
+ *
+ * 주소를 타이핑하는 대신 **폴더에 있는 사진을 눌러서 고른다.** 오타 한 글자에
+ * 깨진 그림이 뜨는데 아버지는 그게 왜 안 나오는지 알 방법이 없다.
+ */
+function GroupHeader({
+  group,
+  images,
+}: {
+  group: { name: string; image: string; items: ManagedProduct[] };
+  images: ProductImageOption[];
+}) {
+  const router = useRouter();
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function choose(url: string) {
+    setError(null);
+    startTransition(async () => {
+      const result = await setGroupImageAction(group.name, url);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setPicking(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <header className="bg-flesh/45">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setPicking((v) => !v)}
+          aria-label={`${group.name} 사진 고르기`}
+          className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-surface"
+        >
+          {group.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={group.image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-[0.65rem] leading-tight text-ink-faint">
+              사진
+              <br />
+              없음
+            </span>
+          )}
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
+          <p className="tnum text-[0.78rem] text-ink-soft">{group.items.length}가지</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setPicking((v) => !v)}
+          className="shrink-0 rounded-full border border-shell/25 bg-surface px-3.5 py-2 text-[0.82rem] font-semibold text-shell"
+        >
+          {picking ? '닫기' : '사진 바꾸기'}
+        </button>
+      </div>
+
+      {picking && (
+        <div className="border-t border-shell/15 px-4 pt-3 pb-4">
+          <p className="text-[0.82rem] leading-snug text-ink-soft">
+            고른 사진이 <b>{group.name}</b> 상품 {group.items.length}가지에 모두 걸립니다.
+          </p>
+
+          {images.length === 0 ? (
+            <p className="mt-2 rounded-xl bg-surface px-3.5 py-3 text-[0.83rem] text-ink-soft">
+              사진 폴더를 읽지 못했습니다. 사진은 <b>public/products/</b> 폴더에 넣고 배포하면
+              여기 나옵니다.
+            </p>
+          ) : (
+            <ul className="mt-2.5 grid grid-cols-4 gap-2">
+              {images.map((image) => {
+                const current = image.url === group.image;
+                return (
+                  <li key={image.url}>
+                    <button
+                      type="button"
+                      onClick={() => choose(image.url)}
+                      disabled={pending}
+                      aria-current={current ? 'true' : undefined}
+                      className={`block w-full overflow-hidden rounded-xl border-2 bg-surface disabled:opacity-50 ${
+                        current ? 'border-burr' : 'border-line'
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image.url}
+                        alt={image.label}
+                        className="aspect-square w-full object-cover"
+                        loading="lazy"
+                      />
+                      <span className="block truncate px-1 py-1 text-[0.7rem] text-ink-soft">
+                        {image.label}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {error && (
+            <p
+              role="alert"
+              className="mt-2 rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </header>
   );
 }
 
@@ -496,32 +629,11 @@ function ProductForm({
         </p>
       </div>
 
-      <div>
-        <label className="label">사진</label>
-
-        {/* 지금 무엇이 걸려 있는지 눈으로 보여준다. 주소만 보고는 알 수 없다. */}
-        <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-2xl border border-line bg-paper">
-          {draft.imageUrl ? (
-            // 관리자가 임의의 외부 URL을 넣을 수 있어 next/image 대신 일반 img를 쓴다
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={draft.imageUrl} alt="지금 걸린 사진" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-[0.7rem] text-ink-faint">사진 없음</span>
-          )}
-        </div>
-
-        <input
-          className="field mt-2.5"
-          value={draft.imageUrl}
-          onChange={(e) => set('imageUrl', e.target.value)}
-          placeholder="/products/daebo.svg"
-          aria-label="사진 주소"
-        />
-        <p className="mt-1.5 text-[0.78rem] leading-snug text-ink-soft">
-          찍은 사진을 여기서 바로 올릴 수는 없습니다. 인터넷에 올라간 사진의 주소
-          (<b>https://</b> 로 시작하고 <b>.jpg</b> 나 <b>.png</b> 로 끝나는 것)를 붙여넣으세요.
-        </p>
-      </div>
+      {/*
+        사진 칸은 여기 없다. 같은 그룹이면 사진이 어차피 같아서 **그룹 머리에서 한 번만** 고른다.
+        여기 두면 상품 여섯 개를 똑같이 고쳐야 하고, 하나만 빠뜨리면 손님 화면에서 갈린다.
+        (새로 만드는 상품은 그룹 사진을 그대로 물려받는다)
+      */}
 
       <label className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
         <input

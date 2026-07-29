@@ -106,6 +106,35 @@ export async function deleteProduct(id: string): Promise<void> {
 }
 
 /**
+ * 한 그룹(품종)의 사진을 한꺼번에 바꾼다.
+ *
+ * 사진은 상품마다가 아니라 **그룹마다** 정한다. 같은 품종이면 사진이 어차피 같은데
+ * 상품마다 따로 두면 여섯 군데를 똑같이 고쳐야 하고, 한 곳만 빠뜨리면 손님 화면에서
+ * 같은 품종의 사진이 갈린다.
+ *
+ * 그룹은 이름 맨 앞 낱말이므로 그것으로 상품을 찾는다(variety 필드로 질의하지 않는 이유:
+ * 예전 문서에는 그 필드가 없거나 이름과 어긋나 있을 수 있어, 읽을 때 이름에서 다시 뽑는다).
+ *
+ * @returns 바뀐 상품 수
+ */
+export async function setGroupImage(group: string, imageUrl: string): Promise<number> {
+  const snap = await db.collection(COL.products).get();
+
+  const targets = snap.docs.filter((doc) => {
+    const name = String(doc.data().name ?? '');
+    return (parseProductName(name).variety || name) === group;
+  });
+  if (targets.length === 0) return 0;
+
+  const now = Date.now();
+  const batch = db.batch();
+  for (const doc of targets) batch.update(doc.ref, { imageUrl, updatedAt: now });
+  await batch.commit();
+
+  return targets.length;
+}
+
+/**
  * 상품이 하나도 없을 때 기본 18종을 넣는다.
  *
  * 배포 직후 관리자 화면에서 한 번 누르면 되도록 만든 것이다.

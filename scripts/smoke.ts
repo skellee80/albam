@@ -1002,6 +1002,35 @@ async function main() {
   );
 
   /* ────────────────────────────────────────────── */
+  section('22-5. 사진은 그룹 단위로 걸린다');
+
+  const { setGroupImage } = await import('../src/lib/products');
+
+  const beforeGroupImage = await listProducts({ includeHidden: true });
+  const daeboItems = beforeGroupImage.filter((p) => p.variety === '대보');
+  check('대보 그룹에 상품이 여러 개다', daeboItems.length > 1, `${daeboItems.length}가지`);
+
+  const changed = await setGroupImage('대보', '/products/시험.jpg');
+  check('그룹 상품 전체가 한 번에 바뀐다', changed === daeboItems.length, `${changed}개`);
+
+  const afterGroup = await listProducts({ includeHidden: true });
+  check(
+    '대보 상품이 모두 같은 사진을 가리킨다',
+    afterGroup
+      .filter((p) => p.variety === '대보')
+      .every((p) => p.imageUrl === '/products/시험.jpg'),
+  );
+  check(
+    '다른 그룹은 건드리지 않는다',
+    afterGroup
+      .filter((p) => p.variety !== '대보')
+      .every((p) => p.imageUrl !== '/products/시험.jpg'),
+  );
+
+  const none = await setGroupImage('없는그룹', '/products/시험.jpg');
+  check('없는 그룹이면 아무것도 바꾸지 않는다', none === 0, `${none}개`);
+
+  /* ────────────────────────────────────────────── */
   // 상품을 지웠다가 다시 넣으므로 반드시 마지막에 둔다.
   section('23. 기본 상품 넣기 — 비어 있을 때 한 번만');
 

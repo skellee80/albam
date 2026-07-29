@@ -141,12 +141,16 @@ export default async function ShopPage() {
                         loading="lazy"
                       />
                     </div>
-                  ) : null}
-
-                  {/* 그룹 이름. 사진이 있든 없든 늘 나온다 — 여기가 품종 이름의 자리다. */}
-                  <h2 className="bg-flesh/45 px-4 py-2.5 text-center font-display text-[1.2rem] text-shell">
-                    {group.variety}
-                  </h2>
+                  ) : (
+                    /*
+                      사진이 있으면 이름 띠를 두지 않는다 — 아래 줄마다 "대보 중 4kg" 처럼
+                      품종이 이미 들어 있어 같은 말이 두 번 나온다.
+                      사진이 없을 때만 무엇인지 알려 줄 것이 필요하다.
+                    */
+                    <h2 className="bg-flesh/45 px-4 py-2.5 text-center font-display text-[1.2rem] text-shell">
+                      {group.variety}
+                    </h2>
+                  )}
 
                   <div className="divide-y divide-line/70">
                     {group.items.map((p) => (
@@ -175,12 +179,19 @@ export default async function ShopPage() {
           />
         </section>
 
-        <section className="mt-6 card overflow-hidden" aria-label="포장 안내">
+        {/*
+          배경은 밤 속살색(flesh)을 옅게 깐다. 상자 사진의 종이 상자 색과 이어져
+          사진과 글이 한 덩어리로 보이고, 위아래 흰 카드들 사이에서 살짝 도드라진다.
+        */}
+        <section
+          className="mt-6 overflow-hidden rounded-card border border-shell/15 bg-flesh/40"
+          aria-label="포장 안내"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/products/4kg박스.jpg"
             alt="4kg 전용 상자에 담긴 밤"
-            className="w-full bg-flesh/30 object-contain"
+            className="w-full object-contain"
             loading="lazy"
           />
           <div className="px-4 py-3.5">

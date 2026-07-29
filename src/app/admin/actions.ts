@@ -25,6 +25,7 @@ import {
   createProduct,
   deleteProduct,
   seedDefaultProductsIfEmpty,
+  setGroupImage,
   updateProduct,
   type ProductInput,
 } from '@/lib/products';
@@ -189,6 +190,17 @@ export async function saveProductAction(
 
 export async function deleteProductAction(productId: string): Promise<ActionResult> {
   return run(() => deleteProduct(productId), ['/admin', '/admin/products', '/']);
+}
+
+/** 그룹(품종) 사진을 그 그룹의 상품 전체에 한꺼번에 건다. */
+export async function setGroupImageAction(
+  group: string,
+  imageUrl: string,
+): Promise<ActionResult> {
+  return run(async () => {
+    const changed = await setGroupImage(group.trim(), imageUrl.trim());
+    if (changed === 0) throw new Error('그 그룹의 상품을 찾지 못했습니다.');
+  }, ['/admin', '/admin/products', '/']);
 }
 
 export async function restockProductAction(
