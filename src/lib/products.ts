@@ -16,11 +16,26 @@ export function isSoldOut(p: Pick<Product, 'stock'>): boolean {
   return p.stock <= 0;
 }
 
+/**
+ * 처음에 넣어 둔 임시 밤 그림 → 실제 사진.
+ *
+ * 그림 파일은 지웠는데 저장된 상품은 아직 그 주소를 가리키고 있다.
+ * 그대로 두면 손님 화면에 깨진 그림이 뜨므로 읽을 때 바꿔 준다.
+ * 상품을 한 번이라도 저장하면 문서에도 새 주소가 들어간다.
+ */
+const RETIRED_IMAGES: Record<string, string> = {
+  '/products/daebo.svg': '/products/대보.jpg',
+  '/products/poredan.svg': '/products/포르단.jpg',
+  '/products/okgwang.svg': '/products/옥광.jpg',
+};
+
 function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {
   const now = Date.now();
   const name = data.name ?? '';
   // 예전 문서에 variety/size/weight가 없거나 이름과 어긋나 있어도 이름 기준으로 맞춘다.
   const derived = parseProductName(name);
+
+  const imageUrl = data.imageUrl ?? '';
 
   return {
     id,
@@ -29,7 +44,7 @@ function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {
     size: derived.size,
     weight: derived.weight,
     price: Number(data.price ?? 0),
-    imageUrl: data.imageUrl ?? '',
+    imageUrl: RETIRED_IMAGES[imageUrl] ?? imageUrl,
     stock: Number(data.stock ?? 0),
     hidden: Boolean(data.hidden),
     sortOrder: Number(data.sortOrder ?? 0),

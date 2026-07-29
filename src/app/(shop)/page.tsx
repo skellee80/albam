@@ -159,7 +159,41 @@ export default async function ShopPage() {
           </div>
         )}
 
-        <section className="mt-10 rounded-card bg-burr-tint px-5 py-5">
+        {/*
+          품종 안내와 상자 안내는 **상품 목록 뒤에** 둔다.
+          앞에 두면 밤을 담으러 온 손님이 읽을거리부터 지나가야 한다.
+          담을 것을 고른 뒤 "어떤 밤이지?" "어떻게 오지?" 가 생기는 순서에 맞춘다.
+        */}
+        <section className="mt-10" aria-label="품종 안내">
+          {/* 사진 안에 제목과 설명이 다 들어 있어 옆에 글을 덧붙이지 않는다 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/products/밤품종.png"
+            alt="축파(일반밤) · 포르단 · 옥광 · 대보 네 품종의 특징 안내"
+            className="w-full rounded-card border border-line"
+            loading="lazy"
+          />
+        </section>
+
+        <section className="mt-6 card overflow-hidden" aria-label="포장 안내">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/products/4kg박스.jpg"
+            alt="4kg 전용 상자에 담긴 밤"
+            className="w-full bg-flesh/30 object-contain"
+            loading="lazy"
+          />
+          <div className="px-4 py-3.5">
+            <h2 className="font-display text-[1.05rem] text-shell">이렇게 담아 보내드립니다</h2>
+            <p className="mt-1.5 text-[0.88rem] leading-relaxed text-ink-soft">
+              <b className="text-ink">4kg</b>은 사진의 전용 상자에 담아 보냅니다.
+              <br />
+              <b className="text-ink">10kg</b>은 일반 택배 상자로 보내드립니다.
+            </p>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-card bg-burr-tint px-5 py-5">
           <h2 className="font-display text-[1.1rem] text-burr-deep">주문은 이렇게 진행됩니다</h2>
           <ol className="mt-3 space-y-2.5 text-[0.9rem] leading-relaxed text-ink-soft">
             <li>

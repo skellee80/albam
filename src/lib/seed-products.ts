@@ -25,9 +25,9 @@ const PRICES: Record<string, Record<string, Record<string, number>>> = {
 };
 
 const IMAGES: Record<string, string> = {
-  대보: '/products/daebo.svg',
-  포르단: '/products/poredan.svg',
-  옥광: '/products/okgwang.svg',
+  대보: '/products/대보.jpg',
+  포르단: '/products/포르단.jpg',
+  옥광: '/products/옥광.jpg',
 };
 
 /** 처음 넣을 재고. 관리자 화면에서 바로 바꿀 수 있다. */

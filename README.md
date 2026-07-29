@@ -442,9 +442,8 @@ curl -X POST https://albam--albam-416fd.asia-east1.hosted.app/api/deposit \
 똑같이 맞추면 **관리자 화면을 한 번도 손대지 않고** 사진만 갈린다.
 
 1. 밤 사진을 찍어 컴퓨터로 옮긴다. 정사각형으로 자르고 가로 800px 정도로 줄인다.
-2. 파일 이름을 `daebo.jpg` · `poredan.jpg` · `okgwang.jpg` 로 한다.
-3. `public/products/` 폴더에 넣고, 쓰지 않게 된 `.svg` 세 개는 지운다.
-4. 배포한다.
+2. `public/products/` 폴더에 넣는다. **파일 이름은 한글로 둬도 된다** (`대보.jpg`).
+3. 배포한다.
 
 ```bash
 git add -A public/products
@@ -453,12 +452,29 @@ git push
 npx firebase apphosting:rollouts:create albam -b main --project albam-416fd
 ```
 
-5. 배포가 끝나면 **재고관리 → 자세히 고치기 → 사진** 칸의 주소를
-   `/products/daebo.jpg` 처럼 상품마다 한 번씩 고친다.
+4. 배포가 끝나면 **재고관리 → 자세히 고치기 → 사진** 칸의 주소를
+   `/products/대보.jpg` 처럼 상품마다 한 번씩 고친다.
 
-> 사진 파일 이름을 `daebo.svg` 그대로 두면 5번을 건너뛸 수 있을 것 같지만 **안 된다.**
-> 서버가 확장자를 보고 "이건 그림 도형 파일"이라고 알려주기 때문에, 안이 사진이어도
-> 브라우저가 그리지 못하고 깨진 그림이 나온다. 확장자는 실제 형식과 맞춰야 한다.
+> 파일 이름을 지금 것과 **똑같이** 맞추면 4번을 건너뛸 수 있다.
+> 다만 확장자는 실제 형식과 맞춰야 한다 — 사진(jpg)을 `.svg` 이름으로 두면
+> 서버가 "그림 도형 파일"이라고 알려주기 때문에 브라우저가 그리지 못한다.
+
+> 처음에 들어 있던 임시 밤 그림(`daebo.svg` 등)은 이제 없다.
+> 그 주소를 가리키는 상품이 아직 남아 있어도 읽을 때 실제 사진으로 바꿔 주므로
+> 깨진 그림이 뜨지 않는다(`src/lib/products.ts` 의 `RETIRED_IMAGES`).
+
+### 사진은 작게 넣어야 한다
+
+`public/` 에 넣은 파일은 **줄이지 않고 그대로** 손님 폰으로 내려간다.
+폰 카메라 사진은 한 장에 5~10MB라, 그대로 두면 첫 화면이 열리는 데 몇 초씩 걸린다.
+
+가로 1000px 정도로 줄여서 넣는다. 한 장이 **200KB를 넘지 않게** 하면 넉넉하다.
+
+```bash
+node -e "require('sharp')('원본.png').resize(1000).png({compressionLevel:9,palette:true,colors:128}).toFile('public/products/이름.png')"
+```
+
+(`sharp` 는 Next.js 가 이미 받아 두므로 따로 설치하지 않아도 된다)
 
 #### 인터넷에 올라간 사진 주소를 붙여넣기
 

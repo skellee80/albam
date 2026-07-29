@@ -171,7 +171,7 @@ export function OrderForm({
                   onClick={() => remove(line.productId)}
                   className="text-[0.8rem] text-ink-faint underline underline-offset-2"
                 >
-                  빼기
+                  삭제
                 </button>
               </div>
 

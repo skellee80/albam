@@ -28,7 +28,7 @@ type Draft = Omit<ManagedProduct, 'id'>;
 const EMPTY_DRAFT: Draft = {
   name: '',
   price: 0,
-  imageUrl: '/products/daebo.svg',
+  imageUrl: '/products/대보.jpg',
   stock: 0,
   hidden: false,
   sortOrder: 99,
