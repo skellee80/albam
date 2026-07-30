@@ -23,6 +23,15 @@ runConfig:
 env:
   # 가게 이름은 src/lib/brand.ts 에 있다. 환경변수로 두면 코드와 두 곳에서 어긋난다.
 
+  # 빌드 캐시 깨기.
+  # public/ 에 새로 넣은 파일이 배포에 안 실리는 일이 있었다(코드는 최신인데 파일만 옛것).
+  # 이 값을 바꾸면 빌드 환경이 달라져 캐시를 다시 만든다. 같은 일이 또 나면 숫자를 올린다.
+  - variable: BUILD_CACHE_BUST
+    value: '2'
+    availability:
+      - BUILD
+
+
   # 관리자 공유 비밀번호 (아버지가 쓰는 그 비밀번호)
   - variable: ADMIN_PASSWORD
     secret: albam-admin-password
