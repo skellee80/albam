@@ -43,7 +43,6 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND.short}`,
   },
   description: '칠갑산 석촌에서 키운 유기농 햇 밤을 무통장 입금으로 주문하세요.',
-  manifest: '/pwa/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -51,12 +50,12 @@ export const metadata: Metadata = {
     title: BRAND.short,
   },
   /*
-    PWA 파일은 전부 public/pwa/ 아래에 둔다.
-    **public/ 루트에 두면 App Hosting 배포에서 빠져 404가 난다** — 로컬에서는 멀쩡해서
-    더 안 보인다. public/products/ 처럼 하위 폴더는 정상이라 한 칸 내려 두었다.
-    (애플 아이콘만 Next 파일 규칙 src/app/apple-icon.png 을 쓴다 — 그건 라우트라 영향 없다)
+    파비콘·애플 아이콘·매니페스트는 여기 적지 않는다.
+    src/app/ 의 파일 규칙(icon.svg · apple-icon.png · manifest.ts)이 링크까지 알아서 넣는다.
+
+    public/ 에 두지 않는 이유는 manifest.ts 주석 참고 —
+    배포에서 새 파일이 빠져 404 가 났다.
   */
-  icons: { icon: '/pwa/icon.svg' },
   // 주문 페이지가 검색에 뜰 이유가 없다. 상품 목록만 노출한다.
   robots: { index: true, follow: true },
 };
