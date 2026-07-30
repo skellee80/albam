@@ -43,17 +43,20 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND.short}`,
   },
   description: '칠갑산 석촌에서 키운 유기농 햇 밤을 무통장 입금으로 주문하세요.',
-  manifest: '/manifest.webmanifest',
+  manifest: '/pwa/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     // 홈화면 아이콘 밑에 붙는 글자라 길면 잘린다
     title: BRAND.short,
   },
-  // 파비콘은 public/icon.svg 를 가리킨다.
-  // src/app/icon.svg 로도 두면 Next가 같은 /icon.svg 경로를 두 번 만들어 500이 난다
-  // (conflicting public file and page file). 애플 아이콘만 파일 규칙(src/app/apple-icon.png)을 쓴다.
-  icons: { icon: '/icon.svg' },
+  /*
+    PWA 파일은 전부 public/pwa/ 아래에 둔다.
+    **public/ 루트에 두면 App Hosting 배포에서 빠져 404가 난다** — 로컬에서는 멀쩡해서
+    더 안 보인다. public/products/ 처럼 하위 폴더는 정상이라 한 칸 내려 두었다.
+    (애플 아이콘만 Next 파일 규칙 src/app/apple-icon.png 을 쓴다 — 그건 라우트라 영향 없다)
+  */
+  icons: { icon: '/pwa/icon.svg' },
   // 주문 페이지가 검색에 뜰 이유가 없다. 상품 목록만 노출한다.
   robots: { index: true, follow: true },
 };
