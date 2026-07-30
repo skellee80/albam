@@ -1031,6 +1031,57 @@ async function main() {
   check('없는 그룹이면 아무것도 바꾸지 않는다', none === 0, `${none}개`);
 
   /* ────────────────────────────────────────────── */
+  section('22-6. 그룹 이름 바꾸기');
+
+  const { renameGroup } = await import('../src/lib/products');
+
+  const poredanCount = beforeGroupImage.filter((p) => p.variety === '포르단').length;
+  const renamedCount = await renameGroup('포르단', '청실');
+  check(
+    '그룹 상품 전체의 이름이 바뀐다',
+    renamedCount === poredanCount,
+    `${renamedCount}개 / ${poredanCount}개`,
+  );
+
+  const afterRename = await listProducts({ includeHidden: true });
+  check('포르단이 사라졌다', afterRename.every((p) => p.variety !== '포르단'));
+  check(
+    '청실로 옮겨졌고 크기·무게는 그대로다',
+    afterRename.filter((p) => p.variety === '청실').length === poredanCount &&
+      afterRename.some((p) => p.name === '청실 중 4kg') &&
+      afterRename.some((p) => p.name === '청실 특 10kg'),
+    afterRename
+      .filter((p) => p.variety === '청실')
+      .map((p) => p.name)
+      .join(' / '),
+  );
+
+  // 이미 있는 이름으로 바꾸면 두 그룹이 섞인다. 막혀야 한다.
+  let mergeBlocked = false;
+  try {
+    await renameGroup('청실', '대보');
+  } catch {
+    mergeBlocked = true;
+  }
+  check('이미 있는 그룹 이름으로는 못 바꾼다', mergeBlocked);
+
+  let spaceBlocked = false;
+  try {
+    await renameGroup('청실', '청실 특');
+  } catch {
+    spaceBlocked = true;
+  }
+  check('띄어쓰기가 든 이름은 막힌다', spaceBlocked);
+
+  // 되돌려 놓는다 — 뒤 점검이 시드 이름을 쓴다
+  await renameGroup('청실', '포르단');
+  const restored = await listProducts({ includeHidden: true });
+  check(
+    '되돌리면 원래 이름으로 돌아온다',
+    restored.filter((p) => p.variety === '포르단').length === poredanCount,
+  );
+
+  /* ────────────────────────────────────────────── */
   section('23. 기본 상품 목록 (시드 스크립트가 쓰는 값)');
 
   // 화면의 "기본 상품 넣기" 버튼은 없앴지만 npm run seed 는 이 목록을 그대로 쓴다.

@@ -24,6 +24,7 @@ import {
 import {
   createProduct,
   deleteProduct,
+  renameGroup,
   setGroupImage,
   updateProduct,
   type ProductInput,
@@ -189,6 +190,14 @@ export async function saveProductAction(
 
 export async function deleteProductAction(productId: string): Promise<ActionResult> {
   return run(() => deleteProduct(productId), ['/admin', '/admin/products', '/']);
+}
+
+/** 그룹(품종) 이름을 바꾼다 — 그 그룹 상품들의 이름 앞부분을 전부 갈아 끼운다. */
+export async function renameGroupAction(from: string, to: string): Promise<ActionResult> {
+  return run(async () => {
+    const changed = await renameGroup(from, to);
+    if (changed === 0) throw new Error('바꿀 상품을 찾지 못했습니다.');
+  }, ['/admin', '/admin/products', '/']);
 }
 
 /** 그룹(품종) 사진을 그 그룹의 상품 전체에 한꺼번에 건다. */

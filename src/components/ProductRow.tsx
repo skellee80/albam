@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { formatKRW } from '@/lib/format';
+import { sizeToneOf } from '@/lib/size-tone';
 import { LOW_STOCK_NOTICE_THRESHOLD, stockNotice } from '@/lib/types';
 
 import { useCart } from './CartProvider';
@@ -70,7 +71,14 @@ export function ProductRow({ product }: { product: ShopProduct }) {
         <span className="flex min-w-0 items-baseline gap-2">
           {product.size ? (
             <>
-              <span className="shrink-0 rounded-full bg-flesh/60 px-2 py-0.5 text-[0.82rem] font-bold text-shell">
+              {/*
+                크기는 위 "밤 사이즈" 안내와 **같은 색**을 쓴다 — 초록·갈색·주황 순으로
+                진해져서 글자를 읽기 전에도 어느 쪽이 큰 것인지 눈에 들어온다.
+                한 줄에서 가장 먼저 읽혀야 하는 값이라 무게보다 살짝 크고 굵게 둔다.
+              */}
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.92rem] font-bold ${sizeToneOf(product.size).chip}`}
+              >
                 {product.size}
               </span>
               <span className="text-[1.05rem] font-semibold">

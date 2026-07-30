@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react';
 import {
   deleteProductAction,
   restockProductAction,
+  renameGroupAction,
   saveProductAction,
   setGroupImageAction,
 } from '@/app/admin/actions';
@@ -355,10 +356,30 @@ function GroupHeader({
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
+  /** 이름을 고치는 중인가. 문자열이 들어 있으면 그게 지금 입력된 새 이름. */
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const itemCount = group.sizes.reduce((n, s) => n + s.items.length, 0);
+
+  function rename() {
+    const next = (renaming ?? '').trim();
+    if (!next || next === group.name) {
+      setRenaming(null);
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await renameGroupAction(group.name, next);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setRenaming(null);
+      router.refresh();
+    });
+  }
 
   function choose(url: string) {
     setError(null);
@@ -399,14 +420,59 @@ function GroupHeader({
           <p className="tnum text-[0.78rem] text-ink-soft">{itemCount}가지</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setPicking((v) => !v)}
-          className="shrink-0 rounded-full border border-shell/25 bg-surface px-3.5 py-2 text-[0.82rem] font-semibold text-shell"
-        >
-          {picking ? '닫기' : '사진 바꾸기'}
-        </button>
+        <div className="flex shrink-0 gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setRenaming(renaming === null ? group.name : null);
+            }}
+            className="rounded-full border border-shell/25 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-shell"
+          >
+            {renaming === null ? '이름' : '닫기'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPicking((v) => !v)}
+            className="rounded-full border border-shell/25 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-shell"
+          >
+            {picking ? '닫기' : '사진'}
+          </button>
+        </div>
       </div>
+
+      {/*
+        이름을 바꾸면 이 그룹 상품들의 이름 앞부분이 전부 갈아 끼워진다
+        ("대보 중 4kg" → "청실 중 4kg"). 그룹을 따로 저장하지 않기 때문이다.
+      */}
+      {renaming !== null && (
+        <div className="border-t border-shell/15 px-4 pt-3 pb-4">
+          <p className="text-[0.82rem] leading-snug text-ink-soft">
+            이 그룹 상품 <b>{itemCount}가지</b>의 이름이 함께 바뀝니다. 지난 주문에 남은
+            이름은 그대로 둡니다.
+          </p>
+          <div className="mt-2.5 flex gap-2">
+            <input
+              className="field flex-1"
+              value={renaming}
+              onChange={(e) => setRenaming(e.target.value)}
+              placeholder="예: 청실"
+              aria-label={`${group.name} 그룹의 새 이름`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') rename();
+              }}
+            />
+            <button
+              type="button"
+              onClick={rename}
+              disabled={pending}
+              className="btn btn-primary shrink-0 px-5"
+            >
+              {pending ? '바꾸는 중…' : '바꾸기'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {picking && (
         <div className="border-t border-shell/15 px-4 pt-3 pb-4">
@@ -599,7 +665,15 @@ function ProductCard({ product, label }: { product: ManagedProduct; label?: stri
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[1.08rem] font-bold">
+          <p className="flex items-center gap-2 text-[1.08rem] font-bold">
+            {/*
+              순번(sortOrder)을 앞에 보여준다. 손님 화면이 이 숫자 순으로 늘어서므로,
+              순서를 옮기려면 지금 몇 번인지 먼저 알아야 한다.
+              "자세히 고치기" 안의 순서 칸에 넣을 값과 같은 숫자다.
+            */}
+            <span className="tnum shrink-0 rounded-md bg-line px-1.5 py-0.5 text-[0.72rem] font-bold text-ink-soft">
+              {product.sortOrder}
+            </span>
             {/* 크기 묶음 안에서는 무게만 — "대보 중" 이 줄마다 반복되지 않게 */}
             {label ?? product.name}
             {product.hidden && (

@@ -2,22 +2,13 @@ import { CartBar } from '@/components/CartBar';
 import { ProductGroup } from '@/components/ProductGroup';
 import { type ShopProduct } from '@/components/ProductRow';
 import { SiteHeader } from '@/components/SiteHeader';
+import { SizeGuide } from '@/components/SizeGuide';
 import { expireStaleOrders } from '@/lib/orders';
 import { listProducts } from '@/lib/products';
-import { PAYMENT_DEADLINE_HOURS, SIZE_GUIDE, type Product } from '@/lib/types';
+import { PAYMENT_DEADLINE_HOURS, type Product } from '@/lib/types';
 
 // 재고와 가격이 바로 반영되어야 하므로 캐시하지 않는다.
 export const dynamic = 'force-dynamic';
-
-/**
- * 크기 등급별 색.
- * 실속(초록) → 선물(밤색) → 최상급(주황)으로 올라가, 글을 읽기 전에도 순서가 보인다.
- */
-const SIZE_TONE = {
-  burr: { chip: 'bg-burr text-white', label: 'text-burr-deep' },
-  shell: { chip: 'bg-shell text-white', label: 'text-shell' },
-  amber: { chip: 'bg-amber text-white', label: 'text-amber' },
-} as const;
 
 /**
  * 품종(그룹)으로만 묶는다.
@@ -73,39 +64,10 @@ export default async function ShopPage() {
         </p>
 
         {/*
-          크기 안내는 여기서 한 번만 한다.
-          중·대·특이 모든 묶음에서 똑같이 반복되므로, 상품마다 붙이면 같은 문장을
-          열여덟 번 읽게 된다.
-
-          한 크기당 한 줄만 쓴다. 예전에는 이름표와 설명을 위아래로 쌓아 세 크기가
-          여섯 줄을 차지했고, 정작 팔 상품이 첫 화면에서 밀려났다.
+          크기 안내. 이 카드가 관리자 화면으로 들어가는 숨은 문이기도 해서
+          클라이언트 컴포넌트로 빼 두었다 (SizeGuide 주석 참고).
         */}
-        <section className="mt-5 overflow-hidden rounded-card border border-line bg-surface">
-          <h2 className="bg-flesh/45 px-4 py-2.5 text-center font-display text-[1rem] text-shell">
-            밤 사이즈
-          </h2>
-          <dl className="divide-y divide-line/70">
-            {SIZE_GUIDE.map((guide) => (
-              <div key={guide.size} className="flex items-center gap-2.5 px-4 py-2.5">
-                <dt
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.8rem] font-bold ${SIZE_TONE[guide.tone].chip}`}
-                >
-                  {guide.size}
-                </dt>
-                {/* 이름표와 설명을 같은 색으로 두고 굵기로만 나눈다 — 한 줄이 한 등급이라는 게 보인다 */}
-                <dd
-                  className={`min-w-0 flex-1 text-[0.83rem] leading-snug ${SIZE_TONE[guide.tone].label}`}
-                >
-                  <b>{guide.tag}</b>
-                  <span aria-hidden="true" className="px-1 opacity-70">
-                    →
-                  </span>
-                  <span className="font-normal">{guide.note}</span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        <SizeGuide />
 
         {groups.length === 0 ? (
           <p className="mt-10 rounded-card border border-dashed border-line px-5 py-10 text-center text-ink-soft">
@@ -153,6 +115,43 @@ export default async function ShopPage() {
             className="w-full rounded-card border border-line"
             loading="lazy"
           />
+        </section>
+
+        {/*
+          보관 안내는 품종 사진 바로 아래에 둔다.
+          "이 밤이 어떤 밤인가"를 읽은 다음 곧바로 "그러니 이렇게 두셔야 한다"가 와야
+          한 이야기로 읽힌다. 받자마자 실온에 두면 며칠 만에 상하는데, 그건 밤이
+          나빠서가 아니라 살아 있는 것이어서다 — 그 말을 먼저 해준다.
+        */}
+        <section className="mt-4 rounded-card border border-burr/25 bg-burr-tint px-5 py-4">
+          <h2 className="font-display text-[1.05rem] text-burr-deep">받으시면 바로 냉장고에</h2>
+
+          <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-soft">
+            <b className="text-ink">수확한 밤은 살아 있는 생물입니다.</b> 받으신 즉시{' '}
+            <b className="text-ink">김치냉장고에 보관해 주세요.</b> 실온에 두면 며칠 만에
+            벌레가 생기거나 마릅니다.
+          </p>
+
+          <dl className="mt-3 space-y-2 border-t border-burr/20 pt-3 text-[0.87rem] leading-snug">
+            <div className="flex gap-2.5">
+              <dt className="w-[4.5rem] shrink-0 font-bold text-burr-deep">가장 좋게</dt>
+              <dd className="min-w-0 flex-1 text-ink-soft">
+                신문지나 종이봉투에 싸서 김치냉장고에 — 0~1℃에서 단맛이 더 오릅니다
+              </dd>
+            </div>
+            <div className="flex gap-2.5">
+              <dt className="w-[4.5rem] shrink-0 font-bold text-burr-deep">없으시면</dt>
+              <dd className="min-w-0 flex-1 text-ink-soft">
+                일반 냉장고 야채칸에. 비닐봉지는 입구를 열어 두세요 — 밤도 숨을 쉽니다
+              </dd>
+            </div>
+            <div className="flex gap-2.5">
+              <dt className="w-[4.5rem] shrink-0 font-bold text-burr-deep">오래 두려면</dt>
+              <dd className="min-w-0 flex-1 text-ink-soft">
+                껍질을 까서 냉동실에. 구울 때는 그대로 꺼내 쓰시면 됩니다
+              </dd>
+            </div>
+          </dl>
         </section>
 
         {/*

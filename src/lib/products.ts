@@ -122,6 +122,58 @@ export async function deleteProduct(id: string): Promise<void> {
  *
  * @returns 바뀐 상품 수
  */
+/**
+ * 그룹(품종) 이름을 바꾼다.
+ *
+ * 그룹은 따로 저장하지 않고 상품 이름 맨 앞 낱말에서 읽으므로, 이름을 바꾸려면
+ * **그 그룹 상품들의 이름을 전부 고쳐야** 한다. "대보 중 4kg" → "청실 중 4kg".
+ *
+ * 지난 주문에 남은 상품명은 건드리지 않는다. 그때 팔린 것은 그때 이름으로
+ * 남아 있어야 아버지가 옛 주문을 보고 무엇을 보냈는지 알 수 있다.
+ *
+ * @returns 바뀐 상품 수
+ */
+export async function renameGroup(from: string, to: string): Promise<number> {
+  const oldName = from.trim();
+  const newName = to.trim();
+
+  if (!oldName || !newName) throw new Error('그룹 이름을 입력해 주세요.');
+  if (newName.includes(' ')) throw new Error('그룹 이름은 띄어쓰기 없이 한 낱말로 넣어 주세요.');
+  if (oldName === newName) return 0;
+
+  const snap = await db.collection(COL.products).get();
+
+  // 바꾸려는 이름이 이미 있으면 두 그룹이 섞인다. 미리 막는다.
+  const taken = snap.docs.some((doc) => {
+    const name = String(doc.data().name ?? '');
+    return (parseProductName(name).variety || name) === newName;
+  });
+  if (taken) throw new Error(`"${newName}" 그룹이 이미 있습니다.`);
+
+  const targets = snap.docs.filter((doc) => {
+    const name = String(doc.data().name ?? '');
+    return (parseProductName(name).variety || name) === oldName;
+  });
+  if (targets.length === 0) return 0;
+
+  const now = Date.now();
+  const batch = db.batch();
+  for (const doc of targets) {
+    const name = String(doc.data().name ?? '');
+    // 맨 앞 낱말만 갈아 끼운다. 뒤의 크기·무게는 그대로 둔다.
+    const rest = name.slice(oldName.length);
+    const renamed = `${newName}${rest}`;
+    batch.update(doc.ref, {
+      name: renamed,
+      ...parseProductName(renamed),
+      updatedAt: now,
+    });
+  }
+  await batch.commit();
+
+  return targets.length;
+}
+
 export async function setGroupImage(group: string, imageUrl: string): Promise<number> {
   const snap = await db.collection(COL.products).get();
 
