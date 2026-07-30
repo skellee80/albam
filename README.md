@@ -867,6 +867,35 @@ npx firebase apphosting:secrets:describe albam-admin-password --project albam-41
 
 ---
 
+### ⚠️ public/ 에 새 파일을 넣어도 배포에 안 실린다
+
+**App Hosting 에서 겪은 함정이다.** 로컬(`npm run dev`)에서는 멀쩡히 200 인데
+배포된 사이트에서만 404 가 난다. 코드는 최신으로 잘 올라간다 — 파일만 옛 상태다.
+
+실제로 확인한 것:
+
+| 파일 | 결과 |
+|---|---|
+| `public/products/대보.webp` (예전에 올라간 것) | 200 |
+| `public/health.txt` (새로 넣은 것) | **404** |
+| `public/pwa/*` (새로 옮긴 것) | **404** |
+| `src/app/apple-icon.png` (라우트) | 200 |
+
+하위 폴더로 옮겨도, 빌드 캐시를 깨도(`BUILD_CACHE_BUST`) 그대로였다.
+롤아웃을 세 번 돌려도 같았다.
+
+**그래서 매니페스트와 아이콘은 `public/` 을 안 쓴다.**
+
+- `src/app/manifest.ts` → `/manifest.webmanifest` (라우트)
+- `src/app/icon.svg` · `src/app/apple-icon.png` (파일 규칙)
+- 아이콘 PNG 는 `src/assets/` 에서 **import** → `/_next/static/media/…` 로 번들에 들어간다
+
+`_next/static` 은 빌드마다 새로 만들어지므로 확실히 실린다(글꼴·자바스크립트가 그 길로 나온다).
+
+> **상품 사진은 아직 `public/products/` 에 있다.** 이미 올라간 것은 잘 나오지만
+> **새 사진을 넣고 배포했는데 손님 화면에서 안 보이면 이 문제다.**
+> 그때는 사진도 `src/assets/` 로 옮기고 코드에서 import 하는 쪽으로 바꿔야 한다.
+
 ## 7. 구조
 
 ```
