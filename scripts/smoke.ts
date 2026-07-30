@@ -155,6 +155,7 @@ async function main() {
   });
   check('금액·이름이 맞으면 확정된다', exact.status === '확정', exact.message);
   check('확정 응답에 상품 요약이 들어간다', exact.message.includes(DAEBO_MID_NAME), exact.message);
+  check('확정 문구가 "발송확정" 이다', exact.message.startsWith('✅ 발송확정:'), exact.message);
 
   const confirmedOrder = await getOrder(created.orderId);
   check('주문이 발송대기로 넘어간다', confirmedOrder?.status === '발송대기', confirmedOrder?.status);
@@ -210,6 +211,37 @@ async function main() {
     bankName: accountBank,
   });
   check('맞는 주문이 없으면 미매칭이 된다', wrongAmount.status === '미매칭', wrongAmount.message);
+
+  /*
+    미매칭은 관리자 화면 **맨 위 빨간 영역에 올라오지 않는다.**
+    아버지 개인 계좌라 가족 송금·다른 거래 문자가 섞여 들어오는데, 그것까지 위에
+    쌓이면 정작 급한 확인필요가 묻힌다. 맨 아래 접이식 목록으로만 보인다.
+  */
+  const { listDepositsNeedingChoice, listUnmatchedDeposits } = await import(
+    '../src/lib/deposits'
+  );
+
+  const needChoice = await listDepositsNeedingChoice();
+  const unmatchedList = await listUnmatchedDeposits();
+
+  check(
+    '빨간 영역에는 확인필요만 올라온다',
+    needChoice.every((d) => d.status === '확인필요'),
+    needChoice.map((d) => d.status).join(', '),
+  );
+  check(
+    '미매칭은 빨간 영역에 없다',
+    needChoice.every((d) => d.status !== '미매칭'),
+  );
+  check(
+    '미매칭은 아래 목록에 담긴다',
+    unmatchedList.some((d) => d.depositorName === '박영희'),
+    unmatchedList.map((d) => d.depositorName).join(', '),
+  );
+  check(
+    '아래 목록은 최신순이다',
+    unmatchedList.every((d, i) => i === 0 || unmatchedList[i - 1].receivedAt >= d.receivedAt),
+  );
 
   /* ────────────────────────────────────────────── */
   section('6. 재고 복원 — 정확히 한 번만');

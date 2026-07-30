@@ -213,9 +213,6 @@ export interface Order {
 export const DEPOSIT_STATUSES = ['확정', '확인필요', '미매칭', '무시'] as const;
 export type DepositStatus = (typeof DEPOSIT_STATUSES)[number];
 
-/** 관리자가 아직 손대야 하는 입금 */
-export const UNRESOLVED_DEPOSIT_STATUSES: readonly DepositStatus[] = ['확인필요', '미매칭'];
-
 /**
  * MacroDroid가 보낸 입금 1건.
  * 매칭에 실패한 건도 반드시 남긴다 — 나중에 추적할 유일한 단서다.

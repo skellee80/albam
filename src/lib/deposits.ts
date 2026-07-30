@@ -7,7 +7,6 @@ import { formatKRW, normalizeName, summarizeItems } from './format';
 import { getSettings } from './settings';
 import { detectBank } from './sms';
 import {
-  UNRESOLVED_DEPOSIT_STATUSES,
   type Deposit,
   type DepositStatus,
   type OrderStatus,
@@ -149,7 +148,7 @@ function decide(candidates: Candidate[], depositorName: string, amount: number):
     const only = candidates[0];
     return {
       status: '확정',
-      message: `✅ 확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${only.itemsSummary ? ` (${only.itemsSummary})` : ''}`,
+      message: `✅ 발송확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${only.itemsSummary ? ` (${only.itemsSummary})` : ''}`,
       matchedOrderId: only.id,
       candidateOrderIds,
     };
@@ -451,11 +450,38 @@ export async function ignoreDeposit(depositId: string): Promise<void> {
   });
 }
 
-/** 관리자 대시보드 최상단에 띄울 미해결 입금 (확인필요 / 미매칭) */
-export async function listUnresolvedDeposits(limit = 50): Promise<Deposit[]> {
+/**
+ * 관리자 화면 **맨 위 빨간 영역**에 띄울 입금 — `확인필요` 뿐이다.
+ *
+ * 같은 이름·같은 금액의 입금대기 주문이 여러 건이라 사람이 하나를 골라야 하는 건이다.
+ * 아버지가 지금 손대야 하는 일이 맞다.
+ *
+ * `미매칭` 은 여기 넣지 않는다. 아버지 개인 계좌라 가족 송금·다른 거래 문자가 섞여
+ * 들어오는데, 그것까지 맨 위 빨간 영역에 쌓이면 정작 급한 확인필요가 묻힌다.
+ * 아래 listUnmatchedDeposits 참고.
+ */
+export async function listDepositsNeedingChoice(limit = 50): Promise<Deposit[]> {
   const snap = await db
     .collection(COL.deposits)
-    .where('status', 'in', [...UNRESOLVED_DEPOSIT_STATUSES])
+    .where('status', '==', '확인필요' satisfies DepositStatus)
+    .orderBy('receivedAt', 'desc')
+    .limit(limit)
+    .get();
+  return snap.docs.map((d) => mapDeposit(d.id, d.data()));
+}
+
+/**
+ * 어느 주문에도 붙지 않은 문자 — `미매칭`.
+ *
+ * 우리 주문과 상관없는 입금(가족 송금 등)과, 서버가 읽지 못한 문자가 함께 들어온다.
+ * **참고용이다.** 관리자 화면 맨 아래에 접어 두고, 궁금할 때만 펴 본다.
+ *
+ * 최신순으로 준다 — 방금 온 문자를 찾으려고 아래까지 내려갈 이유가 없다.
+ */
+export async function listUnmatchedDeposits(limit = 50): Promise<Deposit[]> {
+  const snap = await db
+    .collection(COL.deposits)
+    .where('status', '==', '미매칭' satisfies DepositStatus)
     .orderBy('receivedAt', 'desc')
     .limit(limit)
     .get();

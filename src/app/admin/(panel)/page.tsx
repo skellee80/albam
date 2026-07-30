@@ -6,7 +6,8 @@ import {
   type CandidateOrder,
 } from '@/components/admin/DepositAlerts';
 import { ShipQueue, type ShipItem } from '@/components/admin/ShipQueue';
-import { banksMatch, listUnresolvedDeposits } from '@/lib/deposits';
+import { UnmatchedTexts, type UnmatchedText } from '@/components/admin/UnmatchedTexts';
+import { banksMatch, listDepositsNeedingChoice, listUnmatchedDeposits } from '@/lib/deposits';
 import { summarizeItems } from '@/lib/format';
 import { expireStaleOrders, getOrders, listOrders } from '@/lib/orders';
 import { isSoldOut, listProducts } from '@/lib/products';
@@ -32,8 +33,9 @@ export default async function AdminDashboardPage() {
   // 아버지가 이 화면을 여는 순간의 목록이 정확해야 하므로 먼저 정리한다
   await expireStaleOrders();
 
-  const [deposits, orders, products, settings] = await Promise.all([
-    listUnresolvedDeposits(),
+  const [deposits, unmatched, orders, products, settings] = await Promise.all([
+    listDepositsNeedingChoice(),
+    listUnmatchedDeposits(),
     listOrders({ limit: 1000 }),
     listProducts({ includeHidden: true }),
     getSettings(),
@@ -76,6 +78,15 @@ export default async function AdminDashboardPage() {
 
   const soldOut = products.filter((p) => !p.hidden && isSoldOut(p));
 
+  const unmatchedTexts: UnmatchedText[] = unmatched.map((d) => ({
+    id: d.id,
+    amount: d.amount,
+    depositorName: d.depositorName,
+    bankName: d.bankName,
+    rawText: d.rawText,
+    receivedAt: d.receivedAt,
+  }));
+
   return (
     <div className="space-y-6">
       {/* 1. 가장 급한 것 — 돈은 들어왔는데 주문이 안 움직이는 건 */}
@@ -116,6 +127,12 @@ export default async function AdminDashboardPage() {
         매출은 위 메뉴의 판매현황에서 본다.
       */}
       <ShipQueue orders={shipQueue} />
+
+      {/*
+        4. 맨 아래 — 어느 주문에도 붙지 않은 문자. 접혀 있고 참고용이다.
+        여기 있는 건 아버지가 할 일이 없는 문자라 폰 알림도 보내지 않는다.
+      */}
+      <UnmatchedTexts texts={unmatchedTexts} />
     </div>
   );
 }

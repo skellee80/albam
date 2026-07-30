@@ -31,6 +31,23 @@ function plain(body: string, status = 200) {
   });
 }
 
+/**
+ * 알릴 것이 없을 때 — **빈 본문**으로 답한다.
+ *
+ * 우리 주문과 상관없는 입금(가족 송금 등)이나 읽지 못한 문자는 아버지가 할 일이 없다.
+ * 그때마다 폰이 울리면 정작 봐야 하는 알림을 무시하게 된다.
+ * 기록은 남으니 관리자 화면 맨 아래에서 참고로 볼 수 있다.
+ *
+ * MacroDroid 쪽에서는 알림 동작에 "response 가 비어 있지 않을 때"라는 제약을 걸면
+ * 빈 알림도 뜨지 않는다.
+ */
+function silent() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: { 'cache-control': 'no-store' },
+  });
+}
+
 function timingSafeCompare(a: string, b: string): boolean {
   const ha = crypto.createHash('sha256').update(a).digest();
   const hb = crypto.createHash('sha256').update(b).digest();
@@ -108,6 +125,8 @@ async function handle(request: NextRequest) {
 
   try {
     const result = await recordDeposit({ amount, depositorName, bankName });
+    // 어느 주문에도 안 붙은 건은 알리지 않는다 (silent 주석 참고)
+    if (result.status === '미매칭') return silent();
     // 판정 결과와 무관하게 200으로 답한다.
     // 오류 코드를 주면 MacroDroid가 재시도를 반복하면서 알림만 계속 울린다.
     return plain(result.message);
@@ -133,7 +152,8 @@ async function handleRawSms(rawText: string) {
     } catch (err) {
       console.error('[deposit] 해석 실패 기록 실패', err);
     }
-    return plain(`❓ 문자를 읽지 못했습니다: ${parsed.reason} 관리자에서 확인하세요.`);
+    // 읽지 못한 문자도 알리지 않는다 — 출금 문자·광고가 대부분이다
+    return silent();
   }
 
   try {
@@ -143,6 +163,7 @@ async function handleRawSms(rawText: string) {
       bankName: parsed.bankName,
       rawText,
     });
+    if (result.status === '미매칭') return silent();
     return plain(result.message);
   } catch (err) {
     console.error('[deposit]', err);
