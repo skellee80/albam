@@ -210,7 +210,58 @@ async function main() {
     depositorName: '박영희',
     bankName: accountBank,
   });
-  check('맞는 주문이 없으면 미매칭이 된다', wrongAmount.status === '미매칭', wrongAmount.message);
+  check('이름도 금액도 다르면 미매칭이 된다', wrongAmount.status === '미매칭', wrongAmount.message);
+
+  /* ────────────────────────────────────────────── */
+  section('5-1. 한쪽만 맞아도 확인필요로 올린다');
+
+  /*
+    손님이 이름을 조금 다르게 적었거나(김철수 ↔ 김철수님) 금액을 잘못 보낸 경우가
+    실제로 있다. 미매칭으로 묻어 두면 돈은 들어왔는데 아무도 모르는 상태가 된다.
+    지금 입금대기 주문: 김철수 x2 (각 daeboMid.price)
+  */
+  const nameOnly = await recordDeposit({
+    amount: daeboMid.price + 7,   // 금액은 어디에도 없는 값
+    depositorName: '김철수',       // 이름은 맞다
+    bankName: accountBank,
+  });
+  check('이름만 맞아도 확인필요', nameOnly.status === '확인필요', nameOnly.message);
+  check(
+    '문구가 한쪽만 맞았다고 알려준다',
+    nameOnly.message.includes('이름 또는 금액만'),
+    nameOnly.message,
+  );
+
+  const amountOnly = await recordDeposit({
+    amount: daeboMid.price,        // 금액은 맞다
+    depositorName: '전혀다른사람',   // 이름은 어디에도 없다
+    bankName: accountBank,
+  });
+  check('금액만 맞아도 확인필요', amountOnly.status === '확인필요', amountOnly.message);
+
+  // 확인필요는 폰으로도 알려야 한다 — 미매칭과 달리 사람이 손대야 하는 건이다
+  check('확인필요는 응답 문구가 비어 있지 않다', amountOnly.message.trim().length > 0);
+
+  // 한쪽만 맞은 건도 후보 주문을 달고 올라와야 관리자 화면에서 고를 수 있다
+  const { listDeposits: allDeposits } = await import('../src/lib/deposits');
+  const partialRecord = (await allDeposits(10)).find((d) => d.depositorName === '전혀다른사람');
+  check(
+    '후보 주문이 함께 담긴다',
+    (partialRecord?.candidateOrderIds.length ?? 0) > 0,
+    `${partialRecord?.candidateOrderIds.length ?? 0}건`,
+  );
+
+  // 정확히 맞는 주문이 있으면 예전처럼 곧바로 확정이다 (부분 매칭이 끼어들지 않는다)
+  const stillExact = await recordDeposit({
+    amount: daeboMid.price,
+    depositorName: '김철수',
+    bankName: accountBank,
+  });
+  check(
+    '이름·금액이 둘 다 맞으면 부분 매칭이 끼어들지 않는다',
+    stillExact.status === '확인필요' && stillExact.message.includes('후보 2건'),
+    stillExact.message,
+  );
 
   /*
     미매칭은 관리자 화면 **맨 위 빨간 영역에 올라오지 않는다.**
@@ -549,13 +600,27 @@ async function main() {
   if (!twoOrdersA.ok || !twoOrdersB.ok) throw new Error('이후 검증 불가');
   check('두 주문이 합쳐지지 않는다', twoOrdersA.orderId !== twoOrdersB.orderId);
 
-  // 합산 금액을 한 번에 보내면 어느 주문과도 맞지 않는다 → 미매칭
+  /*
+    합산 금액을 한 번에 보내면 어느 주문과도 금액이 맞지 않는다.
+    이름은 맞으므로 **확인필요**로 올라간다(한쪽만 맞아도 사람이 보게 하는 규칙).
+    여기서 지켜야 하는 것은 "어느 주문도 저절로 발송대기가 되지 않는다" 이다 —
+    두 건 값을 한 번에 받았는데 한 건만 확정되면 나머지 한 건을 그냥 부치게 된다.
+  */
   const lumpSum = await recordDeposit({
     amount: twoOrdersA.totalAmount + twoOrdersB.totalAmount,
     depositorName: '두건주문',
     bankName: accountBank,
   });
-  check('합산 입금은 미매칭이 된다', lumpSum.status === '미매칭', lumpSum.message);
+  check('합산 입금은 자동 확정되지 않는다', lumpSum.status !== '확정', lumpSum.message);
+  check('합산 입금은 확인필요로 올라온다', lumpSum.status === '확인필요', lumpSum.message);
+
+  const lumpA = await getOrder(twoOrdersA.orderId);
+  const lumpB = await getOrder(twoOrdersB.orderId);
+  check(
+    '두 주문 다 입금대기 그대로다',
+    lumpA?.status === '입금대기' && lumpB?.status === '입금대기',
+    `${lumpA?.status} / ${lumpB?.status}`,
+  );
 
   const stillA = await getOrder(twoOrdersA.orderId);
   const stillB = await getOrder(twoOrdersB.orderId);

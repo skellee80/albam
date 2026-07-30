@@ -140,26 +140,44 @@ type Decision = {
  *
  * 실제 처리(recordDeposit)와 미리보기(previewDeposit)가 **같은 함수**를 쓴다.
  * 판정 규칙이 두 벌이면 미리보기가 거짓말을 하게 되고, 그러면 테스트가 무의미해진다.
+ *
+ * | 이름 | 금액 | 결과 |
+ * |---|---|---|
+ * | 맞음 | 맞음 | 1건이면 **확정**, 여러 건이면 **확인필요**(동명이인) |
+ * | 맞음 | 다름 | **확인필요** |
+ * | 다름 | 맞음 | **확인필요** |
+ * | 다름 | 다름 | **미매칭** |
+ *
+ * **한쪽만 맞아도 확인필요로 올리는 이유**: 손님이 이름을 조금 다르게 적었거나
+ * (`김지수` ↔ `김지수님`) 금액을 잘못 보낸 경우가 실제로 있다. 그걸 미매칭으로
+ * 묻어 두면 돈은 들어왔는데 아무도 모르는 상태가 된다. 사람이 한 번 보면 될 일이다.
  */
-function decide(candidates: Candidate[], depositorName: string, amount: number): Decision {
-  const candidateOrderIds = candidates.map((c) => c.id);
-
-  if (candidates.length === 1) {
-    const only = candidates[0];
+function decide(exact: Candidate[], partial: Candidate[], depositorName: string, amount: number): Decision {
+  if (exact.length === 1) {
+    const only = exact[0];
     return {
       status: '확정',
       message: `✅ 발송확정: ${depositorName}님 ${formatKRW(amount)} → 발송대기${only.itemsSummary ? ` (${only.itemsSummary})` : ''}`,
       matchedOrderId: only.id,
-      candidateOrderIds,
+      candidateOrderIds: exact.map((c) => c.id),
     };
   }
 
-  if (candidates.length > 1) {
+  if (exact.length > 1) {
     return {
       status: '확인필요',
-      message: `⚠️ 확인필요: ${depositorName} ${formatKRW(amount)}, 후보 ${candidates.length}건. 관리자에서 선택하세요.`,
+      message: `⚠️ 확인필요: ${depositorName} ${formatKRW(amount)}, 후보 ${exact.length}건. 관리자에서 선택하세요.`,
       matchedOrderId: null,
-      candidateOrderIds,
+      candidateOrderIds: exact.map((c) => c.id),
+    };
+  }
+
+  if (partial.length > 0) {
+    return {
+      status: '확인필요',
+      message: `⚠️ 확인필요: ${depositorName} ${formatKRW(amount)} — 이름 또는 금액만 맞는 주문 ${partial.length}건. 관리자에서 확인하세요.`,
+      matchedOrderId: null,
+      candidateOrderIds: partial.map((c) => c.id),
     };
   }
 
@@ -167,7 +185,7 @@ function decide(candidates: Candidate[], depositorName: string, amount: number):
     status: '미매칭',
     message: `❓ 미매칭: ${depositorName} ${formatKRW(amount)}. 관리자에서 확인하세요.`,
     matchedOrderId: null,
-    candidateOrderIds,
+    candidateOrderIds: [],
   };
 }
 
@@ -200,6 +218,44 @@ function matchQuery(nameNorm: string, amount: number) {
     .where('totalAmount', '==', amount);
 }
 
+/**
+ * 한쪽만 맞는 입금대기 주문 — 이름만 맞거나, 금액만 맞거나.
+ *
+ * 정확히 맞는 주문이 없을 때만 찾아본다. 사람이 한 번 보라고 올리는 용도라
+ * 넉넉히 잡을 필요가 없어 각각 스무 건까지만 본다
+ * (입금대기 주문이 스무 건 넘게 쌓여 있으면 그것부터 볼 일이다).
+ */
+const PARTIAL_MATCH_LIMIT = 20;
+
+function nameOnlyQuery(nameNorm: string) {
+  return db
+    .collection(COL.orders)
+    .where('status', '==', '입금대기')
+    .where('depositorNameNorm', '==', nameNorm)
+    .limit(PARTIAL_MATCH_LIMIT);
+}
+
+function amountOnlyQuery(amount: number) {
+  return db
+    .collection(COL.orders)
+    .where('status', '==', '입금대기')
+    .where('totalAmount', '==', amount)
+    .limit(PARTIAL_MATCH_LIMIT);
+}
+
+/** 이름 질의와 금액 질의 결과를 합친다. 둘 다 걸린 주문이 두 번 나오지 않게 id 로 묶는다. */
+function mergeDocs(
+  ...groups: FirebaseFirestore.QueryDocumentSnapshot[][]
+): FirebaseFirestore.QueryDocumentSnapshot[] {
+  const byId = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+  for (const docs of groups) {
+    for (const doc of docs) {
+      if (!doc.data().deleted) byId.set(doc.id, doc);
+    }
+  }
+  return [...byId.values()];
+}
+
 function toCandidate(doc: FirebaseFirestore.QueryDocumentSnapshot): Candidate {
   const data = doc.data();
   return {
@@ -211,10 +267,11 @@ function toCandidate(doc: FirebaseFirestore.QueryDocumentSnapshot): Candidate {
 /**
  * MacroDroid가 보낸 입금 1건을 기록하고 주문과 매칭한다.
  *
- * 매칭 조건은 **입금자명과 금액이 둘 다 정확히 일치**하는 입금대기 주문.
+ * 이름과 금액이 **둘 다** 맞는 입금대기 주문을 먼저 찾는다.
  *   1건  → 발송대기로 확정
  *   여러 건 → 확인필요 (동명이인, 관리자가 후보 중 선택)
- *   0건  → 미매칭 (관리자가 수동 연결)
+ *   0건  → 이름만 또는 금액만 맞는 주문을 찾아 **확인필요**로 올린다
+ *          그것도 없으면 미매칭
  *
  * 매칭에 실패해도 반드시 기록을 남긴다. 나중에 추적할 유일한 단서다.
  */
@@ -262,9 +319,20 @@ export async function recordDeposit(input: DepositInput): Promise<DepositResult>
       ? (await t.get(matchQuery(nameNorm, amount))).docs.filter((d) => !d.data().deleted)
       : [];
 
+    /*
+      정확히 맞는 주문이 없을 때만 한쪽만 맞는 주문을 찾아본다.
+      트랜잭션은 읽기를 모두 쓰기보다 먼저 해야 하므로 여기서 마친다.
+    */
+    let partial: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    if (sameBank && matched.length === 0) {
+      const byName = await t.get(nameOnlyQuery(nameNorm));
+      const byAmount = await t.get(amountOnlyQuery(amount));
+      partial = mergeDocs(byName.docs, byAmount.docs);
+    }
+
     // ── 판정 ──
     const decision = sameBank
-      ? decide(matched.map(toCandidate), depositorName, amount)
+      ? decide(matched.map(toCandidate), partial.map(toCandidate), depositorName, amount)
       : otherBankDecision(depositorName, amount, bankName, accountBank);
 
     // ── 쓰기 ──
@@ -387,10 +455,24 @@ export async function previewDeposit(input: DepositInput): Promise<DepositPrevie
   }
 
   const sameBank = banksMatch(bankName, settings.bankName);
-  const matched = sameBank ? candidateSnap.docs.filter((d) => !d.data().deleted) : [];
+  const exact = sameBank ? candidateSnap.docs.filter((d) => !d.data().deleted) : [];
+
+  // 정확히 맞는 주문이 없으면 한쪽만 맞는 주문도 찾아본다 (recordDeposit 과 같은 규칙)
+  let partial: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  if (sameBank && exact.length === 0) {
+    const [byName, byAmount] = await Promise.all([
+      nameOnlyQuery(nameNorm).get(),
+      amountOnlyQuery(amount).get(),
+    ]);
+    partial = mergeDocs(byName.docs, byAmount.docs);
+  }
+
   const decision = sameBank
-    ? decide(matched.map(toCandidate), depositorName, amount)
+    ? decide(exact.map(toCandidate), partial.map(toCandidate), depositorName, amount)
     : otherBankDecision(depositorName, amount, bankName, settings.bankName);
+
+  // 화면에 보여줄 후보는 판정이 고른 쪽이다
+  const matched = exact.length > 0 ? exact : partial;
 
   return {
     ok: true,
