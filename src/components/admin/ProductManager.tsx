@@ -6,6 +6,8 @@ import { useState, useTransition } from 'react';
 import {
   deleteProductAction,
   restockProductAction,
+  moveGroupAction,
+  moveProductAction,
   renameGroupAction,
   saveProductAction,
   setGroupImageAction,
@@ -21,10 +23,12 @@ export type ManagedProduct = {
   imageUrl: string;
   stock: number;
   hidden: boolean;
+  groupOrder: number;
   sortOrder: number;
 };
 
-type Draft = Omit<ManagedProduct, 'id'>;
+/** 순서는 여기서 다루지 않는다 — 목록의 ▲▼ 가 맡는다 */
+type Draft = Omit<ManagedProduct, 'id' | 'groupOrder' | 'sortOrder'>;
 
 
 /** 새 상품의 기본값. 사진은 그룹에서 물려받으므로 비워 둔다. */
@@ -34,7 +38,6 @@ const EMPTY_DRAFT: Draft = {
   imageUrl: '',
   stock: 0,
   hidden: false,
-  sortOrder: 99,
 };
 
 /**
@@ -96,6 +99,55 @@ function shortLabel(product: ManagedProduct, size: string): string {
   return parsed.weight || product.name;
 }
 
+/**
+ * 자리 옮기기 단추 — 위/아래.
+ *
+ * 숫자를 적게 하지 않고 단추로 옮긴다. 폰에서 자판을 띄우지 않아도 되고,
+ * "몇 번을 몇 번으로" 를 머리로 계산할 일이 없다.
+ * 맨 위/맨 아래에서는 흐리게 꺼 둬서 더 갈 곳이 없다는 것이 보인다.
+ */
+function MoveButtons({
+  onUp,
+  onDown,
+  atTop,
+  atBottom,
+  disabled,
+  label,
+}: {
+  onUp: () => void;
+  onDown: () => void;
+  atTop: boolean;
+  atBottom: boolean;
+  disabled: boolean;
+  label: string;
+}) {
+  const base =
+    'flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-[0.9rem] font-bold text-ink-soft disabled:opacity-25';
+
+  return (
+    <div className="flex shrink-0 gap-1">
+      <button
+        type="button"
+        onClick={onUp}
+        disabled={disabled || atTop}
+        aria-label={`${label} 위로`}
+        className={base}
+      >
+        ▲
+      </button>
+      <button
+        type="button"
+        onClick={onDown}
+        disabled={disabled || atBottom}
+        aria-label={`${label} 아래로`}
+        className={base}
+      >
+        ▼
+      </button>
+    </div>
+  );
+}
+
 export function ProductManager({
   products,
   images,
@@ -124,9 +176,15 @@ export function ProductManager({
         </p>
       )}
 
-      {groups.map((group) => (
+      {groups.map((group, groupIndex) => (
         <section key={group.name} className="card overflow-hidden">
-          <GroupHeader group={group} images={images} />
+          <GroupHeader
+            group={group}
+            images={images}
+            order={groupIndex + 1}
+            atTop={groupIndex === 0}
+            atBottom={groupIndex === groups.length - 1}
+          />
 
           {/*
             품종 아래 크기로 한 겹 더 묶는다.
@@ -148,13 +206,22 @@ export function ProductManager({
               )}
 
               <div className="divide-y divide-line">
-                {sizeGroup.items.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    label={shortLabel(product, sizeGroup.size)}
-                  />
-                ))}
+                {sizeGroup.items.map((product) => {
+                  // 순번과 끝 여부는 **그룹 전체** 기준이다. 크기 묶음은 보기 좋으라고
+                  // 나눈 것일 뿐, 옮길 때는 그룹 안에서 한 칸씩 움직인다.
+                  const index = group.sizes.flatMap((s) => s.items).findIndex((p) => p.id === product.id);
+                  const total = group.sizes.reduce((n, s) => n + s.items.length, 0);
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      label={shortLabel(product, sizeGroup.size)}
+                      order={index + 1}
+                      atTop={index === 0}
+                      atBottom={index === total - 1}
+                    />
+                  );
+                })}
               </div>
 
               {sizeGroup.size &&
@@ -350,9 +417,16 @@ function NewSize({
 function GroupHeader({
   group,
   images,
+  order,
+  atTop,
+  atBottom,
 }: {
   group: VarietyGroup;
   images: ProductImageOption[];
+  /** 몇 번째 그룹인가 (1부터) */
+  order: number;
+  atTop: boolean;
+  atBottom: boolean;
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
@@ -377,6 +451,18 @@ function GroupHeader({
         return;
       }
       setRenaming(null);
+      router.refresh();
+    });
+  }
+
+  function move(direction: 'up' | 'down') {
+    setError(null);
+    startTransition(async () => {
+      const result = await moveGroupAction(group.name, direction);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -416,11 +502,27 @@ function GroupHeader({
         </button>
 
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
+          <h2 className="flex items-center gap-2 font-display text-[1.15rem] text-shell">
+            {/* 몇 번째 그룹인지. 손님 화면이 이 차례로 늘어선다. */}
+            <span className="tnum shrink-0 rounded-md bg-shell/15 px-1.5 py-0.5 text-[0.72rem] font-bold">
+              {order}
+            </span>
+            {group.name}
+          </h2>
           <p className="tnum text-[0.78rem] text-ink-soft">{itemCount}가지</p>
         </div>
 
-        <div className="flex shrink-0 gap-1.5">
+        <MoveButtons
+          onUp={() => move('up')}
+          onDown={() => move('down')}
+          atTop={atTop}
+          atBottom={atBottom}
+          disabled={pending}
+          label={`${group.name} 그룹`}
+        />
+      </div>
+
+      <div className="flex justify-end gap-1.5 px-4 pb-3">
           <button
             type="button"
             onClick={() => {
@@ -438,7 +540,6 @@ function GroupHeader({
           >
             {picking ? '닫기' : '사진'}
           </button>
-        </div>
       </div>
 
       {/*
@@ -628,7 +729,20 @@ function NewGroup({
   );
 }
 
-function ProductCard({ product, label }: { product: ManagedProduct; label?: string }) {
+function ProductCard({
+  product,
+  label,
+  order,
+  atTop,
+  atBottom,
+}: {
+  product: ManagedProduct;
+  label?: string;
+  /** 이 그룹 안에서 몇 번째인가 (1부터) */
+  order: number;
+  atTop: boolean;
+  atBottom: boolean;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [restock, setRestock] = useState('');
@@ -637,6 +751,13 @@ function ProductCard({ product, label }: { product: ManagedProduct; label?: stri
   // 손님 화면에서 "N개 남았습니다"가 뜨기 시작하는 지점과 같은 기준을 쓴다.
   // 관리자와 손님이 서로 다른 기준으로 "얼마 안 남음"을 보면 대화가 어긋난다.
   const lowStock = !soldOut && product.stock <= LOW_STOCK_NOTICE_THRESHOLD;
+
+  function move(direction: 'up' | 'down') {
+    startTransition(async () => {
+      await moveProductAction(product.id, direction);
+      router.refresh();
+    });
+  }
 
   function applyRestock() {
     const value = Number(restock.replace(/[^\d]/g, ''));
@@ -666,13 +787,9 @@ function ProductCard({ product, label }: { product: ManagedProduct; label?: stri
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-2 text-[1.08rem] font-bold">
-            {/*
-              순번(sortOrder)을 앞에 보여준다. 손님 화면이 이 숫자 순으로 늘어서므로,
-              순서를 옮기려면 지금 몇 번인지 먼저 알아야 한다.
-              "자세히 고치기" 안의 순서 칸에 넣을 값과 같은 숫자다.
-            */}
+            {/* 이 그룹 안에서 몇 번째인가. 오른쪽 ▲▼ 로 옮긴다. */}
             <span className="tnum shrink-0 rounded-md bg-line px-1.5 py-0.5 text-[0.72rem] font-bold text-ink-soft">
-              {product.sortOrder}
+              {order}
             </span>
             {/* 크기 묶음 안에서는 무게만 — "대보 중" 이 줄마다 반복되지 않게 */}
             {label ?? product.name}
@@ -685,6 +802,17 @@ function ProductCard({ product, label }: { product: ManagedProduct; label?: stri
           <p className="tnum mt-0.5 text-[0.9rem] text-ink-soft">{formatKRW(product.price)}</p>
         </div>
 
+        <MoveButtons
+          onUp={() => move('up')}
+          onDown={() => move('down')}
+          atTop={atTop}
+          atBottom={atBottom}
+          disabled={pending}
+          label={product.name}
+        />
+      </div>
+
+      <div className="mt-2 flex items-center justify-end">
         {soldOut ? (
           <span className="shrink-0 rounded-full bg-berry-tint px-2.5 py-1 text-[0.76rem] font-bold text-berry">
             매진
@@ -774,7 +902,6 @@ function ProductForm({
         name: draft.name.trim(),
         price: Number(draft.price) || 0,
         stock: Number(draft.stock) || 0,
-        sortOrder: Number(draft.sortOrder) || 0,
       });
       if (!result.ok) {
         setError(result.error);
@@ -808,25 +935,19 @@ function ProductForm({
         </p>
       </div>
 
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="label">가격</label>
-          <input
-            className="field tnum"
-            value={draft.price}
-            onChange={(e) => set('price', Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
-            inputMode="numeric"
-          />
-        </div>
-        <div className="w-28">
-          <label className="label">순서</label>
-          <input
-            className="field tnum"
-            value={draft.sortOrder}
-            onChange={(e) => set('sortOrder', Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
-            inputMode="numeric"
-          />
-        </div>
+      {/*
+        순서 칸은 없다. 새 상품은 제 그룹 맨 뒤에 붙고, 자리는 목록의 ▲▼ 로 옮긴다.
+        숫자를 직접 적게 하면 빈 번호와 겹친 번호가 쌓이고, 아버지가 몇 번을 몇 번으로
+        바꿔야 하는지 머리로 계산해야 한다.
+      */}
+      <div>
+        <label className="label">가격</label>
+        <input
+          className="field tnum"
+          value={draft.price}
+          onChange={(e) => set('price', Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
+          inputMode="numeric"
+        />
       </div>
 
       <div>

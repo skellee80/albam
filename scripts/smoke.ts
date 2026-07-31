@@ -1128,6 +1128,85 @@ async function main() {
   check('없는 그룹이면 아무것도 바꾸지 않는다', none === 0, `${none}개`);
 
   /* ────────────────────────────────────────────── */
+  section('22-7. 순서 — 그룹이 먼저, 그 안의 상품이 그다음');
+
+  const { moveGroup, moveProduct, compareProducts } = await import('../src/lib/products');
+
+  /** 지금 손님 화면에 보이는 차례대로 그룹 이름을 늘어놓는다 */
+  async function groupOrderNow(): Promise<string[]> {
+    const list = (await listProducts({ includeHidden: true })).slice().sort(compareProducts);
+    const seen: string[] = [];
+    for (const p of list) {
+      const g = p.variety || p.name;
+      if (!seen.includes(g)) seen.push(g);
+    }
+    return seen;
+  }
+
+  const startOrder = await groupOrderNow();
+  check('처음 차례가 시드 순서다', startOrder.join(' ') === '대보 포르단 옥광', startOrder.join(' '));
+
+  // 그룹 하나를 내리면 그 그룹 상품이 통째로 따라 내려가야 한다
+  const daeboBefore = (await listProducts({ includeHidden: true })).filter(
+    (p) => p.variety === '대보',
+  );
+  await moveGroup('대보', 'down');
+
+  const afterMove = await groupOrderNow();
+  check('그룹을 내리면 차례가 바뀐다', afterMove.join(' ') === '포르단 대보 옥광', afterMove.join(' '));
+
+  const daeboAfter = (await listProducts({ includeHidden: true })).filter(
+    (p) => p.variety === '대보',
+  );
+  check(
+    '그룹 안 상품 차례는 그대로다',
+    daeboAfter.map((p) => p.name).join() === daeboBefore.map((p) => p.name).join(),
+    daeboAfter.map((p) => p.name).join(' '),
+  );
+  check(
+    '그룹 상품이 전부 같은 groupOrder 를 갖는다',
+    new Set(daeboAfter.map((p) => p.groupOrder)).size === 1,
+    [...new Set(daeboAfter.map((p) => p.groupOrder))].join(),
+  );
+
+  // 맨 위에서 더 올리면 아무 일도 안 일어난다
+  const topGroup = (await groupOrderNow())[0];
+  const noMove = await moveGroup(topGroup, 'up');
+  check('맨 위에서 더 올리면 아무 일도 없다', noMove === false);
+  check('차례도 그대로다', (await groupOrderNow()).join(' ') === afterMove.join(' '));
+
+  // 되돌려 놓는다
+  await moveGroup('대보', 'up');
+  check('되돌리면 원래 차례다', (await groupOrderNow()).join(' ') === '대보 포르단 옥광');
+
+  /* 그룹 안 상품 옮기기 */
+  const items = (await listProducts({ includeHidden: true })).filter((p) => p.variety === '대보');
+  const first = items[0];
+  const second = items[1];
+
+  await moveProduct(first.id, 'down');
+  const swapped = (await listProducts({ includeHidden: true })).filter((p) => p.variety === '대보');
+  check(
+    '상품을 내리면 옆 상품과 자리가 바뀐다',
+    swapped[0].id === second.id && swapped[1].id === first.id,
+    swapped.slice(0, 2).map((p) => p.name).join(' / '),
+  );
+  check(
+    '그룹 밖으로는 나가지 않는다',
+    swapped.every((p) => p.variety === '대보') && swapped.length === items.length,
+  );
+  check(
+    '옮긴 뒤 번호가 0부터 다시 매겨진다',
+    swapped.every((p, i) => p.sortOrder === i),
+    swapped.map((p) => p.sortOrder).join(','),
+  );
+
+  const atEnd = await moveProduct(swapped[swapped.length - 1].id, 'down');
+  check('맨 아래에서 더 내리면 아무 일도 없다', atEnd === false);
+
+  await moveProduct(first.id, 'up'); // 되돌린다
+
+  /* ────────────────────────────────────────────── */
   section('22-6. 그룹 이름 바꾸기');
 
   const { renameGroup } = await import('../src/lib/products');
@@ -1188,7 +1267,18 @@ async function main() {
   check('기본 목록이 18종이다', seedList.length === 18, `${seedList.length}종`);
   check('이름이 겹치지 않는다', new Set(seedList.map((p) => p.name)).size === seedList.length);
   check('모든 상품에 가격이 있다', seedList.every((p) => p.price > 0));
-  check('sortOrder가 0부터 빠짐없이 이어진다', seedList.every((p, i) => p.sortOrder === i));
+  check(
+    '그룹마다 sortOrder 가 0부터 이어진다',
+    ['대보', '포르단', '옥광'].every((v) =>
+      seedList.filter((p) => p.variety === v).every((p, i) => p.sortOrder === i),
+    ),
+  );
+  check(
+    '품종마다 groupOrder 가 하나씩 매겨진다',
+    seedList.filter((p) => p.variety === '대보').every((p) => p.groupOrder === 0) &&
+      seedList.filter((p) => p.variety === '포르단').every((p) => p.groupOrder === 1) &&
+      seedList.filter((p) => p.variety === '옥광').every((p) => p.groupOrder === 2),
+  );
   // 파일 이름을 바꿔 놓고 여기를 안 고치면 손님 화면에 깨진 그림이 뜬다.
   // 확장자만 보지 말고 **public/ 에 실제로 있는지** 확인한다.
   const { existsSync } = await import('node:fs');

@@ -32,6 +32,7 @@ export type ProductSeed = {
   imageUrl: string;
   stock: number;
   hidden: boolean;
+  groupOrder: number;
   sortOrder: number;
 };
 
@@ -71,6 +72,19 @@ export interface Product {
   imageUrl: string;
   stock: number; // 현재 남은 재고 (0이면 매진)
   hidden: boolean; // 상품 목록에서 숨김
+  /**
+   * 순서는 **두 단계**다.
+   *
+   *   groupOrder  이 상품이 속한 그룹(품종)이 몇 번째인가 — 같은 그룹이면 모두 같은 값
+   *   sortOrder   그 그룹 안에서 몇 번째인가
+   *
+   * 그룹 순서만 바꾸면 그 안의 상품이 통째로 따라 움직인다. 한 줄짜리 번호였을 때는
+   * 대보를 옥광 뒤로 보내려면 여섯 상품의 번호를 하나씩 고쳐야 했다.
+   *
+   * 두 값 모두 **자리를 옮길 때마다 0부터 다시 매긴다**(products.ts 의 moveGroup·moveProduct).
+   * 빈 번호나 겹친 번호가 쌓이지 않는다.
+   */
+  groupOrder: number;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;

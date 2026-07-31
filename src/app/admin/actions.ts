@@ -24,6 +24,8 @@ import {
 import {
   createProduct,
   deleteProduct,
+  moveGroup,
+  moveProduct,
   renameGroup,
   setGroupImage,
   updateProduct,
@@ -190,6 +192,29 @@ export async function saveProductAction(
 
 export async function deleteProductAction(productId: string): Promise<ActionResult> {
   return run(() => deleteProduct(productId), ['/admin', '/admin/products', '/']);
+}
+
+/**
+ * 그룹(품종) 하나를 위/아래로 옮긴다. **그 그룹 상품 전체가 통째로 따라간다.**
+ * 이미 맨 위/맨 아래면 아무것도 하지 않는다(오류가 아니다).
+ */
+export async function moveGroupAction(
+  group: string,
+  direction: 'up' | 'down',
+): Promise<ActionResult> {
+  return run(async () => {
+    await moveGroup(group.trim(), direction);
+  }, ['/admin', '/admin/products', '/']);
+}
+
+/** 상품 하나를 **제 그룹 안에서** 위/아래로 옮긴다. */
+export async function moveProductAction(
+  productId: string,
+  direction: 'up' | 'down',
+): Promise<ActionResult> {
+  return run(async () => {
+    await moveProduct(productId, direction);
+  }, ['/admin', '/admin/products', '/']);
 }
 
 /** 그룹(품종) 이름을 바꾼다 — 그 그룹 상품들의 이름 앞부분을 전부 갈아 끼운다. */

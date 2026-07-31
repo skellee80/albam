@@ -34,14 +34,19 @@ const IMAGES: Record<string, string> = {
 export const SEED_STOCK = 50;
 
 /**
- * 손님 화면이 품종 → 크기 → 무게 순으로 묶이므로 sortOrder도 같은 순서로 매긴다.
- * 순서가 어긋나면 나중에 상품을 추가할 때 자리가 이상해진다.
+ * 순서는 두 단계다 — **품종이 그룹 순서, 그 안의 크기·무게가 상품 순서.**
+ *
+ *   groupOrder 0  대보    sortOrder 0..5  (중 4kg, 중 10kg, 대 4kg, …)
+ *   groupOrder 1  포르단  sortOrder 0..5
+ *   groupOrder 2  옥광    sortOrder 0..5
+ *
+ * 그룹 순서만 바꾸면 그 안의 여섯 상품이 통째로 따라 움직인다.
  */
 export function defaultProducts(): ProductSeed[] {
   const list: ProductSeed[] = [];
-  let sortOrder = 0;
 
-  for (const variety of VARIETIES) {
+  VARIETIES.forEach((variety, groupOrder) => {
+    let sortOrder = 0;
     for (const size of SIZES) {
       for (const weight of WEIGHTS) {
         list.push({
@@ -53,11 +58,12 @@ export function defaultProducts(): ProductSeed[] {
           imageUrl: IMAGES[variety],
           stock: SEED_STOCK,
           hidden: false,
+          groupOrder,
           sortOrder: sortOrder++,
         });
       }
     }
-  }
+  });
 
   return list;
 }

@@ -18,6 +18,7 @@ export default async function AdminProductsPage() {
     imageUrl: p.imageUrl,
     stock: p.stock,
     hidden: p.hidden,
+    groupOrder: p.groupOrder,
     sortOrder: p.sortOrder,
   }));
 
