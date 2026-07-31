@@ -256,6 +256,14 @@ body {
     color: #000;
   }
 
+  /* 한 줄에 두 건씩 뽑는다. 한 건씩 뽑으면 종이가 두 배로 든다.
+     A4 기준 한 칸이 약 90mm 라 주소가 두 줄로 접히는 정도로 넉넉하다. */
+  .print-list {
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm;
+    align-items: start;
+  }
+
   /* 카드 그림자와 배경을 빼고 얇은 선만 남긴다 */
   .print-row {
     border: 1px solid #999 !important;

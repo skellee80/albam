@@ -182,24 +182,45 @@ function groupsInOrder(rows: Loaded[]): { name: string; rows: Loaded[] }[] {
   return groups;
 }
 
+/** 배열에서 한 칸을 빼내 다른 자리에 끼워 넣는다 */
+function moveWithin<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
 /**
- * 그룹 하나를 위/아래로 옮긴다. **그 그룹 상품 전체가 통째로 따라간다.**
- * @returns 실제로 옮겼으면 true. 이미 끝이면 false (오류가 아니다)
+ * 1부터 세는 자리 번호를 배열 범위 안으로 접는다.
+ * 아버지가 0 이나 99 를 넣어도 맨 앞·맨 뒤로 가고 오류가 나지 않는다.
  */
-export async function moveGroup(group: string, direction: 'up' | 'down'): Promise<boolean> {
+function clampPosition(position: number, length: number): number {
+  if (!Number.isFinite(position)) return 0;
+  return Math.min(Math.max(Math.round(position) - 1, 0), length - 1);
+}
+
+/**
+ * 그룹을 **몇 번째 자리로** 보낸다. 그 그룹 상품 전체가 통째로 따라간다.
+ *
+ * 옮긴 뒤 전체 그룹 번호를 0부터 다시 매긴다 — 빈 번호나 겹친 번호가 남지 않는다.
+ * 3번 자리에 있던 그룹을 1번으로 보내면 나머지가 한 칸씩 밀린다(자리 바꾸기가 아니다).
+ *
+ * @param position 1부터 세는 자리 번호
+ * @returns 실제로 자리가 바뀌었으면 true
+ */
+export async function setGroupPosition(group: string, position: number): Promise<boolean> {
   const groups = groupsInOrder(await loadAll());
-  const index = groups.findIndex((g) => g.name === group);
-  if (index < 0) throw new Error('그 그룹을 찾지 못했습니다.');
+  const from = groups.findIndex((g) => g.name === group);
+  if (from < 0) throw new Error('그 그룹을 찾지 못했습니다.');
 
-  const target = direction === 'up' ? index - 1 : index + 1;
-  if (target < 0 || target >= groups.length) return false;
+  const to = clampPosition(position, groups.length);
+  if (from === to) return false;
 
-  [groups[index], groups[target]] = [groups[target], groups[index]];
+  const reordered = moveWithin(groups, from, to);
 
-  // 옮긴 뒤 전체를 0부터 다시 매긴다
   const now = Date.now();
   const batch = db.batch();
-  groups.forEach((g, groupOrder) => {
+  reordered.forEach((g, groupOrder) => {
     for (const row of g.rows) {
       if (row.product.groupOrder !== groupOrder) {
         batch.update(row.ref, { groupOrder, updatedAt: now });
@@ -210,8 +231,12 @@ export async function moveGroup(group: string, direction: 'up' | 'down'): Promis
   return true;
 }
 
-/** 상품 하나를 **제 그룹 안에서** 위/아래로 옮긴다. 그룹 밖으로는 나가지 않는다. */
-export async function moveProduct(productId: string, direction: 'up' | 'down'): Promise<boolean> {
+/**
+ * 상품을 **제 그룹 안에서** 몇 번째 자리로 보낸다. 그룹 밖으로는 나가지 않는다.
+ *
+ * @param position 그 그룹 안에서 1부터 세는 자리 번호
+ */
+export async function setProductPosition(productId: string, position: number): Promise<boolean> {
   const rows = await loadAll();
   const me = rows.find((r) => r.product.id === productId);
   if (!me) throw new Error('그 상품을 찾지 못했습니다.');
@@ -219,15 +244,15 @@ export async function moveProduct(productId: string, direction: 'up' | 'down'): 
   const group = groupsInOrder(rows).find((g) => g.name === groupNameOf(me.product.name));
   if (!group) throw new Error('그 상품의 그룹을 찾지 못했습니다.');
 
-  const index = group.rows.findIndex((r) => r.product.id === productId);
-  const target = direction === 'up' ? index - 1 : index + 1;
-  if (target < 0 || target >= group.rows.length) return false;
+  const from = group.rows.findIndex((r) => r.product.id === productId);
+  const to = clampPosition(position, group.rows.length);
+  if (from === to) return false;
 
-  [group.rows[index], group.rows[target]] = [group.rows[target], group.rows[index]];
+  const reordered = moveWithin(group.rows, from, to);
 
   const now = Date.now();
   const batch = db.batch();
-  group.rows.forEach((row, sortOrder) => {
+  reordered.forEach((row, sortOrder) => {
     if (row.product.sortOrder !== sortOrder) {
       batch.update(row.ref, { sortOrder, updatedAt: now });
     }

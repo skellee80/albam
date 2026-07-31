@@ -1130,7 +1130,9 @@ async function main() {
   /* ────────────────────────────────────────────── */
   section('22-7. 순서 — 그룹이 먼저, 그 안의 상품이 그다음');
 
-  const { moveGroup, moveProduct, compareProducts } = await import('../src/lib/products');
+  const { setGroupPosition, setProductPosition, compareProducts } = await import(
+    '../src/lib/products'
+  );
 
   /** 지금 손님 화면에 보이는 차례대로 그룹 이름을 늘어놓는다 */
   async function groupOrderNow(): Promise<string[]> {
@@ -1146,14 +1148,14 @@ async function main() {
   const startOrder = await groupOrderNow();
   check('처음 차례가 시드 순서다', startOrder.join(' ') === '대보 포르단 옥광', startOrder.join(' '));
 
-  // 그룹 하나를 내리면 그 그룹 상품이 통째로 따라 내려가야 한다
+  // 그룹을 다른 자리로 보내면 그 그룹 상품이 통째로 따라가야 한다
   const daeboBefore = (await listProducts({ includeHidden: true })).filter(
     (p) => p.variety === '대보',
   );
-  await moveGroup('대보', 'down');
+  await setGroupPosition('대보', 2); // 1번 → 2번
 
   const afterMove = await groupOrderNow();
-  check('그룹을 내리면 차례가 바뀐다', afterMove.join(' ') === '포르단 대보 옥광', afterMove.join(' '));
+  check('그룹을 2번으로 보내면 차례가 바뀐다', afterMove.join(' ') === '포르단 대보 옥광', afterMove.join(' '));
 
   const daeboAfter = (await listProducts({ includeHidden: true })).filter(
     (p) => p.variety === '대보',
@@ -1169,25 +1171,34 @@ async function main() {
     [...new Set(daeboAfter.map((p) => p.groupOrder))].join(),
   );
 
-  // 맨 위에서 더 올리면 아무 일도 안 일어난다
-  const topGroup = (await groupOrderNow())[0];
-  const noMove = await moveGroup(topGroup, 'up');
-  check('맨 위에서 더 올리면 아무 일도 없다', noMove === false);
+  // 지금 자리를 그대로 넣으면 아무 일도 안 일어난다
+  const sameSpot = await setGroupPosition('대보', 2);
+  check('같은 자리를 넣으면 아무 일도 없다', sameSpot === false);
   check('차례도 그대로다', (await groupOrderNow()).join(' ') === afterMove.join(' '));
 
+  // 범위를 벗어난 숫자는 맨 앞·맨 뒤로 접힌다 (오류가 아니다)
+  await setGroupPosition('옥광', 99);
+  check('큰 숫자는 맨 뒤가 된다', (await groupOrderNow()).at(-1) === '옥광');
+  await setGroupPosition('대보', 0);
+  check('0 은 맨 앞이 된다', (await groupOrderNow())[0] === '대보');
+
   // 되돌려 놓는다
-  await moveGroup('대보', 'up');
-  check('되돌리면 원래 차례다', (await groupOrderNow()).join(' ') === '대보 포르단 옥광');
+  await setGroupPosition('포르단', 2);
+  check(
+    '되돌리면 원래 차례다',
+    (await groupOrderNow()).join(' ') === '대보 포르단 옥광',
+    (await groupOrderNow()).join(' '),
+  );
 
   /* 그룹 안 상품 옮기기 */
   const items = (await listProducts({ includeHidden: true })).filter((p) => p.variety === '대보');
   const first = items[0];
   const second = items[1];
 
-  await moveProduct(first.id, 'down');
+  await setProductPosition(first.id, 2); // 1번 → 2번
   const swapped = (await listProducts({ includeHidden: true })).filter((p) => p.variety === '대보');
   check(
-    '상품을 내리면 옆 상품과 자리가 바뀐다',
+    '상품을 2번으로 보내면 옆 상품과 자리가 바뀐다',
     swapped[0].id === second.id && swapped[1].id === first.id,
     swapped.slice(0, 2).map((p) => p.name).join(' / '),
   );
@@ -1201,10 +1212,11 @@ async function main() {
     swapped.map((p) => p.sortOrder).join(','),
   );
 
-  const atEnd = await moveProduct(swapped[swapped.length - 1].id, 'down');
-  check('맨 아래에서 더 내리면 아무 일도 없다', atEnd === false);
+  const lastItem = swapped[swapped.length - 1];
+  const alreadyLast = await setProductPosition(lastItem.id, swapped.length);
+  check('이미 그 자리면 아무 일도 없다', alreadyLast === false);
 
-  await moveProduct(first.id, 'up'); // 되돌린다
+  await setProductPosition(first.id, 1); // 되돌린다
 
   /* ────────────────────────────────────────────── */
   section('22-6. 그룹 이름 바꾸기');

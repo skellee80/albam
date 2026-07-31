@@ -37,7 +37,8 @@ export default async function ShippingPrintPage() {
       {orders.length === 0 ? (
         <p className="card px-5 py-10 text-center text-ink-soft">보낼 주문이 없습니다.</p>
       ) : (
-        <ol className="space-y-2.5">
+        <ol className="print-list grid gap-2.5">
+          {/* 화면에서는 한 줄에 하나, 종이에서는 한 줄에 둘 (globals.css @media print) */}
           {orders.map((order, index) => (
             <li key={order.id} className="print-row card px-4 py-3.5">
               <div className="flex items-baseline gap-2.5">

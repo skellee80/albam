@@ -1,16 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import {
   deleteProductAction,
   restockProductAction,
-  moveGroupAction,
-  moveProductAction,
   renameGroupAction,
   saveProductAction,
   setGroupImageAction,
+  setGroupPositionAction,
+  setProductPositionAction,
 } from '@/app/admin/actions';
 import { formatKRW, parseProductName } from '@/lib/format';
 import type { ProductImage as ProductImageOption } from '@/lib/product-images';
@@ -27,9 +27,8 @@ export type ManagedProduct = {
   sortOrder: number;
 };
 
-/** 순서는 여기서 다루지 않는다 — 목록의 ▲▼ 가 맡는다 */
+/** 순서는 여기서 다루지 않는다 — 목록의 자리 번호 칸이 맡는다 */
 type Draft = Omit<ManagedProduct, 'id' | 'groupOrder' | 'sortOrder'>;
-
 
 /** 새 상품의 기본값. 사진은 그룹에서 물려받으므로 비워 둔다. */
 const EMPTY_DRAFT: Draft = {
@@ -100,50 +99,63 @@ function shortLabel(product: ManagedProduct, size: string): string {
 }
 
 /**
- * 자리 옮기기 단추 — 위/아래.
+ * 자리 번호 칸.
  *
- * 숫자를 적게 하지 않고 단추로 옮긴다. 폰에서 자판을 띄우지 않아도 되고,
- * "몇 번을 몇 번으로" 를 머리로 계산할 일이 없다.
- * 맨 위/맨 아래에서는 흐리게 꺼 둬서 더 갈 곳이 없다는 것이 보인다.
+ * 지금 몇 번째인지 보여주고, 다른 숫자를 넣으면 그 자리로 보낸다.
+ * **자리 바꾸기가 아니라 끼워 넣기다** — 3번을 1번으로 보내면 나머지가 한 칸씩 밀린다.
+ *
+ * 범위를 벗어난 숫자(0, 99)는 서버가 맨 앞·맨 뒤로 접는다. 틀린 값을 넣어도 오류가 안 난다.
+ * 값을 고치면 옆에 "이동" 단추가 나타난다 — 자판을 치는 도중에 자리가 튀지 않도록.
  */
-function MoveButtons({
-  onUp,
-  onDown,
-  atTop,
-  atBottom,
+function PositionInput({
+  current,
+  total,
+  onApply,
   disabled,
   label,
 }: {
-  onUp: () => void;
-  onDown: () => void;
-  atTop: boolean;
-  atBottom: boolean;
+  current: number;
+  total: number;
+  onApply: (position: number) => void;
   disabled: boolean;
   label: string;
 }) {
-  const base =
-    'flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-[0.9rem] font-bold text-ink-soft disabled:opacity-25';
+  const [text, setText] = useState(String(current));
+
+  // 서버에서 새 순서를 받아오면 칸에도 반영한다
+  useEffect(() => setText(String(current)), [current]);
+
+  const typed = Number(text);
+  const changed = text.trim() !== '' && Number.isFinite(typed) && typed !== current;
+
+  function apply() {
+    if (!changed) return;
+    onApply(typed);
+  }
 
   return (
-    <div className="flex shrink-0 gap-1">
-      <button
-        type="button"
-        onClick={onUp}
-        disabled={disabled || atTop}
-        aria-label={`${label} 위로`}
-        className={base}
-      >
-        ▲
-      </button>
-      <button
-        type="button"
-        onClick={onDown}
-        disabled={disabled || atBottom}
-        aria-label={`${label} 아래로`}
-        className={base}
-      >
-        ▼
-      </button>
+    <div className="flex shrink-0 items-center gap-1.5">
+      <input
+        className="tnum h-9 w-12 rounded-lg border border-line bg-surface text-center text-[0.95rem] font-bold"
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/[^\d]/g, ''))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') apply();
+        }}
+        inputMode="numeric"
+        aria-label={`${label} 순서 (지금 ${current}번 / 모두 ${total}개)`}
+        disabled={disabled}
+      />
+      {changed && (
+        <button
+          type="button"
+          onClick={apply}
+          disabled={disabled}
+          className="h-9 shrink-0 rounded-lg bg-burr px-2.5 text-[0.8rem] font-bold text-white"
+        >
+          이동
+        </button>
+      )}
     </div>
   );
 }
@@ -182,8 +194,7 @@ export function ProductManager({
             group={group}
             images={images}
             order={groupIndex + 1}
-            atTop={groupIndex === 0}
-            atBottom={groupIndex === groups.length - 1}
+            totalGroups={groups.length}
           />
 
           {/*
@@ -209,7 +220,9 @@ export function ProductManager({
                 {sizeGroup.items.map((product) => {
                   // 순번과 끝 여부는 **그룹 전체** 기준이다. 크기 묶음은 보기 좋으라고
                   // 나눈 것일 뿐, 옮길 때는 그룹 안에서 한 칸씩 움직인다.
-                  const index = group.sizes.flatMap((s) => s.items).findIndex((p) => p.id === product.id);
+                  const index = group.sizes
+                    .flatMap((s) => s.items)
+                    .findIndex((p) => p.id === product.id);
                   const total = group.sizes.reduce((n, s) => n + s.items.length, 0);
                   return (
                     <ProductCard
@@ -217,8 +230,7 @@ export function ProductManager({
                       product={product}
                       label={shortLabel(product, sizeGroup.size)}
                       order={index + 1}
-                      atTop={index === 0}
-                      atBottom={index === total - 1}
+                      totalInGroup={total}
                     />
                   );
                 })}
@@ -418,15 +430,13 @@ function GroupHeader({
   group,
   images,
   order,
-  atTop,
-  atBottom,
+  totalGroups,
 }: {
   group: VarietyGroup;
   images: ProductImageOption[];
   /** 몇 번째 그룹인가 (1부터) */
   order: number;
-  atTop: boolean;
-  atBottom: boolean;
+  totalGroups: number;
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
@@ -455,10 +465,10 @@ function GroupHeader({
     });
   }
 
-  function move(direction: 'up' | 'down') {
+  function move(position: number) {
     setError(null);
     startTransition(async () => {
-      const result = await moveGroupAction(group.name, direction);
+      const result = await setGroupPositionAction(group.name, position);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -502,44 +512,38 @@ function GroupHeader({
         </button>
 
         <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 font-display text-[1.15rem] text-shell">
-            {/* 몇 번째 그룹인지. 손님 화면이 이 차례로 늘어선다. */}
-            <span className="tnum shrink-0 rounded-md bg-shell/15 px-1.5 py-0.5 text-[0.72rem] font-bold">
-              {order}
-            </span>
-            {group.name}
-          </h2>
+          <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
           <p className="tnum text-[0.78rem] text-ink-soft">{itemCount}가지</p>
         </div>
 
-        <MoveButtons
-          onUp={() => move('up')}
-          onDown={() => move('down')}
-          atTop={atTop}
-          atBottom={atBottom}
+        {/* 몇 번째 그룹인지. 손님 화면이 이 차례로 늘어선다. */}
+        <PositionInput
+          current={order}
+          total={totalGroups}
+          onApply={move}
           disabled={pending}
           label={`${group.name} 그룹`}
         />
       </div>
 
       <div className="flex justify-end gap-1.5 px-4 pb-3">
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              setRenaming(renaming === null ? group.name : null);
-            }}
-            className="rounded-full border border-shell/25 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-shell"
-          >
-            {renaming === null ? '이름' : '닫기'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPicking((v) => !v)}
-            className="rounded-full border border-shell/25 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-shell"
-          >
-            {picking ? '닫기' : '사진'}
-          </button>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setRenaming(renaming === null ? group.name : null);
+          }}
+          className="rounded-full border border-shell/25 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-shell"
+        >
+          {renaming === null ? '이름' : '닫기'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setPicking((v) => !v)}
+          className="rounded-full border border-shell/25 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-shell"
+        >
+          {picking ? '닫기' : '사진'}
+        </button>
       </div>
 
       {/*
@@ -733,15 +737,13 @@ function ProductCard({
   product,
   label,
   order,
-  atTop,
-  atBottom,
+  totalInGroup,
 }: {
   product: ManagedProduct;
   label?: string;
   /** 이 그룹 안에서 몇 번째인가 (1부터) */
   order: number;
-  atTop: boolean;
-  atBottom: boolean;
+  totalInGroup: number;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -752,9 +754,9 @@ function ProductCard({
   // 관리자와 손님이 서로 다른 기준으로 "얼마 안 남음"을 보면 대화가 어긋난다.
   const lowStock = !soldOut && product.stock <= LOW_STOCK_NOTICE_THRESHOLD;
 
-  function move(direction: 'up' | 'down') {
+  function move(position: number) {
     startTransition(async () => {
-      await moveProductAction(product.id, direction);
+      await setProductPositionAction(product.id, position);
       router.refresh();
     });
   }
@@ -802,11 +804,11 @@ function ProductCard({
           <p className="tnum mt-0.5 text-[0.9rem] text-ink-soft">{formatKRW(product.price)}</p>
         </div>
 
-        <MoveButtons
-          onUp={() => move('up')}
-          onDown={() => move('down')}
-          atTop={atTop}
-          atBottom={atBottom}
+        {/* 이 그룹 안에서 몇 번째인가 */}
+        <PositionInput
+          current={order}
+          total={totalInGroup}
+          onApply={move}
           disabled={pending}
           label={product.name}
         />
@@ -980,7 +982,10 @@ function ProductForm({
       </label>
 
       {error && (
-        <p role="alert" className="rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry">
+        <p
+          role="alert"
+          className="rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry"
+        >
           {error}
         </p>
       )}
@@ -996,7 +1001,12 @@ function ProductForm({
       </div>
 
       {productId && (
-        <button type="button" onClick={remove} disabled={pending} className="btn btn-danger w-full min-h-11 text-[0.88rem]">
+        <button
+          type="button"
+          onClick={remove}
+          disabled={pending}
+          className="btn btn-danger w-full min-h-11 text-[0.88rem]"
+        >
           이 상품 지우기
         </button>
       )}

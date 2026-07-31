@@ -24,10 +24,10 @@ import {
 import {
   createProduct,
   deleteProduct,
-  moveGroup,
-  moveProduct,
   renameGroup,
   setGroupImage,
+  setGroupPosition,
+  setProductPosition,
   updateProduct,
   type ProductInput,
 } from '@/lib/products';
@@ -195,25 +195,25 @@ export async function deleteProductAction(productId: string): Promise<ActionResu
 }
 
 /**
- * 그룹(품종) 하나를 위/아래로 옮긴다. **그 그룹 상품 전체가 통째로 따라간다.**
- * 이미 맨 위/맨 아래면 아무것도 하지 않는다(오류가 아니다).
+ * 그룹(품종)을 몇 번째 자리로 보낸다. **그 그룹 상품 전체가 통째로 따라간다.**
+ * 범위를 벗어난 숫자는 맨 앞·맨 뒤로 접힌다(오류가 아니다).
  */
-export async function moveGroupAction(
+export async function setGroupPositionAction(
   group: string,
-  direction: 'up' | 'down',
+  position: number,
 ): Promise<ActionResult> {
   return run(async () => {
-    await moveGroup(group.trim(), direction);
+    await setGroupPosition(group.trim(), position);
   }, ['/admin', '/admin/products', '/']);
 }
 
-/** 상품 하나를 **제 그룹 안에서** 위/아래로 옮긴다. */
-export async function moveProductAction(
+/** 상품을 **제 그룹 안에서** 몇 번째 자리로 보낸다. */
+export async function setProductPositionAction(
   productId: string,
-  direction: 'up' | 'down',
+  position: number,
 ): Promise<ActionResult> {
   return run(async () => {
-    await moveProduct(productId, direction);
+    await setProductPosition(productId, position);
   }, ['/admin', '/admin/products', '/']);
 }
 
