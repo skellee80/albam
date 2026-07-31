@@ -1,0 +1,37 @@
+{
+  "name": "칠갑산 석촌 햇 밤",
+  "short_name": "칠갑산 햇밤",
+  "description": "칠갑산 석촌 햇 밤 주문과 발송을 관리합니다.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFCF4",
+  "theme_color": "#6F9A57",
+  "lang": "ko",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
