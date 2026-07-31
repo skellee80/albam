@@ -22,7 +22,9 @@ import {
   type StockShortage,
 } from '@/lib/orders';
 import {
+  createGroup,
   createProduct,
+  deleteGroup,
   deleteProduct,
   renameGroup,
   setGroupImage,
@@ -215,6 +217,19 @@ export async function setProductPositionAction(
   return run(async () => {
     await setProductPosition(productId, position);
   }, ['/admin', '/admin/products', '/']);
+}
+
+/**
+ * 그룹(품종)만 먼저 만들어 둔다. **상품은 없어도 된다.**
+ * 그룹을 하나 정해 놓고 상품은 천천히 채워 넣는 것이 실제 순서에 가깝다.
+ */
+export async function createGroupAction(name: string): Promise<ActionResult> {
+  return run(() => createGroup(name), ['/admin', '/admin/products', '/']);
+}
+
+/** 빈 그룹을 지운다. 상품이 남아 있으면 거절한다. */
+export async function deleteGroupAction(name: string): Promise<ActionResult> {
+  return run(() => deleteGroup(name), ['/admin', '/admin/products', '/']);
 }
 
 /** 그룹(품종) 이름을 바꾼다 — 그 그룹 상품들의 이름 앞부분을 전부 갈아 끼운다. */

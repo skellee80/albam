@@ -2,6 +2,12 @@ import 'server-only';
 
 import { COL, db, toMillisOr } from './firebase-admin';
 import { parseProductName } from './format';
+import {
+  addGroupName,
+  listStoredGroupNames,
+  mergeGroupNames,
+  writeGroupNames,
+} from './product-groups';
 import type { Product } from './types';
 
 /**
@@ -37,15 +43,25 @@ const RETIRED_IMAGES: Record<string, string> = {
 function mapProduct(id: string, data: FirebaseFirestore.DocumentData): Product {
   const now = Date.now();
   const name = data.name ?? '';
-  // 예전 문서에 variety/size/weight가 없거나 이름과 어긋나 있어도 이름 기준으로 맞춘다.
   const derived = parseProductName(name);
-
   const imageUrl = data.imageUrl ?? '';
+
+  /*
+    그룹(품종)은 **문서에 적힌 값을 쓴다.** 이름에서 뽑지 않는다.
+
+    이름에서 뽑던 시절에는 "대보 소 8kg" 처럼 크기 이름이 목록(중·대·특)에 없으면
+    "대보 소" 가 통째로 품종이 되어, 대보에 넣은 상품이 새 그룹으로 튀어 나갔다.
+
+    다만 문서의 값이 이름과 아예 어긋나 있으면(옛 이름으로 저장된 채 이름만 바뀐 문서)
+    이름 쪽을 믿는다 — 화면에 보이는 것은 이름이므로, 어긋날 때는 눈에 보이는 쪽이 맞다.
+  */
+  const stored = String(data.variety ?? '').trim();
+  const variety = stored && name.startsWith(stored) ? stored : derived.variety;
 
   return {
     id,
     name,
-    variety: derived.variety,
+    variety,
     size: derived.size,
     weight: derived.weight,
     price: Number(data.price ?? 0),
@@ -104,46 +120,113 @@ export type ProductInput = {
   imageUrl: string;
   stock: number;
   hidden: boolean;
+  /**
+   * 어느 그룹에 넣을 것인가. 화면에서 "+ 대보 에 상품 추가" 로 들어오면 여기에 "대보" 가 온다.
+   * 비어 있으면 이름 맨 앞 낱말로 본다(예전 방식 — 새 그룹을 만드는 길).
+   */
+  group?: string;
 };
 
-/** 이름에서 유도한 품종·크기·무게를 함께 저장한다. 손님 화면 묶음이 이 값을 쓴다. */
+/**
+ * 크기·무게는 이름에서 뽑아 함께 저장한다. 손님 화면의 크기 고르기가 이 값을 쓴다.
+ *
+ * **품종(그룹)은 여기서 건드리지 않는다.** 상품 이름을 고쳤다고 그룹이 옮겨 다니면
+ * 안 된다 — 그룹은 만들 때 정해지고, 바꾸려면 그룹 이름 바꾸기로만 바뀐다.
+ */
 function withDerivedFields(input: Partial<ProductInput>) {
-  if (input.name === undefined) return { ...input };
-  const name = input.name.trim();
-  return { ...input, name, ...parseProductName(name) };
+  const rest = { ...input };
+  delete rest.group;
+  if (rest.name === undefined) return { ...rest };
+  const name = rest.name.trim();
+  const { size, weight } = parseProductName(name);
+  return { ...rest, name, size, weight };
 }
 
 /**
  * 새 상품은 **제 그룹 맨 뒤에** 붙는다.
  *
- * 이미 있는 그룹이면 그 그룹의 순서를 물려받고, 처음 보는 그룹이면 맨 뒤 그룹이 된다.
- * 아버지가 순서를 따로 정하지 않아도 자리가 잡히고, 마음에 안 들면 ▲▼ 로 옮긴다.
+ * 어느 그룹인지는 `input.group` 으로 받는다 — 화면에서 "+ 대보 에 상품 추가" 를 누른
+ * 그 그룹이다. 이름에서 다시 뽑지 않는다. 뽑으려 들면 "대보 소 8kg" 같은 이름이
+ * 엉뚱한 그룹으로 튄다(mapProduct 주석 참고).
+ *
+ * **이름 앞에 그룹 이름을 붙여 준다.** 아버지가 앞부분을 지우고 "소 8kg" 만 적어도
+ * "대보 소 8kg" 으로 저장된다. 그러지 않으면 주문서와 송장에 품종 없는 이름이 남는다.
  */
 export async function createProduct(input: ProductInput): Promise<string> {
   const now = Date.now();
-  const group = groupNameOf(input.name);
+  const typed = input.name.trim();
+  const group = (input.group ?? '').trim() || parseProductName(typed).variety || typed;
 
-  const all = (await db.collection(COL.products).get()).docs.map((d) =>
-    mapProduct(d.id, d.data()),
+  const name = typed === group || typed.startsWith(`${group} `) ? typed : `${group} ${typed}`;
+
+  const all = await listAllProducts();
+  const siblings = all.filter((p) => p.variety === group);
+
+  // 적어 둔 그룹 목록이 차례의 주인이다. 처음 보는 그룹이면 맨 뒤에 이어 붙인다.
+  const stored = await listStoredGroupNames();
+  const names = mergeGroupNames(
+    stored,
+    all.map((p) => p.variety),
   );
-  const siblings = all.filter((p) => groupNameOf(p.name) === group);
-
-  const groupOrder =
-    siblings.length > 0
-      ? siblings[0].groupOrder
-      : // 처음 보는 그룹 — 지금 있는 그룹 중 가장 뒤 다음 자리
-        all.reduce((max, p) => Math.max(max, p.groupOrder), -1) + 1;
+  if (!names.includes(group)) {
+    names.push(group);
+    await writeGroupNames(names);
+  } else if (names.length !== stored.length) {
+    await writeGroupNames(names);
+  }
 
   const sortOrder = siblings.reduce((max, p) => Math.max(max, p.sortOrder), -1) + 1;
 
   const ref = await db.collection(COL.products).add({
-    ...withDerivedFields(input),
-    groupOrder,
+    ...withDerivedFields({ ...input, name }),
+    variety: group,
+    groupOrder: names.indexOf(group),
     sortOrder,
     createdAt: now,
     updatedAt: now,
   });
   return ref.id;
+}
+
+async function listAllProducts(): Promise<Product[]> {
+  const snap = await db.collection(COL.products).get();
+  return snap.docs.map((d) => mapProduct(d.id, d.data()));
+}
+
+/**
+ * 지금 있는 그룹을 **차례대로** 돌려준다. 상품이 하나도 없는 그룹도 들어 있다.
+ *
+ * 적어 둔 목록이 주인이고, 목록에 빠진 그룹(이 구조 이전에 만들어진 상품들)은
+ * 뒤에 이어 붙인다.
+ */
+export async function listGroupNames(): Promise<string[]> {
+  const [stored, products] = await Promise.all([listStoredGroupNames(), listAllProducts()]);
+  const inOrder = [...products]
+    .sort(compareProducts)
+    .map((p) => p.variety)
+    .filter((v, i, arr) => arr.indexOf(v) === i);
+  return mergeGroupNames(stored, inOrder);
+}
+
+/** 상품 없이 그룹만 먼저 만들어 둔다. */
+export async function createGroup(name: string): Promise<void> {
+  await addGroupName(name, await listGroupNames());
+}
+
+/**
+ * 그룹을 지운다. **상품이 남아 있으면 지우지 않는다** —
+ * 그룹만 사라지고 상품이 떠도는 상태가 되면 손으로 수습할 방법이 없다.
+ */
+export async function deleteGroup(name: string): Promise<void> {
+  const group = name.trim();
+  const products = await listAllProducts();
+  const inGroup = products.filter((p) => p.variety === group);
+  if (inGroup.length > 0) {
+    throw new Error(`"${group}" 안에 상품이 ${inGroup.length}가지 있습니다. 먼저 지워 주세요.`);
+  }
+
+  const names = (await listGroupNames()).filter((n) => n !== group);
+  await writeGroupNames(names);
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -153,11 +236,6 @@ export async function createProduct(input: ProductInput): Promise<string> {
  * **옮길 때마다 0부터 다시 매긴다** — 빈 번호나 겹친 번호가 쌓이지 않는다.
  * ──────────────────────────────────────────────────────────── */
 
-/** 이름 맨 앞 낱말이 그룹이다. 못 읽으면 이름 전체를 그룹으로 본다. */
-function groupNameOf(name: string): string {
-  return parseProductName(name).variety || name;
-}
-
 type Loaded = { product: Product; ref: FirebaseFirestore.DocumentReference };
 
 async function loadAll(): Promise<Loaded[]> {
@@ -165,19 +243,17 @@ async function loadAll(): Promise<Loaded[]> {
   return snap.docs.map((d) => ({ product: mapProduct(d.id, d.data()), ref: d.ref }));
 }
 
-/** 지금 순서대로 그룹을 늘어놓는다 */
-function groupsInOrder(rows: Loaded[]): { name: string; rows: Loaded[] }[] {
+/**
+ * 적어 둔 그룹 차례대로 늘어놓고, 각 그룹에 제 상품을 담는다.
+ * **상품이 없는 그룹도 빈 채로 들어 있다** — 차례를 옮길 수 있어야 하기 때문이다.
+ */
+function groupsInOrder(rows: Loaded[], names: string[]): { name: string; rows: Loaded[] }[] {
   const sorted = [...rows].sort((a, b) => compareProducts(a.product, b.product));
-  const groups: { name: string; rows: Loaded[] }[] = [];
+  const groups = names.map((name) => ({ name, rows: [] as Loaded[] }));
 
   for (const row of sorted) {
-    const name = groupNameOf(row.product.name);
-    let group = groups.find((g) => g.name === name);
-    if (!group) {
-      group = { name, rows: [] };
-      groups.push(group);
-    }
-    group.rows.push(row);
+    const group = groups.find((g) => g.name === row.product.variety);
+    if (group) group.rows.push(row);
   }
   return groups;
 }
@@ -209,7 +285,8 @@ function clampPosition(position: number, length: number): number {
  * @returns 실제로 자리가 바뀌었으면 true
  */
 export async function setGroupPosition(group: string, position: number): Promise<boolean> {
-  const groups = groupsInOrder(await loadAll());
+  const names = await listGroupNames();
+  const groups = groupsInOrder(await loadAll(), names);
   const from = groups.findIndex((g) => g.name === group);
   if (from < 0) throw new Error('그 그룹을 찾지 못했습니다.');
 
@@ -217,6 +294,9 @@ export async function setGroupPosition(group: string, position: number): Promise
   if (from === to) return false;
 
   const reordered = moveWithin(groups, from, to);
+
+  // 목록이 차례의 주인. 상품의 groupOrder 는 손님 화면이 상품만 읽고 정렬하도록 베껴 둔다.
+  await writeGroupNames(reordered.map((g) => g.name));
 
   const now = Date.now();
   const batch = db.batch();
@@ -241,7 +321,8 @@ export async function setProductPosition(productId: string, position: number): P
   const me = rows.find((r) => r.product.id === productId);
   if (!me) throw new Error('그 상품을 찾지 못했습니다.');
 
-  const group = groupsInOrder(rows).find((g) => g.name === groupNameOf(me.product.name));
+  const names = await listGroupNames();
+  const group = groupsInOrder(rows, names).find((g) => g.name === me.product.variety);
   if (!group) throw new Error('그 상품의 그룹을 찾지 못했습니다.');
 
   const from = group.rows.findIndex((r) => r.product.id === productId);
@@ -303,33 +384,27 @@ export async function renameGroup(from: string, to: string): Promise<number> {
   if (newName.includes(' ')) throw new Error('그룹 이름은 띄어쓰기 없이 한 낱말로 넣어 주세요.');
   if (oldName === newName) return 0;
 
-  const snap = await db.collection(COL.products).get();
-
+  const names = await listGroupNames();
   // 바꾸려는 이름이 이미 있으면 두 그룹이 섞인다. 미리 막는다.
-  const taken = snap.docs.some((doc) => {
-    const name = String(doc.data().name ?? '');
-    return (parseProductName(name).variety || name) === newName;
-  });
-  if (taken) throw new Error(`"${newName}" 그룹이 이미 있습니다.`);
+  if (names.includes(newName)) throw new Error(`"${newName}" 그룹이 이미 있습니다.`);
+  if (!names.includes(oldName)) throw new Error('그 그룹을 찾지 못했습니다.');
 
-  const targets = snap.docs.filter((doc) => {
-    const name = String(doc.data().name ?? '');
-    return (parseProductName(name).variety || name) === oldName;
-  });
+  // 상품이 없는 그룹이어도 이름은 바뀌어야 한다
+  await writeGroupNames(names.map((n) => (n === oldName ? newName : n)));
+
+  const snap = await db.collection(COL.products).get();
+  const targets = snap.docs.filter((doc) => mapProduct(doc.id, doc.data()).variety === oldName);
   if (targets.length === 0) return 0;
 
   const now = Date.now();
   const batch = db.batch();
   for (const doc of targets) {
     const name = String(doc.data().name ?? '');
-    // 맨 앞 낱말만 갈아 끼운다. 뒤의 크기·무게는 그대로 둔다.
-    const rest = name.slice(oldName.length);
+    // 맨 앞의 그룹 이름만 갈아 끼운다. 뒤의 크기·무게는 그대로 둔다.
+    const rest = name.startsWith(oldName) ? name.slice(oldName.length) : ` ${name}`;
     const renamed = `${newName}${rest}`;
-    batch.update(doc.ref, {
-      name: renamed,
-      ...parseProductName(renamed),
-      updatedAt: now,
-    });
+    const { size, weight } = parseProductName(renamed);
+    batch.update(doc.ref, { name: renamed, variety: newName, size, weight, updatedAt: now });
   }
   await batch.commit();
 
@@ -339,10 +414,7 @@ export async function renameGroup(from: string, to: string): Promise<number> {
 export async function setGroupImage(group: string, imageUrl: string): Promise<number> {
   const snap = await db.collection(COL.products).get();
 
-  const targets = snap.docs.filter((doc) => {
-    const name = String(doc.data().name ?? '');
-    return (parseProductName(name).variety || name) === group;
-  });
+  const targets = snap.docs.filter((doc) => mapProduct(doc.id, doc.data()).variety === group);
   if (targets.length === 0) return 0;
 
   const now = Date.now();

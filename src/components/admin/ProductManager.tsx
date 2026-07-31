@@ -9,6 +9,8 @@ import type {
 } from 'react';
 
 import {
+  createGroupAction,
+  deleteGroupAction,
   deleteProductAction,
   restockProductAction,
   renameGroupAction,
@@ -24,6 +26,8 @@ import { LOW_STOCK_NOTICE_THRESHOLD } from '@/lib/types';
 export type ManagedProduct = {
   id: string;
   name: string;
+  /** 어느 그룹(품종)에 속하는가. 이름에서 뽑지 않고 서버가 적어 둔 값이다. */
+  group: string;
   price: number;
   imageUrl: string;
   stock: number;
@@ -33,7 +37,7 @@ export type ManagedProduct = {
 };
 
 /** 순서는 여기서 다루지 않는다 — 목록에서 끌어 옮긴다 */
-type Draft = Omit<ManagedProduct, 'id' | 'groupOrder' | 'sortOrder'>;
+type Draft = Omit<ManagedProduct, 'id' | 'group' | 'groupOrder' | 'sortOrder'>;
 
 /** 새 상품의 기본값. 사진은 그룹에서 물려받으므로 비워 둔다. */
 const EMPTY_DRAFT: Draft = {
@@ -68,15 +72,15 @@ function namePreview(name: string): string {
  */
 type VarietyGroup = { name: string; image: string; items: ManagedProduct[] };
 
-function groupByVariety(products: ManagedProduct[]): VarietyGroup[] {
-  const groups: VarietyGroup[] = [];
+function groupByVariety(products: ManagedProduct[], names: string[]): VarietyGroup[] {
+  // 목록에 적힌 차례가 주인이다. 상품이 하나도 없는 그룹도 빈 채로 자리를 지킨다.
+  const groups: VarietyGroup[] = names.map((name) => ({ name, image: '', items: [] }));
 
   for (const product of products) {
-    const variety = parseProductName(product.name).variety || product.name || '이름 없음';
-
-    let group = groups.find((g) => g.name === variety);
+    let group = groups.find((g) => g.name === product.group);
     if (!group) {
-      group = { name: variety, image: product.imageUrl, items: [] };
+      // 목록에 아직 안 올라간 그룹(옛 상품). 서버가 다음 저장 때 기워 넣는다.
+      group = { name: product.group, image: '', items: [] };
       groups.push(group);
     }
     // 그룹 사진은 하나다. 상품마다 달라져 있으면 먼저 걸린 것을 대표로 보여준다.
@@ -89,9 +93,8 @@ function groupByVariety(products: ManagedProduct[]): VarietyGroup[] {
 
 /** 줄에 쓸 짧은 이름. 품종은 그룹 머리에 이미 있으니 뒤만 남긴다 ("대보 중 4kg" → "중 4kg"). */
 function shortLabel(product: ManagedProduct): string {
-  const { variety } = parseProductName(product.name);
-  if (!variety) return product.name;
-  return product.name.slice(variety.length).trim() || product.name;
+  if (!product.name.startsWith(product.group)) return product.name;
+  return product.name.slice(product.group.length).trim() || product.name;
 }
 
 /** 배열에서 한 칸을 빼내 다른 자리에 끼워 넣는다 (서버의 setProductPosition 과 같은 규칙) */
@@ -327,9 +330,12 @@ function DragHandle({
 export function ProductManager({
   products,
   images,
+  groupNames,
 }: {
   products: ManagedProduct[];
   images: ProductImageOption[];
+  /** 지금 있는 그룹의 차례. 상품이 없는 그룹도 들어 있다. */
+  groupNames: string[];
 }) {
   const router = useRouter();
   /**
@@ -339,6 +345,11 @@ export function ProductManager({
    *  - `'대보'`    대보 안에 새 상품
    */
   const [creating, setCreating] = useState<string | null>(null);
+  /*
+    접어 둔 그룹의 이름. **기본은 다 펴진 상태**라 여기 든 것만 접는다 —
+    그래야 그룹이 새로 생겨도 저절로 보인다.
+  */
+  const [folded, setFolded] = useState<string[]>([]);
   const [, startTransition] = useTransition();
 
   /*
@@ -354,7 +365,7 @@ export function ProductManager({
     setItems(products);
   }
 
-  const groups = groupByVariety(items);
+  const groups = groupByVariety(items, groupNames);
 
   function reorderGroups(from: number, to: number) {
     const blocks = groups.map((g) => g.items);
@@ -388,10 +399,12 @@ export function ProductManager({
         </p>
       )}
 
-      {products.length > 1 && (
+      {(groups.length > 1 || products.length > 1) && (
         <p className="px-1 text-[0.83rem] leading-snug text-ink-soft">
           왼쪽 <b>손잡이</b>를 눌러 위아래로 끌면 차례가 바뀝니다. 그룹을 옮기면 그 안 상품이 통째로
           따라갑니다. 상품은 <b>제 그룹 안에서만</b> 움직입니다.
+          <br />
+          그룹 이름을 누르면 <b>접었다 폈다</b> 할 수 있습니다.
         </p>
       )}
 
@@ -406,40 +419,61 @@ export function ProductManager({
             images={images}
             handle={groupSort.handleProps(groupIndex)}
             dragging={groupSort.draggingIndex === groupIndex}
+            open={!folded.includes(group.name)}
+            onToggle={() =>
+              setFolded((prev) =>
+                prev.includes(group.name)
+                  ? prev.filter((n) => n !== group.name)
+                  : [...prev, group.name],
+              )
+            }
           />
 
-          {/*
-            묶음은 품종 한 겹뿐이다. 예전에는 그 아래 크기로 한 겹 더 묶었는데,
-            그러면 상품을 옮길 때 크기 띠를 넘나드는 것이 되어 지금 어디로 가는지가
-            눈에 안 보였다. 한 겹으로 펴 두면 끄는 대로 보인다.
-          */}
-          <GroupProducts
-            group={group}
-            onReorder={(from, to) => reorderProducts(groupIndex, from, to)}
-          />
+          {!folded.includes(group.name) && (
+            <>
+              {/*
+                묶음은 품종 한 겹뿐이다. 예전에는 그 아래 크기로 한 겹 더 묶었는데,
+                그러면 상품을 옮길 때 크기 띠를 넘나드는 것이 되어 지금 어디로 가는지가
+                눈에 안 보였다. 한 겹으로 펴 두면 끄는 대로 보인다.
+              */}
+              {group.items.length > 0 ? (
+                <GroupProducts
+                  group={group}
+                  onReorder={(from, to) => reorderProducts(groupIndex, from, to)}
+                />
+              ) : (
+                <p className="border-t-2 border-line px-4 py-6 text-center text-[0.88rem] text-ink-soft">
+                  아직 상품이 없습니다.
+                </p>
+              )}
 
-          {creating === group.name ? (
-            <div className="border-t-2 border-line px-4 py-4">
-              <h3 className="mb-1 font-display text-[1.05rem]">{group.name} 에 상품 추가</h3>
-              <p className="mb-3 text-[0.8rem] leading-snug text-ink-soft">
-                이름 뒤에 크기와 무게를 이어 적어 주세요. 예: <b>{group.name} 중 4kg</b>
-              </p>
-              <ProductForm
-                // 사진은 그룹 것을 그대로 물려받는다 — 상품마다 고를 일이 없다
-                initial={{ ...EMPTY_DRAFT, name: `${group.name} `, imageUrl: group.image }}
-                productId={null}
-                onDone={() => setCreating(null)}
-                onCancel={() => setCreating(null)}
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCreating(group.name)}
-              className="w-full border-t-2 border-line px-4 py-3 text-[0.88rem] font-semibold text-burr-deep"
-            >
-              + {group.name} 에 상품 추가
-            </button>
+              {creating === group.name ? (
+                <div className="border-t-2 border-line px-4 py-4">
+                  <h3 className="mb-1 font-display text-[1.05rem]">{group.name} 에 상품 추가</h3>
+                  <p className="mb-3 text-[0.8rem] leading-snug text-ink-soft">
+                    이름 뒤에 크기와 무게를 이어 적어 주세요. 예: <b>{group.name} 중 4kg</b>
+                  </p>
+                  <ProductForm
+                    // 사진은 그룹 것을 그대로 물려받는다 — 상품마다 고를 일이 없다
+                    initial={{ ...EMPTY_DRAFT, name: `${group.name} `, imageUrl: group.image }}
+                    productId={null}
+                    // 어느 그룹에 넣을지 **여기서 정해서 보낸다.** 이름에서 되읽지 않는다 —
+                    // "대보 소 8kg" 처럼 크기가 목록에 없는 이름이 새 그룹으로 튀던 원인이다.
+                    group={group.name}
+                    onDone={() => setCreating(null)}
+                    onCancel={() => setCreating(null)}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreating(group.name)}
+                  className="w-full border-t-2 border-line px-4 py-3 text-[0.88rem] font-semibold text-burr-deep"
+                >
+                  + {group.name} 에 상품 추가
+                </button>
+              )}
+            </>
           )}
         </section>
       ))}
@@ -501,16 +535,22 @@ function GroupHeader({
   images,
   handle,
   dragging,
+  open,
+  onToggle,
 }: {
   group: VarietyGroup;
   images: ProductImageOption[];
   handle: HandleProps;
   dragging: boolean;
+  /** 펴져 있는가. 기본은 펴진 상태다. */
+  open: boolean;
+  onToggle: () => void;
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   /** 이름을 고치는 중인가. 문자열이 들어 있으면 그게 지금 입력된 새 이름. */
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -530,6 +570,19 @@ function GroupHeader({
         return;
       }
       setRenaming(null);
+      router.refresh();
+    });
+  }
+
+  function remove() {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteGroupAction(group.name);
+      if (!result.ok) {
+        setError(result.error);
+        setConfirmDelete(false);
+        return;
+      }
       router.refresh();
     });
   }
@@ -571,10 +624,31 @@ function GroupHeader({
           )}
         </button>
 
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[1.15rem] text-shell">{group.name}</h2>
-          <p className="tnum text-[0.78rem] text-ink-soft">{itemCount}가지</p>
-        </div>
+        {/*
+          이름 전체가 접기 단추다. 작은 삼각형만 누르게 하면 폰에서 자꾸 빗나간다.
+        */}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
+        >
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-[0.8rem] text-shell transition-transform duration-200"
+            style={{ transform: open ? 'rotate(90deg)' : 'none' }}
+          >
+            ▶
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-display text-[1.15rem] text-shell">
+              {group.name}
+            </span>
+            <span className="tnum block text-[0.78rem] text-ink-soft">
+              {itemCount}가지{open ? '' : ' · 접힘'}
+            </span>
+          </span>
+        </button>
       </div>
 
       <div className="flex justify-end gap-1.5 px-4 pb-3">
@@ -595,6 +669,20 @@ function GroupHeader({
         >
           {picking ? '닫기' : '사진'}
         </button>
+
+        {/*
+          빈 그룹일 때만 지울 수 있다. 상품이 든 그룹을 지우면 상품이 갈 곳을 잃는데,
+          그 상태는 화면에서 되돌릴 방법이 없다. 서버도 같은 조건으로 한 번 더 막는다.
+        */}
+        {itemCount === 0 && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="rounded-full border border-berry/35 bg-surface px-3 py-2 text-[0.82rem] font-semibold text-berry"
+          >
+            그룹 지우기
+          </button>
+        )}
       </div>
 
       {/*
@@ -628,6 +716,36 @@ function GroupHeader({
             </button>
           </div>
         </div>
+      )}
+
+      {confirmDelete && (
+        <div className="border-t border-shell/15 bg-berry-tint/40 px-4 pt-3 pb-4">
+          <p className="text-[0.9rem] font-semibold">{group.name} 그룹을 지울까요?</p>
+          <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
+            안에 상품이 없으므로 되돌릴 것도 없습니다. 필요하면 다시 만들면 됩니다.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={remove} disabled={pending} className="btn btn-danger">
+              {pending ? '지우는 중…' : '예, 지웁니다'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className="btn btn-outline"
+            >
+              아니요
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && !picking && (
+        <p
+          role="alert"
+          className="mx-4 mb-3 rounded-xl bg-berry-tint px-3.5 py-2.5 text-[0.85rem] font-semibold text-berry"
+        >
+          {error}
+        </p>
       )}
 
       {picking && (
@@ -690,12 +808,12 @@ function GroupHeader({
 /**
  * 새 그룹 만들기.
  *
- * 그룹 이름을 **먼저 묻고**, 그다음 그 그룹의 첫 상품을 받는다.
- * 예전에는 "이름 맨 앞 낱말이 그룹이 됩니다" 라고 설명만 하고 상품 이름 한 칸을
- * 내줬는데, 그러면 그룹을 만든다는 감각이 없고 앞 낱말을 잘못 띄우면 엉뚱한 그룹이 생긴다.
+ * **이름만 받고 끝난다.** 예전에는 첫 상품까지 이어서 받았는데, 그룹만 하나
+ * 정해 놓고 상품은 천천히 채우고 싶을 때가 있다. 그러려면 상품이 없는 그룹이
+ * 저장소에 남아야 한다 — 그래서 그룹 목록을 따로 적어 둔다(product-groups.ts).
  *
- * 저장할 때는 결국 "그룹 + 나머지" 를 붙인 이름 하나로 들어간다.
- * 그룹을 따로 저장하지 않는 이유는 groupByVariety 주석 참고.
+ * 그룹 이름을 먼저 받는 것은 그대로다. 상품 이름 앞 낱말로 그룹을 만들게 하면
+ * 띄어쓰기 한 번에 엉뚱한 그룹이 생긴다.
  */
 function NewGroup({
   existing,
@@ -706,12 +824,13 @@ function NewGroup({
   onCancel: () => void;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const [group, setGroup] = useState('');
-  const [confirmed, setConfirmed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
   const name = group.trim();
 
-  function next() {
+  function create() {
     if (!name) {
       setError('그룹 이름을 넣어 주세요.');
       return;
@@ -724,25 +843,17 @@ function NewGroup({
       setError(`"${name}" 그룹은 이미 있습니다. 그 그룹 아래에서 상품을 추가하세요.`);
       return;
     }
-    setError(null);
-    setConfirmed(name);
-  }
 
-  if (confirmed) {
-    return (
-      <div className="card px-4 py-4">
-        <h2 className="mb-1 font-display text-[1.1rem]">{confirmed} — 첫 상품</h2>
-        <p className="mb-3 text-[0.82rem] leading-snug text-ink-soft">
-          이름 뒤에 크기와 무게를 이어 적어 주세요. 예: <b>{confirmed} 중 4kg</b>
-        </p>
-        <ProductForm
-          initial={{ ...EMPTY_DRAFT, name: `${confirmed} ` }}
-          productId={null}
-          onDone={onDone}
-          onCancel={onCancel}
-        />
-      </div>
-    );
+    setError(null);
+    startTransition(async () => {
+      const result = await createGroupAction(name);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onDone();
+      router.refresh();
+    });
   }
 
   return (
@@ -750,6 +861,8 @@ function NewGroup({
       <h2 className="font-display text-[1.1rem]">새 그룹</h2>
       <p className="mt-1 text-[0.82rem] leading-snug text-ink-soft">
         품종 이름을 넣어 주세요. 손님 화면에서 이 이름으로 묶입니다.
+        <br />
+        상품은 만든 다음에 <b>+ 상품 추가</b> 로 채우시면 됩니다.
       </p>
 
       <input
@@ -759,7 +872,7 @@ function NewGroup({
         placeholder="예: 청실"
         aria-label="새 그룹 이름"
         onKeyDown={(e) => {
-          if (e.key === 'Enter') next();
+          if (e.key === 'Enter') create();
         }}
       />
 
@@ -773,8 +886,8 @@ function NewGroup({
       )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={next} className="btn btn-primary">
-          다음
+        <button type="button" onClick={create} disabled={pending} className="btn btn-primary">
+          {pending ? '만드는 중…' : '만들기'}
         </button>
         <button type="button" onClick={onCancel} className="btn btn-outline">
           취소
@@ -911,11 +1024,18 @@ function ProductCard({
 function ProductForm({
   initial,
   productId,
+  group,
   onDone,
   onCancel,
 }: {
   initial: Draft;
   productId: string | null;
+  /**
+   * 새 상품을 **어느 그룹에 넣을 것인가.** 새로 만들 때만 쓴다.
+   * 이름에서 되읽지 않고 이 값을 그대로 서버에 넘긴다 — 이름을 어떻게 적어도
+   * 누른 그룹 안에 들어간다.
+   */
+  group?: string;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -940,6 +1060,7 @@ function ProductForm({
         name: draft.name.trim(),
         price: Number(draft.price) || 0,
         stock: Number(draft.stock) || 0,
+        group,
       });
       if (!result.ok) {
         setError(result.error);

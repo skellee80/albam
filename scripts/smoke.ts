@@ -1270,6 +1270,116 @@ async function main() {
   );
 
   /* ────────────────────────────────────────────── */
+  section('22-8. 그룹은 이름에서 읽지 않고 적어 둔 것을 쓴다');
+
+  const { createProduct, deleteProduct, createGroup, deleteGroup, listGroupNames } = await import(
+    '../src/lib/products'
+  );
+
+  /*
+    예전에는 그룹을 상품 이름 맨 앞 낱말에서 읽었다. 크기 이름이 목록(중·대·특)에
+    없으면 "대보 소 8kg" 의 품종이 "대보 소" 가 되어 대보 옆에 새 그룹이 생겼다.
+    아버지가 "+ 대보 에 상품 추가" 를 눌렀는데 대보 밖으로 나가던 그 증상이다.
+  */
+  const oddId = await createProduct({
+    name: '대보 소 8kg',
+    price: 50000,
+    imageUrl: '',
+    stock: 3,
+    hidden: false,
+    group: '대보',
+  });
+
+  const withOdd = await listProducts({ includeHidden: true });
+  const odd = withOdd.find((p) => p.id === oddId)!;
+  check('크기가 목록에 없어도 누른 그룹에 들어간다', odd.variety === '대보', odd.variety);
+  check(
+    '새 그룹이 생기지 않았다',
+    (await listGroupNames()).join(' ') === '대보 포르단 옥광',
+    (await listGroupNames()).join(' '),
+  );
+  check('대보 맨 뒤에 붙는다', withOdd.filter((p) => p.variety === '대보').at(-1)?.id === oddId);
+
+  // 그룹 이름을 지우고 적어도 서버가 앞에 붙여 준다
+  const bareId = await createProduct({
+    name: '왕 9kg',
+    price: 60000,
+    imageUrl: '',
+    stock: 1,
+    hidden: false,
+    group: '대보',
+  });
+  const bare = (await listProducts({ includeHidden: true })).find((p) => p.id === bareId)!;
+  check('그룹 이름이 빠졌으면 앞에 붙여 준다', bare.name === '대보 왕 9kg', bare.name);
+
+  // 상품 이름을 고쳐도 그룹은 따라 옮겨 다니지 않는다
+  await updateProduct(bareId, { name: '대보 왕 12kg' });
+  const renamedItem = (await listProducts({ includeHidden: true })).find((p) => p.id === bareId)!;
+  check('이름을 고쳐도 그룹은 그대로다', renamedItem.variety === '대보', renamedItem.variety);
+
+  await deleteProduct(oddId);
+  await deleteProduct(bareId);
+
+  /* 상품 없는 그룹 */
+  await createGroup('청실');
+  const withEmpty = await listGroupNames();
+  check('상품 없이도 그룹이 만들어진다', withEmpty.includes('청실'), withEmpty.join(' '));
+  check('맨 뒤에 붙는다', withEmpty.at(-1) === '청실');
+  check(
+    '빈 그룹이라 상품은 하나도 없다',
+    (await listProducts({ includeHidden: true })).every((p) => p.variety !== '청실'),
+  );
+
+  let dupBlocked = false;
+  try {
+    await createGroup('대보');
+  } catch {
+    dupBlocked = true;
+  }
+  check('이미 있는 이름으로는 못 만든다', dupBlocked);
+
+  // 빈 그룹도 차례를 옮길 수 있다
+  await setGroupPosition('청실', 1);
+  check('빈 그룹도 맨 앞으로 갈 수 있다', (await listGroupNames())[0] === '청실');
+  check(
+    '상품이 든 그룹 차례는 그대로다',
+    (await listGroupNames()).join(' ') === '청실 대보 포르단 옥광',
+    (await listGroupNames()).join(' '),
+  );
+
+  // 빈 그룹에 상품을 넣으면 그 자리를 그대로 지킨다
+  const firstOfEmpty = await createProduct({
+    name: '청실 중 4kg',
+    price: 30000,
+    imageUrl: '',
+    stock: 5,
+    hidden: false,
+    group: '청실',
+  });
+  const shopOrder = await listProducts({ includeHidden: true });
+  check(
+    '빈 그룹에 넣은 상품이 맨 앞 그룹에 온다',
+    shopOrder[0].id === firstOfEmpty,
+    shopOrder[0].name,
+  );
+
+  let deleteBlocked = false;
+  try {
+    await deleteGroup('청실');
+  } catch {
+    deleteBlocked = true;
+  }
+  check('상품이 든 그룹은 못 지운다', deleteBlocked);
+
+  await deleteProduct(firstOfEmpty);
+  await deleteGroup('청실');
+  check(
+    '비운 뒤에는 지워진다',
+    (await listGroupNames()).join(' ') === '대보 포르단 옥광',
+    (await listGroupNames()).join(' '),
+  );
+
+  /* ────────────────────────────────────────────── */
   section('23. 기본 상품 목록 (시드 스크립트가 쓰는 값)');
 
   // 화면의 "기본 상품 넣기" 버튼은 없앴지만 npm run seed 는 이 목록을 그대로 쓴다.
